@@ -14,7 +14,7 @@ const parser = new Parser({
   },
 });
 
-// ── Feed registry (20+ sources) ─────────────────────────────────────────
+// ── Feed registry (6 approved US crime sources) ─────────────────────────
 interface FeedEntry {
   name: string;
   url: string;
@@ -22,36 +22,15 @@ interface FeedEntry {
 }
 
 const FEEDS: FeedEntry[] = [
-  // ── Mainstream US outlets (general — need keyword filtering) ──
-  { name: 'NYT US',            url: 'https://rss.nytimes.com/services/xml/rss/nyt/US.xml',      crimeSpecific: false },
-  { name: 'Fox News Crime',    url: 'https://moxie.foxnews.com/google-publisher/crime.xml',      crimeSpecific: true  },
-  { name: 'USA Today',         url: 'https://www.usatoday.com/rss/news.rss',                     crimeSpecific: false },
-  { name: 'ABC News US',       url: 'https://abcnews.go.com/abcnews/usheadlines',                crimeSpecific: false },
-  { name: 'Washington Post',   url: 'https://feeds.washingtonpost.com/rss/national',              crimeSpecific: false },
-  { name: 'AP News',           url: 'https://apnews.com/rss',                                    crimeSpecific: false },
-
   // ── Mainstream US outlets (crime-specific endpoints) ──
-  { name: 'CNN Crime',         url: 'http://rss.cnn.com/rss/cnn_crime.rss',                      crimeSpecific: true  },
-  { name: 'NBC Crime Courts',  url: 'https://feeds.nbcnews.com/nbcnews/public/news',             crimeSpecific: true  },
-  { name: 'CBS Crime',         url: 'https://www.cbsnews.com/latest/rss/us',                      crimeSpecific: true  },
+  { name: 'NBC Crime',       url: 'https://feeds.nbcnews.com/nbcnews/public/news',      crimeSpecific: false },
+  { name: 'ABC News US',     url: 'https://abcnews.go.com/abcnews/usheadlines',           crimeSpecific: false },
+  { name: 'CBS Crime',       url: 'https://www.cbsnews.com/latest/rss/us',                 crimeSpecific: false },
 
   // ── Specialist crime & court outlets ──
-  { name: 'Law & Crime',       url: 'https://lawandcrime.com/feed/',                              crimeSpecific: true  },
-  { name: 'Court TV',          url: 'https://www.courttv.com/feed/',                              crimeSpecific: true  },
-  { name: 'Crime Online',      url: 'https://www.crimeonline.com/feed/',                          crimeSpecific: true  },
-  { name: 'Oxygen Crime',      url: 'https://www.oxygen.com/crime-news/feed',                     crimeSpecific: true  },
-  { name: 'People Crime',      url: 'https://people.com/crime-news/feed/',                        crimeSpecific: true  },
-  { name: 'Courthouse News',   url: 'https://www.courthousenews.com/feed/',                       crimeSpecific: true  },
-
-  // ── Additional mainstream (general — need keyword filtering) ──
-  { name: 'NBC US News',       url: 'https://www.nbcnews.com/rss/us-news',                       crimeSpecific: false },
-  { name: 'People Magazine',   url: 'https://people.com/feed/',                                   crimeSpecific: false },
-
-  // ── Extra crime-adjacent sources ──
-  { name: 'Fox News Latest',   url: 'https://feeds.foxnews.com/foxnews/latest',                   crimeSpecific: false },
-  { name: 'USA Today Crime',   url: 'https://www.usatoday.com/rss/news.rss',                      crimeSpecific: false },
-  { name: 'CBS US',            url: 'https://www.cbsnews.com/latest/rss/main',                     crimeSpecific: false },
-  { name: 'NBC Top Stories',   url: 'https://feeds.nbcnews.com/nbcnews/public/news',              crimeSpecific: false },
+  { name: 'Law & Crime',     url: 'https://lawandcrime.com/feed/',                         crimeSpecific: true  },
+  { name: 'Court TV',        url: 'https://www.courttv.com/feed/',                         crimeSpecific: true  },
+  { name: 'Crime Online',    url: 'https://www.crimeonline.com/feed/',                     crimeSpecific: true  },
 ];
 
 // ── Crime keyword filter ─────────────────────────────────────────────────
@@ -66,21 +45,68 @@ const CRIME_KEYWORDS: string[] = [
   'body found', 'crime scene', 'police', 'fatal',
 ];
 
+// ── International / non-US exclusion filter ──────────────────────────────
+const EXCLUDE_KEYWORDS: string[] = [
+  'ukraine', 'russia', 'gaza', 'israel', 'hamas', 'palestine', 'nato',
+  'syria', 'iran', 'iraq', 'afghanistan', 'china', 'north korea',
+  'taiwan', 'myanmar', 'yemen', 'sudan', 'congo', 'ethiopia',
+  'brexit', 'european union', 'g7', 'g20', 'united nations',
+  'missile strike', 'airstrike', 'ceasefire', 'invasion', 'troops deployed',
+];
+
+// ── Political news exclusion filter ──────────────────────────────────────
+// Filter out political stories — we only want individual/organized crime
+const POLITICAL_KEYWORDS: string[] = [
+  'election', 'elections', 'ballot', 'polling', 'voters', 'voting rights',
+  'democrat', 'republican', 'gop', 'liberal', 'conservative',
+  'congress', 'senate', 'senator', 'congressman', 'congresswoman',
+  'house of representatives', 'speaker of the house',
+  'white house', 'oval office', 'executive order',
+  'president biden', 'president trump', 'vice president',
+  'cabinet', 'secretary of state', 'attorney general',
+  'legislation', 'bill passes', 'bill signed', 'filibuster',
+  'immigration policy', 'border policy', 'immigration reform',
+  'supreme court ruling', 'constitutional', 'amendment',
+  'political', 'bipartisan', 'partisan', 'campaign',
+  'gubernatorial', 'governor signs', 'governor vetoes',
+  'lobby', 'lobbyist', 'pac', 'super pac', 'political action',
+  'impeach', 'impeachment', 'censure',
+  'state of the union', 'inaugural', 'inauguration',
+  'tariff', 'trade war', 'sanctions',
+  'federal budget', 'debt ceiling', 'government shutdown',
+];
+
 const CRIME_REGEX = new RegExp(
   CRIME_KEYWORDS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
   'i'
 );
 
+const EXCLUDE_REGEX = new RegExp(
+  EXCLUDE_KEYWORDS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+  'i'
+);
+
+const POLITICAL_REGEX = new RegExp(
+  POLITICAL_KEYWORDS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+  'i'
+);
+
 function isCrimeArticle(article: Article, isCrimeSpecificFeed: boolean): boolean {
-  if (isCrimeSpecificFeed) return true;
   const text = `${article.title} ${article.description}`;
+  // Exclude international conflicts
+  if (EXCLUDE_REGEX.test(text)) return false;
+  // Exclude political news (even from crime-specific feeds)
+  if (POLITICAL_REGEX.test(text)) return false;
+  // For crime-specific feeds, accept all remaining (already filtered by feed)
+  if (isCrimeSpecificFeed) return true;
+  // For general feeds, require crime keywords
   return CRIME_REGEX.test(text);
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const MIN_ARTICLES = 20;
-const MAX_ARTICLES = 25;
+const MAX_ARTICLES = 30;
 const IMG_SRC_REGEX_PATTERN = '<img[^>]+src="([^"]+)"';
 
 /** Extract description from item, falling back through multiple fields. */

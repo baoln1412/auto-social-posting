@@ -4,8 +4,13 @@ import {
   addUrlSource,
   queryNotebook,
   deleteNotebook,
-  isAvailable,
+  isAvailable as isNotebookLmAvailable,
 } from './notebooklm-client';
+import {
+  generateContent as geminiGenerate,
+  isAvailable as isGeminiAvailable,
+  BATCH_SIZE,
+} from './gemini-client';
 
 // ── Emoji picker ──────────────────────────────────────────────────────────
 
@@ -100,39 +105,116 @@ COLOR SCHEME:
 - Style: dark, dramatic crime news aesthetic`;
 }
 
-// ── Style-spec content prompt ─────────────────────────────────────────────
+// ── True Crime Social Media Specialist prompt ─────────────────────────────
 
 function buildContentPrompt(article: Article): string {
-  return `You are writing content for a US crime news Facebook page targeting American audiences who follow crime news closely. Study this style carefully and follow it exactly.
+  return [
+    '=== ROLE ===',
+    'You are an expert True Crime Social Media Specialist for US platforms.',
+    'Read the provided English news article and transform it into a high-engagement, viral Facebook post.',
+    '',
+    '=== TITLE FORMAT ===',
+    'Bilingual format:',
+    '- emojiTitle: English title with **bold emphasis** on the most critical/outrageous part + relevant emoji',
+    '- emojiTitleVi: Vietnamese literal translation with matching **bold** + same emoji',
+    'Objective: Spark curiosity and evoke outrage to drive engagement.',
+    '',
+    '=== MAIN CONTENT (facebookText) ===',
+    'Structure the post in this exact order:',
+    '',
+    '1. THE HOOK (1-2 sentences): Immediately convey the severity and gravity of the incident to grab attention.',
+    '',
+    '2. CHILLING DETAILS / FORENSIC EVIDENCE: Extract specific, high-impact details from the report',
+    '   (e.g., exact temperatures, specific wound patterns, GPS tracking data, bizarre suspect behavior,',
+    '   destroying evidence, filming social media during the crime).',
+    '',
+    '3. THE NARRATIVE: Rewrite the news flow to be concise (roughly 50-60% of original length).',
+    '   Focus on core facts while adding a controversial angle to provoke reader outrage and drive engagement.',
+    '',
+    '4. THE REPORTER\'S PERSPECTIVE: Include a brief personal commentary/reflection to amplify',
+    '   the sense of tragedy or indignation felt by the community.',
+    '',
+    '5. LEGAL STATUS: Clearly list the formal charges and potential sentencing (if available).',
+    '   Provide the current custody status and scheduled date for the next court appearance.',
+    '',
+    'Always end with a blank line then "👉 Please follow for more!"',
+    '',
+    '=== COMMENT SECTION (commentBait) ===',
+    'Detailed Breakdown: Rewrite the article in more detail, covering approximately 80% of the original key points.',
+    'Format: Use a purely journalistic, detailed reporting style WITHOUT additional personal commentary.',
+    'Source Attribution: State the news source clearly at the end (e.g., "Source: NBC Miami" or "Source: Law & Crime")',
+    'DO NOT include a direct URL in the comment section - use only the source name.',
+    '',
+    '=== STYLE AND WRITING RULES ===',
+    'Tone: Dramatic yet professional. Use accessible American English for mass audiences.',
+    'Compliance: Strategically rephrase sensitive terms to bypass Facebook community standard filters.',
+    'Examples of safe rephrasing:',
+    '- Instead of "killed" → "un-alived", "took their last breath", "met a tragic end"',
+    '- Instead of "death" → "passing", "final moments", "tragic outcome"',
+    '- Instead of "murdered" → "taken from this world", "lost their life at the hands of"',
+    '- Instead of "suicide" → "took their own life", "self-harm resulting in passing"',
+    '- Instead of "abuse" → "mistreatment", "harm inflicted upon"',
+    '- Instead of "assault" → "violent confrontation", "physical altercation"',
+    '- Instead of "rape" → "a heinous act", "violation"',
+    '- Instead of "shooting" → "incident involving a firearm", "shots rang out"',
+    '- Instead of "weapon/gun" → "firearm", "tool of violence"',
+    '- Instead of "drugs" → "substances", "controlled materials"',
+    '',
+    '=== ARTICLE TO PROCESS ===',
+    `Title: ${article.title}`,
+    `Source: ${article.source}`,
+    `URL: ${article.url}`,
+    `Description: ${article.description}`,
+    '',
+    'Return ONLY a JSON object (no markdown fences, no preamble):',
+    '{"emojiTitle":"English title with **bold** + emoji","emojiTitleVi":"Vietnamese translation with **bold** + emoji","facebookText":"structured post following the 5 sections above","commentBait":"80% key points, journalistic style, ends with Source: [source name]","summary":"3-4 paragraph factual summary","state":"US state, infer from city. Unknown if unclear"}',
+  ].join('\n');
+}
 
-ARTICLE TO PROCESS:
-Title: ${article.title}
-Source: ${article.source}
-Description: ${article.description}
+// ── Batch content prompt (for Gemini — multiple articles per call) ────────
 
-PRODUCE THREE OUTPUTS:
+function buildBatchContentPrompt(articles: Article[]): string {
+  const articleBlocks = articles
+    .map(
+      (a, i) =>
+        `--- ARTICLE ${i + 1} ---\nTitle: ${a.title}\nSource: ${a.source}\nURL: ${a.url}\nDescription: ${a.description}`,
+    )
+    .join('\n\n');
 
-1. emojiTitle (≤16 words + ONE emoji at the end):
-   - Rewrite the headline to be punchy, mass-audience friendly
-   - Add an icon/emoji at the very END that matches the crime: ax→🪓, knife→🔪, gun→🔫, fire→🔥, drowning→🌊, drugs→💊, murder→💀, arrest→🚔, court→⚖️, missing→🔍
-   - Keep under 16 words total (not counting the emoji)
-
-2. facebookText (4 paragraphs + CTA):
-   Paragraph 1 (~2 sentences): "What started as [trigger] ended in [outcome]." + "[Suspect name, age] is behind bars charged with [crime] of [victim name, age if known]."
-   Paragraph 2 (~3-4 sentences): Who discovered the crime, what alerted them, sensory details, the discovery moment. Use real names and specific details.
-   Paragraph 3 (~3 sentences): Suspect's character/background + witness account + key physical evidence found. Use direct quotes where available.
-   Paragraph 4 (~2 sentences): Irony — contrast suspect's denial with evidence. End with a punchy observation.
-   Then a blank line, then: "👉 Please follow for more!"
-
-   IMPORTANT: Avoid Facebook-banned words. Keep language dramatic but safe for social media.
-
-3. commentBait (3 paragraphs to provoke engagement):
-   Paragraph 1 (~3 sentences): Forensic/medical deep dive — investigative techniques, physical evidence matching.
-   Paragraph 2 (~2 sentences): The petty trigger — express dismay at how small the cause was.
-   Paragraph 3 (~3-4 sentences): Prior record, open warrants, known to police → systemic critique: "why was this person still free?" End by naming the victim and what they deserved.
-
-Return ONLY a JSON object with these fields (no markdown fences, no preamble):
-{"emojiTitle":"...","facebookText":"...","commentBait":"...","summary":"3-4 paragraph factual summary of the article"}`;
+  return [
+    '=== ROLE ===',
+    'You are an expert True Crime Social Media Specialist for US platforms.',
+    'Read each provided English news article and transform it into a high-engagement, viral Facebook post.',
+    'Apply the SAME structure to EVERY article.',
+    '',
+    '=== TITLE FORMAT ===',
+    'Bilingual: emojiTitle (English with **bold** emphasis + emoji) and emojiTitleVi (Vietnamese translation, same **bold** + emoji).',
+    '',
+    '=== MAIN CONTENT (facebookText) ===',
+    'Structure each post in this order:',
+    '1. THE HOOK: 1-2 sentences conveying severity to grab attention.',
+    '2. CHILLING DETAILS: Specific high-impact details (temperatures, wound patterns, GPS data, bizarre behavior).',
+    '3. THE NARRATIVE: Concise rewrite (50-60% of original), controversial angle to provoke outrage.',
+    '4. REPORTER\'S PERSPECTIVE: Brief personal commentary amplifying tragedy/indignation.',
+    '5. LEGAL STATUS: Formal charges, potential sentencing, custody status, next court date (if available).',
+    'End each post with "👉 Please follow for more!"',
+    '',
+    '=== COMMENT SECTION (commentBait) ===',
+    'Cover ~80% of original key points in journalistic detail. No personal commentary.',
+    'End with source name only (e.g., "Source: NBC Miami"). NO direct URL.',
+    '',
+    '=== STYLE RULES ===',
+    'Dramatic yet professional. Bypass FB filters: use "un-alived" not "killed", "firearm" not "gun",',
+    '"substances" not "drugs", "mistreatment" not "abuse", "violent confrontation" not "assault", etc.',
+    '',
+    `NOW PROCESS ALL ${articles.length} ARTICLES. For each produce: emojiTitle, emojiTitleVi, facebookText, commentBait, summary, state.`,
+    '',
+    'ARTICLES:',
+    articleBlocks,
+    '',
+    `Return ONLY a JSON array with ${articles.length} objects, one per article in order (no markdown fences, no preamble):`,
+    '[{"emojiTitle":"...","emojiTitleVi":"...","facebookText":"...","commentBait":"...","summary":"...","state":"..."}, ...]',
+  ].join('\n');
 }
 
 // ── Fallback post builder ─────────────────────────────────────────────────
@@ -153,50 +235,75 @@ export function buildFallbackPost(article: Article): PostDraft {
   const commentBait =
     `The details emerging from ${article.source} paint a disturbing picture that deserves closer examination by investigators and the public.\n\n` +
     `What triggered these events — and why did no one intervene sooner? The answer may shock you.\n\n` +
-    `Follow for updates as this story develops and justice is pursued for those affected. Every victim deserves answers.`;
+    `Follow for updates as this story develops and justice is pursued for those affected. Every victim deserves answers.\n\n` +
+    `Source: ${article.url}`;
 
   const articleWithSummary: ArticleWithSummary = { ...article, summary: desc };
   return {
     article: articleWithSummary,
     emojiTitle,
+    emojiTitleVi: '',
     facebookText,
     commentBait,
     nb2Prompt: buildNb2Prompt(article, emojiTitle),
+    state: 'Unknown',
   };
+}
+
+// ── AI engine detection ───────────────────────────────────────────────────
+
+export type AiEngine = 'gemini' | 'notebooklm' | 'fallback';
+
+export function detectEngine(): AiEngine {
+  if (isGeminiAvailable()) return 'gemini';
+  return 'fallback'; // NotebookLM check is async, handled in initPipelineNotebook
 }
 
 // ── Main processor ────────────────────────────────────────────────────────
 
 let sharedNotebookId: string | null = null;
+let activeEngine: AiEngine = 'fallback';
 
 /**
- * Initialize a shared notebook for the current pipeline run.
- * Call once before processing articles.
+ * Initialize the pipeline. Determines which AI engine to use.
+ * - Gemini API (preferred for production/Vercel)
+ * - NotebookLM MCP (optional, local dev)
+ * - Fallback (RSS description templates)
  */
 export async function initPipelineNotebook(): Promise<string | null> {
-  try {
-    const available = await isAvailable();
-    if (!available) {
-      console.warn('[pipeline] NotebookLM MCP not available — using fallback mode');
-      return null;
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-    const notebook = await createNotebook(`Crime News – ${today}`);
-    sharedNotebookId = notebook.id;
-    console.log(`[pipeline] Created shared notebook: ${notebook.id}`);
-    return notebook.id;
-  } catch (err) {
-    console.error('[pipeline] Failed to create notebook:', err);
-    return null;
+  // Prefer Gemini
+  if (isGeminiAvailable()) {
+    activeEngine = 'gemini';
+    console.log('[pipeline] Using Gemini API engine');
+    return 'gemini'; // Return a truthy string (no real notebook ID needed)
   }
+
+  // Try NotebookLM MCP
+  try {
+    const available = await isNotebookLmAvailable();
+    if (available) {
+      const today = new Date().toISOString().split('T')[0];
+      const notebook = await createNotebook(`Crime News – ${today}`);
+      sharedNotebookId = notebook.id;
+      activeEngine = 'notebooklm';
+      console.log(`[pipeline] Using NotebookLM engine, notebook: ${notebook.id}`);
+      return notebook.id;
+    }
+  } catch (err) {
+    console.error('[pipeline] Failed to init NotebookLM:', err);
+  }
+
+  activeEngine = 'fallback';
+  console.warn('[pipeline] No AI engine available — using fallback mode');
+  return null;
 }
 
 /**
  * Add an article URL to the shared notebook as a source.
+ * Only used for NotebookLM engine.
  */
 export async function addArticleSource(article: Article): Promise<boolean> {
-  if (!sharedNotebookId) return false;
+  if (activeEngine !== 'notebooklm' || !sharedNotebookId) return false;
   try {
     await addUrlSource(sharedNotebookId, article.url);
     return true;
@@ -207,32 +314,23 @@ export async function addArticleSource(article: Article): Promise<boolean> {
 }
 
 /**
- * Process a single article using NotebookLM for content generation.
+ * Parse AI response JSON into post fields.
  */
-export async function processArticle(article: Article): Promise<PostDraft> {
-  // If no shared notebook, use fallback immediately
-  if (!sharedNotebookId) {
-    console.log(`[pipeline] No notebook — using fallback for: ${article.title}`);
-    return buildFallbackPost(article);
-  }
+function parseAiResponse(
+  raw: string,
+  article: Article,
+): PostDraft | null {
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
 
   try {
-    // Query the notebook for content generation
-    const prompt = buildContentPrompt(article);
-    const raw = await queryNotebook(sharedNotebookId, prompt);
-
-    // Try to parse JSON from the response
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.warn(`[pipeline] No JSON in NotebookLM response for "${article.title}", using fallback`);
-      return buildFallbackPost(article);
-    }
-
     const parsed = JSON.parse(jsonMatch[0]) as {
       emojiTitle: string;
+      emojiTitleVi?: string;
       facebookText: string;
       commentBait: string;
       summary: string;
+      state?: string;
     };
 
     const articleWithSummary: ArticleWithSummary = {
@@ -243,14 +341,128 @@ export async function processArticle(article: Article): Promise<PostDraft> {
     return {
       article: articleWithSummary,
       emojiTitle: parsed.emojiTitle,
+      emojiTitleVi: parsed.emojiTitleVi ?? '',
       facebookText: parsed.facebookText,
       commentBait: parsed.commentBait,
       nb2Prompt: buildNb2Prompt(article, parsed.emojiTitle),
+      state: parsed.state ?? 'Unknown',
     };
-  } catch (err) {
-    console.error(`[pipeline] NotebookLM query failed for "${article.title}":`, err);
-    return buildFallbackPost(article);
+  } catch {
+    return null;
   }
+}
+
+/**
+ * Parse a batch AI response (JSON array) into PostDraft[] paired with articles.
+ */
+function parseBatchAiResponse(
+  raw: string,
+  articles: Article[],
+): (PostDraft | null)[] {
+  // Find the JSON array in the response
+  const arrayMatch = raw.match(/\[[\s\S]*\]/);
+  if (!arrayMatch) return articles.map(() => null);
+
+  try {
+    const parsed = JSON.parse(arrayMatch[0]) as Array<{
+      emojiTitle: string;
+      emojiTitleVi?: string;
+      facebookText: string;
+      commentBait: string;
+      summary: string;
+      state?: string;
+    }>;
+
+    return articles.map((article, i) => {
+      const item = parsed[i];
+      if (!item?.emojiTitle || !item?.facebookText) return null;
+
+      const articleWithSummary: ArticleWithSummary = {
+        ...article,
+        summary: item.summary ?? article.description,
+      };
+
+      return {
+        article: articleWithSummary,
+        emojiTitle: item.emojiTitle,
+        emojiTitleVi: item.emojiTitleVi ?? '',
+        facebookText: item.facebookText,
+        commentBait: item.commentBait,
+        nb2Prompt: buildNb2Prompt(article, item.emojiTitle),
+        state: item.state ?? 'Unknown',
+      };
+    });
+  } catch {
+    return articles.map(() => null);
+  }
+}
+
+/**
+ * Process a batch of articles with Gemini (BATCH_SIZE per API call).
+ * Returns PostDraft[] in the same order as input.
+ *
+ * Rate budget: 25 articles ÷ 5 per batch = 5 API calls.
+ * Fits within 20 RPD with room for 3 full runs/day.
+ */
+export async function processBatchGemini(
+  articles: Article[],
+  onPost: (post: PostDraft, index: number) => void,
+  onProgress: (current: number, total: number, title: string) => void,
+): Promise<void> {
+  for (let batchStart = 0; batchStart < articles.length; batchStart += BATCH_SIZE) {
+    const batch = articles.slice(batchStart, batchStart + BATCH_SIZE);
+    const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(articles.length / BATCH_SIZE);
+
+    onProgress(
+      batchStart + 1,
+      articles.length,
+      `Gemini batch ${batchNum}/${totalBatches} (${batch.length} articles)`,
+    );
+    console.log(`[pipeline] Gemini batch ${batchNum}/${totalBatches}: ${batch.map((a) => a.title).join(', ')}`);
+
+    let results: (PostDraft | null)[];
+    try {
+      const prompt = buildBatchContentPrompt(batch);
+      const raw = await geminiGenerate(prompt);
+      results = parseBatchAiResponse(raw, batch);
+    } catch (err) {
+      console.error(`[pipeline] Gemini batch ${batchNum} failed:`, err);
+      results = batch.map(() => null);
+    }
+
+    // Emit each result (or fallback) individually
+    for (let j = 0; j < batch.length; j++) {
+      const globalIndex = batchStart + j;
+      const post = results[j] ?? buildFallbackPost(batch[j]);
+      if (!results[j]) {
+        console.warn(`[pipeline] Fallback used for article ${globalIndex + 1}: ${batch[j].title}`);
+      }
+      onPost(post, globalIndex);
+    }
+  }
+}
+
+/**
+ * Process a single article (NotebookLM or fallback — NOT Gemini).
+ * Gemini uses processBatchGemini() instead.
+ */
+export async function processArticle(article: Article): Promise<PostDraft> {
+  // ── NotebookLM path ──
+  if (activeEngine === 'notebooklm' && sharedNotebookId) {
+    try {
+      const prompt = buildContentPrompt(article);
+      const raw = await queryNotebook(sharedNotebookId, prompt);
+      const post = parseAiResponse(raw, article);
+      if (post) return post;
+      console.warn(`[pipeline] NotebookLM returned unparseable response for "${article.title}", using fallback`);
+    } catch (err) {
+      console.error(`[pipeline] NotebookLM failed for "${article.title}":`, err);
+    }
+  }
+
+  // ── Fallback ──
+  return buildFallbackPost(article);
 }
 
 /**

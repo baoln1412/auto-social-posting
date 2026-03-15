@@ -95,8 +95,19 @@ function CollapsibleSection({
   );
 }
 
+// Render **bold** markdown in title strings
+function renderBoldMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} style={{ color: '#f0e523' }}>{part.slice(2, -2)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 export default function PostCard({ post }: PostCardProps) {
-  const { article, facebookText, nb2Prompt, emojiTitle, commentBait } = post;
+  const { article, facebookText, nb2Prompt, emojiTitle, emojiTitleVi, commentBait, state } = post;
   const { title, pubDate, source, imageUrl, portraitUrl, url } = article;
 
   const [portraitVisible, setPortraitVisible] = useState(true);
@@ -142,6 +153,20 @@ export default function PostCard({ post }: PostCardProps) {
         <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-sm text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
           <div>
             <span className="font-semibold">{source}</span>
+            {state && state !== 'Unknown' && (
+              <>
+                <span className="mx-1 opacity-70">•</span>
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                  style={{
+                    backgroundColor: 'rgba(240,229,35,0.2)',
+                    color: '#f0e523',
+                  }}
+                >
+                  📍 {state}
+                </span>
+              </>
+            )}
             <span className="mx-1 opacity-70">•</span>
             <span className="opacity-80">{formattedDate}</span>
           </div>
@@ -182,12 +207,16 @@ export default function PostCard({ post }: PostCardProps) {
               }}
             />
           )}
-          <h2
-            className="text-xl font-bold text-white leading-snug"
-            style={{ flex: 1 }}
-          >
-            {emojiTitle}
-          </h2>
+          <div style={{ flex: 1 }}>
+            <h2 className="text-xl font-bold text-white leading-snug">
+              {renderBoldMarkdown(emojiTitle)}
+            </h2>
+            {emojiTitleVi && (
+              <p className="text-sm mt-1 leading-snug" style={{ color: '#9ca3af' }}>
+                ({renderBoldMarkdown(emojiTitleVi)})
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Original article title (smaller, for reference) */}

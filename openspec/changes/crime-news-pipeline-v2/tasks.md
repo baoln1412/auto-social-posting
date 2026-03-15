@@ -45,4 +45,4 @@
 - [x] 7.1 Remove unused `claude -p` subprocess code and related imports
 - [x] 7.2 Ensure `package.json` has no unused dependencies
 - [x] 7.3 Run `npm run build` to verify no TypeScript errors
-- [ ] 7.4 Manual end-to-end test: click "Fetch Today's Crime News" → verify 20+ articles appear → verify Facebook drafts, comment bait, and NB2 prompts are properly formatted
+- [x] 7.4 Manual end-to-end test: click "Fetch Today's Crime News" → verify 20+ articles appear → verify Facebook drafts, comment bait, and NB2 prompts are properly formatted
