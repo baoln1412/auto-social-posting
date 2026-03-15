@@ -20,7 +20,12 @@ export function getSupabaseServer(): SupabaseClient {
     if (!url || !key) {
       throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
     }
-    serverClient = createClient(url, key);
+    serverClient = createClient(url, key, {
+      global: {
+        fetch: (input, init) =>
+          fetch(input, { ...init, cache: 'no-store' }),
+      },
+    });
   }
   return serverClient;
 }
