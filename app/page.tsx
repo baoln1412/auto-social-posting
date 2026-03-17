@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import PostCard from '@/app/components/PostCard';
 import FilterBar from '@/app/components/FilterBar';
+import SourceManager from '@/app/components/SourceManager';
 import { PostDraft } from '@/app/types';
 
 type Status = 'idle' | 'loading' | 'fetching' | 'processing' | 'done' | 'error';
@@ -206,6 +207,11 @@ export default function Home() {
         <p className="text-base" style={{ color: '#9ca3af' }}>
           Generate Facebook post drafts from today&apos;s crime headlines
         </p>
+      </div>
+
+      {/* Source manager */}
+      <div className="mb-4">
+        <SourceManager />
       </div>
 
       {/* Action bar */}
