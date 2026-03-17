@@ -37,8 +37,8 @@ export default function SourceManager() {
   }, []);
 
   useEffect(() => {
-    if (isOpen && feeds.length === 0) loadFeeds();
-  }, [isOpen, feeds.length, loadFeeds]);
+    loadFeeds();
+  }, [loadFeeds]);
 
   const handleAdd = async () => {
     if (!newName.trim() || !newUrl.trim()) return;
