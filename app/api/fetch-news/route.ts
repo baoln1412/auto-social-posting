@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import Parser from 'rss-parser';
 import { Article } from '@/app/types';
 import { getSupabaseServer } from '@/app/lib/supabase';
+import { generateContent } from '@/app/api/pipeline/gemini-client';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+export const maxDuration = 300;
 
 const parser = new Parser({
   customFields: {
@@ -20,17 +22,16 @@ const parser = new Parser({
 interface FeedEntry {
   name: string;
   url: string;
-  crimeSpecific: boolean; // true = every article is crime-related
 }
 
 // ── Hardcoded fallback feeds (used if Supabase query fails) ─────────────
 const FALLBACK_FEEDS: FeedEntry[] = [
-  { name: 'NBC Crime',       url: 'https://feeds.nbcnews.com/nbcnews/public/news',      crimeSpecific: false },
-  { name: 'ABC News US',     url: 'https://abcnews.go.com/abcnews/usheadlines',           crimeSpecific: false },
-  { name: 'CBS Crime',       url: 'https://www.cbsnews.com/latest/rss/us',                 crimeSpecific: false },
-  { name: 'Law & Crime',     url: 'https://lawandcrime.com/feed/',                         crimeSpecific: true  },
-  { name: 'Court TV',        url: 'https://www.courttv.com/feed/',                         crimeSpecific: true  },
-  { name: 'Crime Online',    url: 'https://www.crimeonline.com/feed/',                     crimeSpecific: true  },
+  { name: 'VNExpress', url: 'https://vnexpress.net/rss/the-thao.rss' },
+  { name: 'The Thao 247', url: 'https://thethao247.vn/trang-chu.rss' },
+  { name: 'Vietnamnet', url: 'https://vietnamnet.vn/rss/the-thao.rss' },
+  { name: 'Znews', url: 'https://znews.vn/the-thao.rss' },
+  { name: 'Thanh Nien', url: 'https://thanhnien.vn/rss/the-thao.rss' },
+  { name: 'The Thao Van Hoa', url: 'https://thethaovanhoa.vn/the-thao.rss' }
 ];
 
 /** Load enabled feeds from Supabase, fall back to hardcoded list on error. */
@@ -39,7 +40,7 @@ async function loadFeeds(): Promise<FeedEntry[]> {
     const supabase = getSupabaseServer();
     const { data, error } = await supabase
       .from('rss_feeds')
-      .select('name, url, crime_specific')
+      .select('name, url')
       .eq('enabled', true)
       .order('name');
 
@@ -48,8 +49,7 @@ async function loadFeeds(): Promise<FeedEntry[]> {
 
     return data.map((row) => ({
       name: row.name,
-      url: row.url,
-      crimeSpecific: row.crime_specific,
+      url: row.url
     }));
   } catch (err) {
     console.warn('[fetch-news] Failed to load feeds from Supabase, using fallback:', err);
@@ -57,69 +57,43 @@ async function loadFeeds(): Promise<FeedEntry[]> {
   }
 }
 
-// ── Crime keyword filter ─────────────────────────────────────────────────
-const CRIME_KEYWORDS: string[] = [
-  'murder', 'kill', 'killed', 'killing', 'dead', 'death', 'homicide', 'manslaughter',
-  'arrest', 'arrested', 'charged', 'suspect', 'shooting', 'shot', 'gunfire',
-  'stabbing', 'stabbed', 'assault', 'robbery', 'kidnap', 'kidnapped', 'abduct',
-  'missing', 'court', 'trial', 'verdict', 'sentenced', 'convicted', 'indicted',
-  'arson', 'fentanyl', 'overdose', 'carjacking', 'burglary', 'rape',
-  'crime', 'criminal', 'felony', 'felon', 'weapon', 'firearm', 'victim',
-  'prosecutor', 'detective', 'investigation', 'homicide', 'manslaughter',
-  'body found', 'crime scene', 'police', 'fatal',
+// ── Sports keyword filter ─────────────────────────────────────────────────
+const SPORTS_KEYWORDS: string[] = [
+  'bóng đá', 'football', 'soccer', 'ngoại hạng', 'v-league', 'vleague', 'đội tuyển',
+  'huấn luyện viên', 'cầu thủ', 'chuyển nhượng', 'bàn thắng', 'trận đấu', 'giải đấu',
+  'fifa', 'uefa', 'champions league', 'cúp c1', 'world cup', 'euro', 'copa',
+  'm.u', 'man utd', 'real madrid', 'barcelona', 'arsenal', 'chelsea', 'liverpool',
+  'thắng', 'hòa', 'thua', 'vô địch', 'đá chính', 'dự bị'
 ];
 
-// ── International / non-US exclusion filter ──────────────────────────────
+// ── Exclude filter ──────────────────────────────
 const EXCLUDE_KEYWORDS: string[] = [
-  'ukraine', 'russia', 'gaza', 'israel', 'hamas', 'palestine', 'nato',
-  'syria', 'iran', 'iraq', 'afghanistan', 'china', 'north korea',
-  'taiwan', 'myanmar', 'yemen', 'sudan', 'congo', 'ethiopia',
-  'brexit', 'european union', 'g7', 'g20', 'united nations',
-  'missile strike', 'airstrike', 'ceasefire', 'invasion', 'troops deployed',
+  'chứng khoán', 'bất động sản', 'pháp luật', 'hình sự', 'chính trị', 'tai nạn',
+  'án mạng', 'khởi tố', 'tham nhũng', 'thị trường', 'kinh tế'
 ];
 
-// ── Political news exclusion filter ──────────────────────────────────────
+// ── Not needed for sports generally, but keeping structure ──────────────────────────────────────
 const POLITICAL_KEYWORDS: string[] = [
-  'election', 'elections', 'ballot', 'polling', 'voters', 'voting rights',
-  'democrat', 'republican', 'gop', 'liberal', 'conservative',
-  'congress', 'senate', 'senator', 'congressman', 'congresswoman',
-  'house of representatives', 'speaker of the house',
-  'white house', 'oval office', 'executive order',
-  'president biden', 'president trump', 'vice president',
-  'cabinet', 'secretary of state', 'attorney general',
-  'legislation', 'bill passes', 'bill signed', 'filibuster',
-  'immigration policy', 'border policy', 'immigration reform',
-  'supreme court ruling', 'constitutional', 'amendment',
-  'political', 'bipartisan', 'partisan', 'campaign',
-  'gubernatorial', 'governor signs', 'governor vetoes',
-  'lobby', 'lobbyist', 'pac', 'super pac', 'political action',
-  'impeach', 'impeachment', 'censure',
-  'state of the union', 'inaugural', 'inauguration',
-  'tariff', 'trade war', 'sanctions',
-  'federal budget', 'debt ceiling', 'government shutdown',
+  'bầu cử', 'quốc hội', 'đảng', 'chính phủ', 'thủ tướng', 'chủ tịch', 'bộ trưởng'
 ];
 
-const CRIME_REGEX = new RegExp(
-  CRIME_KEYWORDS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
-  'i'
-);
+function escapeRegExp(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-const EXCLUDE_REGEX = new RegExp(
-  EXCLUDE_KEYWORDS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
-  'i'
-);
+const SPORTS_REGEX = new RegExp(SPORTS_KEYWORDS.map(escapeRegExp).join('|'), 'i');
+const EXCLUDE_REGEX = new RegExp(EXCLUDE_KEYWORDS.map(escapeRegExp).join('|'), 'i');
+const POLITICAL_REGEX = new RegExp(POLITICAL_KEYWORDS.map(escapeRegExp).join('|'), 'i');
 
-const POLITICAL_REGEX = new RegExp(
-  POLITICAL_KEYWORDS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
-  'i'
-);
-
-function isCrimeArticle(article: Article, isCrimeSpecificFeed: boolean): boolean {
+function isSportsArticle(article: Article): boolean {
   const text = `${article.title} ${article.description}`;
   if (EXCLUDE_REGEX.test(text)) return false;
   if (POLITICAL_REGEX.test(text)) return false;
-  if (isCrimeSpecificFeed) return true;
-  return CRIME_REGEX.test(text);
+
+  // STRICTLY require soccer/football keywords
+  if (!SPORTS_REGEX.test(text)) return false;
+
+  return true;
 }
 
 // ── Fuzzy title deduplication ────────────────────────────────────────────
@@ -168,9 +142,9 @@ const SOURCE_PRIORITY: Record<string, number> = {};
 
 /** Fuzzy-dedup articles by title similarity. Keeps the higher-priority source. */
 function fuzzyDedup(articles: Article[], feeds: FeedEntry[]): Article[] {
-  // Build priority map: crime-specific feeds get higher priority
+  // Priority is mostly the same now, just pick any
   for (const feed of feeds) {
-    SOURCE_PRIORITY[feed.name] = feed.crimeSpecific ? 10 : 1;
+    SOURCE_PRIORITY[feed.name] = 1;
   }
 
   const kept: Article[] = [];
@@ -205,6 +179,56 @@ function fuzzyDedup(articles: Article[], feeds: FeedEntry[]): Article[] {
   }
 
   return kept;
+}
+
+// ── LLM Semantic deduplication ───────────────────────────────────────────
+async function llmSemanticDedup(articles: Article[]): Promise<Article[]> {
+  if (articles.length === 0) return [];
+
+  // To avoid exceeding context or processing time, process max 40 articles at once
+  const batch = articles.slice(0, 40);
+
+  const payloadStr = JSON.stringify(batch.map((a, idx) => ({
+    id: idx,
+    title: a.title,
+    description: a.description
+  })));
+
+  const systemPrompt = `You are an expert sports news deduplicator. I will provide a list of JSON objects representing news articles with 'id', 'title', and 'description'.
+Your job is to identify articles that are reporting on the EXACT SAME MATCH OR EVENT.
+To do this effectively, compare:
+1. The participating teams in the match
+2. The match time, date, or round
+3. The prominent players or managers mentioned
+
+If multiple articles cover the same event (e.g. two articles talking about the same "Man Utd vs Liverpool" match that just happened), they are duplicates.
+For each group of duplicates, pick exactly ONE article ID to keep (prefer the one with the most detailed title/description).
+If an article is completely unique (no other article covers the same event), keep its ID.
+
+Return strictly a JSON object containing a 'uniqueIds' array of integers (the IDs of the articles we should keep). Do not output any markdown formatting, just raw JSON.
+Example format:
+{ "uniqueIds": [0, 2, 5] }`;
+
+  try {
+    const rawResponse = await generateContent(systemPrompt, payloadStr);
+
+    // Clean up potential markdown formatting before parsing
+    const jsonStr = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    const result = JSON.parse(jsonStr);
+
+    if (result.uniqueIds && Array.isArray(result.uniqueIds)) {
+      const uniqueIds = new Set(result.uniqueIds);
+      const kept = batch.filter((_, idx) => uniqueIds.has(idx)).map(a => a);
+      console.log(`[fetch-news] LLM Dedup: In= ${batch.length}, Out= ${kept.length}`);
+
+      const remaining = articles.slice(40);
+      return [...kept, ...remaining];
+    }
+  } catch (err) {
+    console.error('[fetch-news] LLM dedup failed. Falling back to input list.', err);
+  }
+
+  return articles;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -262,7 +286,7 @@ function extractImages(item: any): { imageUrl?: string; portraitUrl?: string } {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function fetchFeed(feed: FeedEntry, filterByDate: boolean = true): Promise<{ articles: Article[]; crimeSpecific: boolean }> {
+async function fetchFeed(feed: FeedEntry, filterByDate: boolean = true): Promise<{ articles: Article[] }> {
   const feedData = await Promise.race([
     parser.parseURL(feed.url),
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 8000)),
@@ -299,7 +323,7 @@ async function fetchFeed(feed: FeedEntry, filterByDate: boolean = true): Promise
     });
   }
 
-  return { articles, crimeSpecific: feed.crimeSpecific };
+  return { articles };
 }
 
 export async function GET(): Promise<NextResponse> {
@@ -311,7 +335,7 @@ export async function GET(): Promise<NextResponse> {
     feeds.map((feed) =>
       fetchFeed(feed, true).catch((err) => {
         console.error(`[fetch-news] Failed to fetch feed "${feed.name}":`, err);
-        return { articles: [] as Article[], crimeSpecific: feed.crimeSpecific };
+        return { articles: [] as Article[] };
       })
     )
   );
@@ -319,8 +343,8 @@ export async function GET(): Promise<NextResponse> {
   let allArticles: Article[] = [];
   for (const result of results) {
     if (result.status !== 'fulfilled') continue;
-    const { articles, crimeSpecific } = result.value;
-    const filtered = articles.filter((a) => isCrimeArticle(a, crimeSpecific));
+    const { articles } = result.value;
+    const filtered = articles.filter((a) => isSportsArticle(a));
     allArticles.push(...filtered);
   }
 
@@ -330,15 +354,15 @@ export async function GET(): Promise<NextResponse> {
       feeds.map((feed) =>
         fetchFeed(feed, false).catch((err) => {
           console.error(`[fetch-news] Failed to fetch feed (unfiltered) "${feed.name}":`, err);
-          return { articles: [] as Article[], crimeSpecific: feed.crimeSpecific };
+          return { articles: [] as Article[] };
         })
       )
     );
     allArticles = [];
     for (const result of unfilteredResults) {
       if (result.status !== 'fulfilled') continue;
-      const { articles, crimeSpecific } = result.value;
-      const filtered = articles.filter((a) => isCrimeArticle(a, crimeSpecific));
+      const { articles } = result.value;
+      const filtered = articles.filter((a) => isSportsArticle(a));
       allArticles.push(...filtered);
     }
   }
@@ -351,8 +375,11 @@ export async function GET(): Promise<NextResponse> {
     return true;
   });
 
-  // Fuzzy title dedup (removes same story from different sources)
-  const deduped = fuzzyDedup(urlDeduped, feeds);
+  // Fuzzy title dedup (removes exact same story from different sources)
+  let deduped = fuzzyDedup(urlDeduped, feeds);
+
+  // Semantic LLM dedup (removes articles about the same match)
+  deduped = await llmSemanticDedup(deduped);
 
   // Sort by pubDate descending (newest first)
   deduped.sort(
@@ -363,7 +390,7 @@ export async function GET(): Promise<NextResponse> {
   const articles = deduped.slice(0, MAX_ARTICLES);
 
   console.log(
-    `[fetch-news] ${urlDeduped.length} after URL dedup → ${deduped.length} after fuzzy dedup → returning ${articles.length} from ${feeds.length} feeds`
+    `[fetch-news] ${urlDeduped.length} after URL dedup → returned ${articles.length} after all dedup`
   );
   return NextResponse.json({ articles });
 }

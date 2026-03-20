@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     const supabase = getSupabaseServer();
     const { error } = await supabase
-      .from('crime_posts')
+      .from('sports_posts')
       .update({ is_done: isDone })
       .eq('article_url', articleUrl);
 

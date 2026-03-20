@@ -17,22 +17,23 @@ export const maxDuration = 300; // 5 minutes total for all articles
 async function savePostToDb(post: PostDraft): Promise<void> {
   try {
     const supabase = getSupabaseServer();
-    await supabase.from('crime_posts').upsert(
+    await supabase.from('sports_posts').upsert(
       {
         article_url: post.article.url,
         article_title: post.article.title,
         source: post.article.source,
-        state: post.state ?? 'Unknown',
         pub_date: post.article.pubDate,
-        image_url: post.article.imageUrl ?? null,
+        image_url: post.generatedImageUrl ?? post.article.imageUrl ?? null,
         portrait_url: post.article.portraitUrl ?? null,
         description: post.article.description ?? null,
         summary: post.article.summary ?? null,
         emoji_title: post.emojiTitle,
         emoji_title_vi: post.emojiTitleVi ?? '',
         facebook_text: post.facebookText,
-        comment_bait: post.commentBait,
-        nb2_prompt: post.nb2Prompt,
+        match_time: post.matchTime ?? '',
+        match_teams: post.matchTeams ?? '',
+        best_player: post.bestPlayer ?? '',
+        match_highlight: post.matchHighlight ?? '',
         fetch_time: new Date().toISOString(),
       },
       { onConflict: 'article_url' },
@@ -49,11 +50,11 @@ async function filterNewArticles(articles: Article[]): Promise<Article[]> {
     const urls = articles.map((a) => a.url);
 
     const { data: existing } = await supabase
-      .from('crime_posts')
+      .from('sports_posts')
       .select('article_url')
       .in('article_url', urls);
 
-    const existingUrls = new Set((existing ?? []).map((r) => r.article_url));
+    const existingUrls = new Set((existing ?? []).map((r: { article_url: string }) => r.article_url));
     const newArticles = articles.filter((a) => !existingUrls.has(a.url));
 
     console.log(`[pipeline] ${articles.length} total → ${existingUrls.size} already in DB → ${newArticles.length} new`);
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       };
 
       if (engine === 'gemini') {
-        // ── Gemini batch path (5 articles per API call) ──
+        // ── OpenRouter batch path ──
         await processBatchGemini(
           newArticles,
           async (post) => { await emitAndSave(post); },

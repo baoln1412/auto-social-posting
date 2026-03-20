@@ -11,7 +11,7 @@ let serverClient: SupabaseClient | null = null;
 
 /**
  * Server-side Supabase client with service-role privileges.
- * Used in API routes for reading and writing crime_posts.
+ * Used in API routes for reading and writing sports_posts.
  */
 export function getSupabaseServer(): SupabaseClient {
   if (!serverClient) {

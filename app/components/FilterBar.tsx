@@ -1,16 +1,14 @@
 'use client';
+import React from 'react';
 
 import DateRangePicker from './DateRangePicker';
 
 interface FilterBarProps {
-  states: string[];
   sources: string[];
-  selectedState: string;
   selectedSource: string;
   fromDate: string;
   toDate: string;
   doneFilter: string;
-  onStateChange: (s: string) => void;
   onSourceChange: (s: string) => void;
   onDateRangeChange: (from: string, to: string) => void;
   onDoneFilterChange: (d: string) => void;
@@ -18,14 +16,11 @@ interface FilterBarProps {
 }
 
 export default function FilterBar({
-  states,
   sources,
-  selectedState,
   selectedSource,
   fromDate,
   toDate,
   doneFilter,
-  onStateChange,
   onSourceChange,
   onDateRangeChange,
   onDoneFilterChange,
@@ -66,23 +61,6 @@ export default function FilterBar({
         border: '1px solid #1e293b',
       }}
     >
-      {/* State Filter */}
-      <div>
-        <label style={labelStyle}>📍 State</label>
-        <select
-          value={selectedState}
-          onChange={(e) => onStateChange(e.target.value)}
-          style={selectStyle}
-        >
-          <option value="All">All States</option>
-          {states.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Source Filter */}
       <div>
         <label style={labelStyle}>📰 Source</label>

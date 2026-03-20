@@ -73,7 +73,6 @@ export default function Home() {
   const [newPostUrls, setNewPostUrls] = useState<Set<string>>(new Set());
 
   // Filter state
-  const [selectedState, setSelectedState] = useState('All');
   const [selectedSource, setSelectedSource] = useState('All');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -82,24 +81,18 @@ export default function Home() {
   const isLoading = status === 'loading' || status === 'fetching' || status === 'processing';
 
   // ── Derive filter options from loaded posts ────────────────────────────
-  const availableStates = useMemo(() => {
-    const set = new Set(posts.map((p) => p.state).filter((s) => s && s !== 'Unknown'));
-    return [...set].sort();
-  }, [posts]);
-
   const availableSources = useMemo(() => {
     const set = new Set(posts.map((p) => p.article.source).filter(Boolean));
     return [...set].sort();
   }, [posts]);
 
   // ── Load saved posts from Supabase ──────────────────────────────────────
-  const loadSavedPosts = useCallback(async (state: string, source: string, from: string, to: string, done: string = 'All') => {
+  const loadSavedPosts = useCallback(async (source: string, from: string, to: string, done: string = 'All') => {
     try {
       setStatus('loading');
       setError(null);
 
       const params = new URLSearchParams();
-      if (state !== 'All') params.set('state', state);
       if (source !== 'All') params.set('source', source);
       if (from) params.set('from', from);
       if (to) params.set('to', to);
@@ -120,27 +113,23 @@ export default function Home() {
 
   // Load saved posts on mount
   useEffect(() => {
-    loadSavedPosts(selectedState, selectedSource, fromDate, toDate, doneFilter);
+    loadSavedPosts(selectedSource, fromDate, toDate, doneFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Filter handlers
-  const handleStateChange = (s: string) => {
-    setSelectedState(s);
-    loadSavedPosts(s, selectedSource, fromDate, toDate, doneFilter);
-  };
   const handleSourceChange = (s: string) => {
     setSelectedSource(s);
-    loadSavedPosts(selectedState, s, fromDate, toDate, doneFilter);
+    loadSavedPosts(s, fromDate, toDate, doneFilter);
   };
   const handleDateRangeChange = (from: string, to: string) => {
     setFromDate(from);
     setToDate(to);
-    loadSavedPosts(selectedState, selectedSource, from, to, doneFilter);
+    loadSavedPosts(selectedSource, from, to, doneFilter);
   };
   const handleDoneFilterChange = (d: string) => {
     setDoneFilter(d);
-    loadSavedPosts(selectedState, selectedSource, fromDate, toDate, d);
+    loadSavedPosts(selectedSource, fromDate, toDate, d);
   };
 
   // ── Toggle done status ─────────────────────────────────────────────────
@@ -223,7 +212,7 @@ export default function Home() {
 
       // Reload from DB to get clean data + filters
       if (newCount > 0) {
-        await loadSavedPosts(selectedState, selectedSource, fromDate, toDate, doneFilter);
+        await loadSavedPosts(selectedSource, fromDate, toDate, doneFilter);
       } else {
         setStatus('done');
       }
@@ -238,10 +227,10 @@ export default function Home() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-black tracking-tight mb-2" style={{ color: '#ffffff' }}>
-          🔴 CRIME NEWS DRAFT TOOL
+          ⚽ SPORTS NEWS DRAFT TOOL
         </h1>
         <p className="text-base" style={{ color: '#9ca3af' }}>
-          Generate Facebook post drafts from today&apos;s crime headlines
+          Generate Facebook post drafts from today&apos;s headlines
         </p>
       </div>
 
@@ -280,14 +269,11 @@ export default function Home() {
       {/* Filter bar — always show so user can change date range before first fetch */}
       <div className="mb-6">
         <FilterBar
-          states={availableStates}
           sources={availableSources}
-          selectedState={selectedState}
           selectedSource={selectedSource}
           fromDate={fromDate}
           toDate={toDate}
           doneFilter={doneFilter}
-          onStateChange={handleStateChange}
           onSourceChange={handleSourceChange}
           onDateRangeChange={handleDateRangeChange}
           onDoneFilterChange={handleDoneFilterChange}
@@ -319,7 +305,7 @@ export default function Home() {
             No posts found
           </p>
           <p className="text-sm" style={{ color: '#64748b' }}>
-            Click &quot;Fetch New Articles&quot; to generate your first batch of crime news drafts.
+            Click &quot;Fetch New Articles&quot; to generate your first batch of sports news drafts.
           </p>
         </div>
       )}

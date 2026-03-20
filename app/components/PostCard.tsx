@@ -46,57 +46,6 @@ function CopyButton({ text, ariaLabel }: { text: string; ariaLabel?: string }) {
   );
 }
 
-function CollapsibleSection({
-  label,
-  text,
-  defaultOpen = false,
-}: {
-  label: string;
-  text: string;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div
-      className="rounded-lg overflow-hidden"
-      style={{ backgroundColor: '#111', border: '1px solid #2a2a2a' }}
-    >
-      <div
-        className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
-        onClick={() => setOpen(!open)}
-      >
-        <span
-          className="text-xs font-semibold tracking-widest uppercase"
-          style={{ color: '#f0e523' }}
-        >
-          {open ? '▾' : '▸'} {label}
-        </span>
-        <CopyButton text={text} ariaLabel={`Copy ${label.toLowerCase()}`} />
-      </div>
-      {open && (
-        <div className="px-3 pb-3">
-          {label === 'NB2 Image Prompt' ? (
-            <pre
-              className="text-xs text-gray-300 whitespace-pre-wrap break-words font-mono select-all"
-              style={{ lineHeight: '1.5' }}
-            >
-              {text}
-            </pre>
-          ) : (
-            <p
-              className="text-sm text-gray-200 whitespace-pre-wrap break-words select-all"
-              style={{ lineHeight: '1.6' }}
-            >
-              {text}
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Render **bold** markdown in title strings
 function renderBoldMarkdown(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*)/);
@@ -109,11 +58,21 @@ function renderBoldMarkdown(text: string) {
 }
 
 export default function PostCard({ post, isNew, onToggleDone }: PostCardProps) {
-  const { article, facebookText, nb2Prompt, emojiTitle, emojiTitleVi, commentBait, state } = post;
+  const { article, facebookText, emojiTitle, emojiTitleVi, matchTime, matchTeams, bestPlayer, matchHighlight, generatedImageUrl } = post;
   const { title, pubDate, source, imageUrl, portraitUrl, url } = article;
   const isDone = post.isDone ?? false;
 
   const [portraitVisible, setPortraitVisible] = useState(true);
+
+  // ── Editable draft state ──────────────────────────────────────────
+  const [editedDraft, setEditedDraft] = useState(facebookText);
+  const [isEditing, setIsEditing] = useState(false);
+
+  // ── AI Fix panel state ────────────────────────────────────────────
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiSuggestion, setAiSuggestion] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
 
   // Format dates in UTC+7 (Asia/Bangkok)
   const tzOptions: Intl.DateTimeFormatOptions = { timeZone: 'Asia/Bangkok' };
@@ -152,6 +111,36 @@ export default function PostCard({ post, isNew, onToggleDone }: PostCardProps) {
     console.error('Failed to parse fetch_time:', err);
   }
 
+  const handleAiRefine = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiLoading(true);
+    try {
+      const res = await fetch('/api/ai/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft: editedDraft, instruction: aiPrompt }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAiSuggestion(data.refined);
+      } else {
+        alert(`AI Error: ${data.error}`);
+      }
+    } catch (err) {
+      alert(`Network error: ${err}`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const applyAiSuggestion = () => {
+    setEditedDraft(aiSuggestion);
+    setAiSuggestion('');
+    setAiPrompt('');
+    setShowAiPanel(false);
+    setIsEditing(true);
+  };
+
   return (
     <div
       className="rounded-xl overflow-hidden border transition-opacity duration-200"
@@ -184,20 +173,6 @@ export default function PostCard({ post, isNew, onToggleDone }: PostCardProps) {
         <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-sm text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
           <div>
             <span className="font-semibold">{source}</span>
-            {state && state !== 'Unknown' && (
-              <>
-                <span className="mx-1 opacity-70">•</span>
-                <span
-                  className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                  style={{
-                    backgroundColor: 'rgba(240,229,35,0.2)',
-                    color: '#f0e523',
-                  }}
-                >
-                  📍 {state}
-                </span>
-              </>
-            )}
             <span className="mx-1 opacity-70">•</span>
             <span className="opacity-80">{formattedDate}</span>
             {formattedFetchTime && (
@@ -272,26 +247,285 @@ export default function PostCard({ post, isNew, onToggleDone }: PostCardProps) {
           Original: {title}
         </p>
 
-        {/* Collapsible sections */}
-        <CollapsibleSection label="Facebook Draft" text={facebookText} defaultOpen={true} />
-        <CollapsibleSection label="Comment Bait" text={commentBait} />
-        <CollapsibleSection label="NB2 Image Prompt" text={nb2Prompt} />
+        {/* Match Info Summary */}
+        <div className="text-sm text-gray-300" style={{ lineHeight: '1.6' }}>
+          <div><strong>Khoảng thời gian:</strong> {matchTime}</div>
+          <div><strong>Trận đấu:</strong> {matchTeams}</div>
+          <div><strong>Dấu ấn:</strong> {bestPlayer}</div>
+          <div><strong>Điểm nổi bật:</strong> {matchHighlight}</div>
+        </div>
 
-        {/* Done toggle button */}
-        {onToggleDone && (
-          <button
-            onClick={onToggleDone}
-            className="w-full mt-2 py-2 rounded-lg text-sm font-semibold transition-colors duration-150"
+        {/* Generated Image Preview */}
+        {generatedImageUrl && (
+          <div className="mt-2 rounded-lg overflow-hidden border border-gray-700">
+             <img src={generatedImageUrl} alt="Generated graphic" className="w-full object-cover" style={{ maxHeight: '300px' }} />
+          </div>
+        )}
+
+        {/* Download Facebook-sized Image */}
+        {(generatedImageUrl || imageUrl) && (
+          <a
+            href={`/api/image/resize?url=${encodeURIComponent(generatedImageUrl || imageUrl || '')}`}
+            download="fb-post-image.jpg"
+            className="flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-colors duration-150 mt-1"
             style={{
-              backgroundColor: isDone ? 'rgba(34,197,94,0.15)' : 'rgba(100,116,139,0.15)',
-              color: isDone ? '#22c55e' : '#94a3b8',
-              border: `1px solid ${isDone ? 'rgba(34,197,94,0.3)' : 'rgba(100,116,139,0.3)'}`,
+              backgroundColor: 'rgba(59,130,246,0.15)',
+              color: '#60a5fa',
+              border: '1px solid rgba(59,130,246,0.3)',
               cursor: 'pointer',
+              textDecoration: 'none',
             }}
           >
-            {isDone ? '✅ Done' : '☐ Mark Done'}
-          </button>
+            📥 Download FB Image (1200×630)
+          </a>
         )}
+
+        {/* ── Editable Facebook Draft ────────────────────────────────── */}
+        <div
+          className="rounded-lg overflow-hidden"
+          style={{ backgroundColor: '#111', border: '1px solid #2a2a2a' }}
+        >
+          <div className="flex items-center justify-between px-3 py-2">
+            <span
+              className="text-xs font-semibold tracking-widest uppercase"
+              style={{ color: '#f0e523' }}
+            >
+              Facebook Draft {isEditing && <span className="text-green-400 normal-case tracking-normal">(edited)</span>}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAiPanel(!showAiPanel)}
+                className="text-xs px-2 py-1 rounded border transition-colors duration-150"
+                style={{
+                  borderColor: '#a855f7',
+                  color: showAiPanel ? '#1a1a1a' : '#a855f7',
+                  backgroundColor: showAiPanel ? '#a855f7' : 'transparent',
+                }}
+              >
+                🤖 AI Fix
+              </button>
+              <CopyButton text={editedDraft} ariaLabel="Copy facebook draft" />
+            </div>
+          </div>
+          <div className="px-3 pb-3">
+            <textarea
+              value={editedDraft}
+              onChange={(e) => {
+                setEditedDraft(e.target.value);
+                setIsEditing(true);
+              }}
+              className="w-full text-sm text-gray-200 bg-transparent border-0 outline-none resize-y"
+              style={{
+                lineHeight: '1.6',
+                minHeight: '150px',
+                fontFamily: 'inherit',
+              }}
+              rows={8}
+            />
+          </div>
+        </div>
+
+        {/* ── AI Fix Panel ───────────────────────────────────────────── */}
+        {showAiPanel && (
+          <div
+            className="rounded-lg p-3 flex flex-col gap-3"
+            style={{ backgroundColor: '#0d0d1a', border: '1px solid #a855f7' }}
+          >
+            <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#a855f7' }}>
+              🤖 AI Draft Editor
+            </span>
+
+            {/* Prompt input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !aiLoading) handleAiRefine(); }}
+                placeholder="e.g. Thêm chi tiết về đội hình, viết lại đoạn mở đầu..."
+                className="flex-1 text-sm px-3 py-2 rounded-lg bg-transparent outline-none"
+                style={{
+                  border: '1px solid #333',
+                  color: '#e5e7eb',
+                }}
+                disabled={aiLoading}
+              />
+              <button
+                onClick={handleAiRefine}
+                disabled={aiLoading || !aiPrompt.trim()}
+                className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors duration-150"
+                style={{
+                  backgroundColor: aiLoading ? '#333' : '#a855f7',
+                  color: '#fff',
+                  cursor: aiLoading ? 'wait' : 'pointer',
+                  opacity: !aiPrompt.trim() ? 0.5 : 1,
+                }}
+              >
+                {aiLoading ? '⏳ Refining...' : '✨ Refine'}
+              </button>
+            </div>
+
+            {/* AI Suggestion result */}
+            {aiSuggestion && (
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-green-400 font-semibold">AI Suggestion:</span>
+                <div
+                  className="text-sm text-gray-200 whitespace-pre-wrap rounded-lg p-3"
+                  style={{
+                    backgroundColor: 'rgba(168,85,247,0.08)',
+                    border: '1px solid rgba(168,85,247,0.25)',
+                    lineHeight: '1.6',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {aiSuggestion}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={applyAiSuggestion}
+                    className="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors duration-150"
+                    style={{
+                      backgroundColor: '#22c55e',
+                      color: '#fff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✅ Apply Changes
+                  </button>
+                  <button
+                    onClick={() => setAiSuggestion('')}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors duration-150"
+                    style={{
+                      backgroundColor: 'rgba(239,68,68,0.15)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239,68,68,0.3)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕ Discard
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Post / Schedule to Facebook ─────────────────────────── */}
+        <div className="flex flex-col gap-2 mt-2">
+          {/* Schedule date/time picker */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-400 whitespace-nowrap">📅 Schedule:</label>
+            <input
+              type="datetime-local"
+              id={`schedule-${encodeURIComponent(url)}`}
+              className="flex-1 text-sm px-2 py-1.5 rounded-lg bg-transparent outline-none"
+              style={{
+                border: '1px solid #333',
+                color: '#e5e7eb',
+                colorScheme: 'dark',
+              }}
+            />
+          </div>
+
+          {/* Action buttons row */}
+          <div className="flex gap-2">
+            {onToggleDone && (
+              <button
+                onClick={onToggleDone}
+                className="py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-150"
+                style={{
+                  backgroundColor: isDone ? 'rgba(34,197,94,0.15)' : 'rgba(100,116,139,0.15)',
+                  color: isDone ? '#22c55e' : '#94a3b8',
+                  border: `1px solid ${isDone ? 'rgba(34,197,94,0.3)' : 'rgba(100,116,139,0.3)'}`,
+                  cursor: 'pointer',
+                }}
+              >
+                {isDone ? '✅' : '☐'}
+              </button>
+            )}
+
+            <button
+              onClick={async () => {
+                if (!confirm('Post this NOW to your Facebook Page?')) return;
+                try {
+                  const res = await fetch('/api/facebook/post', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      emojiTitleVi: emojiTitleVi || emojiTitle,
+                      facebookText: editedDraft,
+                      imageUrl: generatedImageUrl || imageUrl,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    alert(`✅ Posted to Facebook! Post ID: ${data.postId}`);
+                  } else {
+                    alert(`❌ Failed: ${data.error}`);
+                  }
+                } catch (err) {
+                  alert(`❌ Network error: ${err}`);
+                }
+              }}
+              className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors duration-150"
+              style={{
+                backgroundColor: '#1877F2',
+                color: '#ffffff',
+                border: '1px solid #166FE5',
+                cursor: 'pointer',
+              }}
+            >
+              📘 Post Now
+            </button>
+
+            <button
+              onClick={async () => {
+                const input = document.getElementById(`schedule-${encodeURIComponent(url)}`) as HTMLInputElement;
+                const scheduledTime = input?.value;
+                if (!scheduledTime) {
+                  alert('Please pick a date and time first.');
+                  return;
+                }
+                const scheduledDate = new Date(scheduledTime);
+                const formatted = scheduledDate.toLocaleString('vi-VN', {
+                  day: '2-digit', month: '2-digit', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                });
+                if (!confirm(`Schedule this post for ${formatted}?`)) return;
+                try {
+                  const res = await fetch('/api/facebook/post', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      emojiTitleVi: emojiTitleVi || emojiTitle,
+                      facebookText: editedDraft,
+                      imageUrl: generatedImageUrl || imageUrl,
+                      scheduledTime: new Date(scheduledTime).toISOString(),
+                    }),
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    alert(`📅 Scheduled for ${formatted}!\nPost ID: ${data.postId}`);
+                  } else {
+                    alert(`❌ Failed: ${data.error}`);
+                  }
+                } catch (err) {
+                  alert(`❌ Network error: ${err}`);
+                }
+              }}
+              className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors duration-150"
+              style={{
+                backgroundColor: 'rgba(251,146,60,0.15)',
+                color: '#fb923c',
+                border: '1px solid rgba(251,146,60,0.4)',
+                cursor: 'pointer',
+              }}
+            >
+              📅 Schedule
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

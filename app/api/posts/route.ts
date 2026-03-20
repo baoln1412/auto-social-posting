@@ -27,7 +27,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Build query
     let query = supabase
-      .from('crime_posts')
+      .from('sports_posts')
       .select('*')
       .order('fetch_time', { ascending: false });
 
@@ -70,26 +70,30 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         description: row.description ?? '',
         imageUrl: row.image_url ?? undefined,
         portraitUrl: row.portrait_url ?? undefined,
-        summary: row.summary ?? row.description ?? '',
+        summary: row.summary,
       },
       emojiTitle: row.emoji_title,
-      emojiTitleVi: row.emoji_title_vi ?? '',
+      emojiTitleVi: row.emoji_title_vi,
       facebookText: row.facebook_text,
-      commentBait: row.comment_bait,
-      nb2Prompt: row.nb2_prompt,
-      state: row.state,
+      matchTime: row.match_time,
+      matchTeams: row.match_teams,
+      bestPlayer: row.best_player,
+      matchHighlight: row.match_highlight,
+      commentBait: '',
+      nb2Prompt: '',
+      state: null,
       fetchTime: row.fetch_time,
       isDone: row.is_done ?? false,
     }));
 
     // Also return distinct filters for the UI
     const { data: states } = await supabase
-      .from('crime_posts')
+      .from('sports_posts')
       .select('state')
       .order('state');
 
     const { data: sources } = await supabase
-      .from('crime_posts')
+      .from('sports_posts')
       .select('source')
       .order('source');
 

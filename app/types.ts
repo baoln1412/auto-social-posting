@@ -15,11 +15,13 @@ export interface ArticleWithSummary extends Article {
 export interface PostDraft {
   article: ArticleWithSummary;
   facebookText: string;  // full Facebook post draft (1400-2000 chars)
-  nb2Prompt: string;     // Nano Banana 2 image generation prompt
   emojiTitle: string;    // English title with emphasis + emoji
   emojiTitleVi: string;  // Vietnamese translation of the title
-  commentBait: string;   // comprehensive comment — more detailed than the post, with source
-  state: string;         // US state where the crime occurred
+  matchTime: string;     // Match time
+  matchTeams: string;    // Teams playing
+  bestPlayer: string;    // Best performed player
+  matchHighlight: string; // Match highlights
+  generatedImageUrl?: string; // Generated image via OpenRouter
   fetchTime?: string;    // when the article was fetched (ISO timestamp)
   isNew?: boolean;       // true for posts freshly fetched in this session
   isDone?: boolean;      // true if user marked this post as done
