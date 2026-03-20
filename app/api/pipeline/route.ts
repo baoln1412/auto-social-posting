@@ -33,6 +33,7 @@ async function savePostToDb(post: PostDraft): Promise<void> {
         facebook_text: post.facebookText,
         comment_bait: post.commentBait,
         nb2_prompt: post.nb2Prompt,
+        fetch_time: new Date().toISOString(),
       },
       { onConflict: 'article_url' },
     );
@@ -104,7 +105,8 @@ export async function POST(request: NextRequest): Promise<Response> {
 
       // Wrap emit to also save to DB
       const emitAndSave = async (post: PostDraft) => {
-        emit({ type: 'post', post });
+        const postWithFetchTime = { ...post, fetchTime: new Date().toISOString() };
+        emit({ type: 'post', post: postWithFetchTime });
         await savePostToDb(post);
       };
 

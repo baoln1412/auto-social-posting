@@ -9,9 +9,11 @@ interface FilterBarProps {
   selectedSource: string;
   fromDate: string;
   toDate: string;
+  doneFilter: string;
   onStateChange: (s: string) => void;
   onSourceChange: (s: string) => void;
   onDateRangeChange: (from: string, to: string) => void;
+  onDoneFilterChange: (d: string) => void;
   totalCount: number;
 }
 
@@ -22,9 +24,11 @@ export default function FilterBar({
   selectedSource,
   fromDate,
   toDate,
+  doneFilter,
   onStateChange,
   onSourceChange,
   onDateRangeChange,
+  onDoneFilterChange,
   totalCount,
 }: FilterBarProps) {
   const selectStyle: React.CSSProperties = {
@@ -102,6 +106,20 @@ export default function FilterBar({
         toDate={toDate}
         onChange={onDateRangeChange}
       />
+
+      {/* Status Filter */}
+      <div>
+        <label style={labelStyle}>✅ Status</label>
+        <select
+          value={doneFilter}
+          onChange={(e) => onDoneFilterChange(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="All">All</option>
+          <option value="Not Done">Not Done</option>
+          <option value="Done">Done</option>
+        </select>
+      </div>
 
       {/* Count badge */}
       <div

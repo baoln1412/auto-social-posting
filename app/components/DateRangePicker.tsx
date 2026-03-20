@@ -56,7 +56,8 @@ const PRESETS = [
 ];
 
 function fmt(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Format in UTC+7 (Asia/Bangkok) → returns YYYY-MM-DD
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
 }
 
 function parseDate(s: string): Date {

@@ -5,6 +5,8 @@ import { PostDraft } from '../types';
 
 interface PostCardProps {
   post: PostDraft;
+  isNew?: boolean;
+  onToggleDone?: () => void;
 }
 
 function CopyButton({ text, ariaLabel }: { text: string; ariaLabel?: string }) {
@@ -106,11 +108,15 @@ function renderBoldMarkdown(text: string) {
   });
 }
 
-export default function PostCard({ post }: PostCardProps) {
+export default function PostCard({ post, isNew, onToggleDone }: PostCardProps) {
   const { article, facebookText, nb2Prompt, emojiTitle, emojiTitleVi, commentBait, state } = post;
   const { title, pubDate, source, imageUrl, portraitUrl, url } = article;
+  const isDone = post.isDone ?? false;
 
   const [portraitVisible, setPortraitVisible] = useState(true);
+
+  // Format dates in UTC+7 (Asia/Bangkok)
+  const tzOptions: Intl.DateTimeFormatOptions = { timeZone: 'Asia/Bangkok' };
 
   let formattedDate = '';
   try {
@@ -119,16 +125,41 @@ export default function PostCard({ post }: PostCardProps) {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
+        ...tzOptions,
       });
     }
   } catch (err) {
     console.error('Failed to parse date:', err);
   }
 
+  let formattedFetchTime = '';
+  try {
+    const ft = post.fetchTime;
+    if (ft) {
+      const d = new Date(ft);
+      formattedFetchTime = d.toLocaleString('en-GB', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        ...tzOptions,
+      }).replace(',', '');
+    }
+  } catch (err) {
+    console.error('Failed to parse fetch_time:', err);
+  }
+
   return (
     <div
-      className="rounded-xl overflow-hidden border"
-      style={{ backgroundColor: '#1a1a1a', borderColor: '#333' }}
+      className="rounded-xl overflow-hidden border transition-opacity duration-200"
+      style={{
+        backgroundColor: '#1a1a1a',
+        borderColor: isDone ? '#22c55e' : '#333',
+        opacity: isDone ? 0.6 : 1,
+      }}
     >
       {/* Background image header */}
       <div
@@ -169,6 +200,23 @@ export default function PostCard({ post }: PostCardProps) {
             )}
             <span className="mx-1 opacity-70">•</span>
             <span className="opacity-80">{formattedDate}</span>
+            {formattedFetchTime && (
+              <>
+                <span className="mx-1 opacity-70">•</span>
+                <span className="opacity-60 text-xs">Fetched: {formattedFetchTime}</span>
+              </>
+            )}
+            {isNew && (
+              <span
+                className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full animate-pulse"
+                style={{
+                  backgroundColor: '#f0e523',
+                  color: '#000000',
+                }}
+              >
+                🆕 NEW
+              </span>
+            )}
           </div>
           <a
             href={url}
@@ -228,6 +276,22 @@ export default function PostCard({ post }: PostCardProps) {
         <CollapsibleSection label="Facebook Draft" text={facebookText} defaultOpen={true} />
         <CollapsibleSection label="Comment Bait" text={commentBait} />
         <CollapsibleSection label="NB2 Image Prompt" text={nb2Prompt} />
+
+        {/* Done toggle button */}
+        {onToggleDone && (
+          <button
+            onClick={onToggleDone}
+            className="w-full mt-2 py-2 rounded-lg text-sm font-semibold transition-colors duration-150"
+            style={{
+              backgroundColor: isDone ? 'rgba(34,197,94,0.15)' : 'rgba(100,116,139,0.15)',
+              color: isDone ? '#22c55e' : '#94a3b8',
+              border: `1px solid ${isDone ? 'rgba(34,197,94,0.3)' : 'rgba(100,116,139,0.3)'}`,
+              cursor: 'pointer',
+            }}
+          >
+            {isDone ? '✅ Done' : '☐ Mark Done'}
+          </button>
+        )}
       </div>
     </div>
   );

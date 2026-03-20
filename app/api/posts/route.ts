@@ -23,19 +23,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const sourceFilter = searchParams.get('source');
     const fromDate = searchParams.get('from');
     const toDate = searchParams.get('to');
+    const doneFilter = searchParams.get('done');
 
     // Build query
     let query = supabase
       .from('crime_posts')
       .select('*')
-      .order('pub_date', { ascending: false });
+      .order('fetch_time', { ascending: false });
 
-    // Date range filter (ISO date strings: YYYY-MM-DD)
+    // Date range filter — boundaries in UTC+7 (Asia/Bangkok)
     if (fromDate) {
-      query = query.gte('pub_date', `${fromDate}T00:00:00Z`);
+      query = query.gte('fetch_time', `${fromDate}T00:00:00+07:00`);
     }
     if (toDate) {
-      query = query.lte('pub_date', `${toDate}T23:59:59Z`);
+      query = query.lte('fetch_time', `${toDate}T23:59:59+07:00`);
     }
 
     if (stateFilter && stateFilter !== 'All') {
@@ -44,6 +45,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     if (sourceFilter && sourceFilter !== 'All') {
       query = query.eq('source', sourceFilter);
+    }
+
+    if (doneFilter === 'done') {
+      query = query.eq('is_done', true);
+    } else if (doneFilter === 'not_done') {
+      query = query.eq('is_done', false);
     }
 
     const { data, error } = await query.limit(100);
@@ -71,6 +78,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       commentBait: row.comment_bait,
       nb2Prompt: row.nb2_prompt,
       state: row.state,
+      fetchTime: row.fetch_time,
+      isDone: row.is_done ?? false,
     }));
 
     // Also return distinct filters for the UI

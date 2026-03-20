@@ -70,12 +70,14 @@ export default function Home() {
   const [posts, setPosts] = useState<PostDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number; title?: string } | null>(null);
+  const [newPostUrls, setNewPostUrls] = useState<Set<string>>(new Set());
 
   // Filter state
   const [selectedState, setSelectedState] = useState('All');
   const [selectedSource, setSelectedSource] = useState('All');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [doneFilter, setDoneFilter] = useState('All');
 
   const isLoading = status === 'loading' || status === 'fetching' || status === 'processing';
 
@@ -91,7 +93,7 @@ export default function Home() {
   }, [posts]);
 
   // ── Load saved posts from Supabase ──────────────────────────────────────
-  const loadSavedPosts = useCallback(async (state: string, source: string, from: string, to: string) => {
+  const loadSavedPosts = useCallback(async (state: string, source: string, from: string, to: string, done: string = 'All') => {
     try {
       setStatus('loading');
       setError(null);
@@ -101,6 +103,8 @@ export default function Home() {
       if (source !== 'All') params.set('source', source);
       if (from) params.set('from', from);
       if (to) params.set('to', to);
+      if (done === 'Done') params.set('done', 'done');
+      else if (done === 'Not Done') params.set('done', 'not_done');
 
       const res = await fetch(`/api/posts?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to load posts');
@@ -116,23 +120,54 @@ export default function Home() {
 
   // Load saved posts on mount
   useEffect(() => {
-    loadSavedPosts(selectedState, selectedSource, fromDate, toDate);
+    loadSavedPosts(selectedState, selectedSource, fromDate, toDate, doneFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Filter handlers
   const handleStateChange = (s: string) => {
     setSelectedState(s);
-    loadSavedPosts(s, selectedSource, fromDate, toDate);
+    loadSavedPosts(s, selectedSource, fromDate, toDate, doneFilter);
   };
   const handleSourceChange = (s: string) => {
     setSelectedSource(s);
-    loadSavedPosts(selectedState, s, fromDate, toDate);
+    loadSavedPosts(selectedState, s, fromDate, toDate, doneFilter);
   };
   const handleDateRangeChange = (from: string, to: string) => {
     setFromDate(from);
     setToDate(to);
-    loadSavedPosts(selectedState, selectedSource, from, to);
+    loadSavedPosts(selectedState, selectedSource, from, to, doneFilter);
+  };
+  const handleDoneFilterChange = (d: string) => {
+    setDoneFilter(d);
+    loadSavedPosts(selectedState, selectedSource, fromDate, toDate, d);
+  };
+
+  // ── Toggle done status ─────────────────────────────────────────────────
+  const handleToggleDone = async (articleUrl: string, currentDone: boolean) => {
+    const newDone = !currentDone;
+    // Optimistic update
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.article.url === articleUrl ? { ...p, isDone: newDone } : p
+      )
+    );
+    try {
+      const res = await fetch('/api/posts/toggle-done', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleUrl, isDone: newDone }),
+      });
+      if (!res.ok) throw new Error('Failed to toggle done');
+    } catch (err) {
+      console.error('Toggle done failed:', err);
+      // Revert on failure
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.article.url === articleUrl ? { ...p, isDone: currentDone } : p
+        )
+      );
+    }
   };
 
   // ── Fetch NEW articles + pipeline ──────────────────────────────────────
@@ -173,6 +208,7 @@ export default function Home() {
             const event = JSON.parse(line.slice(6));
             if (event.type === 'post') {
               setPosts((prev) => [event.post, ...prev]);
+              setNewPostUrls((prev) => new Set(prev).add(event.post.article.url));
               newCount++;
             } else if (event.type === 'progress') {
               setProgress({ current: event.current, total: event.total, title: event.title });
@@ -187,7 +223,7 @@ export default function Home() {
 
       // Reload from DB to get clean data + filters
       if (newCount > 0) {
-        await loadSavedPosts(selectedState, selectedSource, fromDate, toDate);
+        await loadSavedPosts(selectedState, selectedSource, fromDate, toDate, doneFilter);
       } else {
         setStatus('done');
       }
@@ -250,9 +286,11 @@ export default function Home() {
           selectedSource={selectedSource}
           fromDate={fromDate}
           toDate={toDate}
+          doneFilter={doneFilter}
           onStateChange={handleStateChange}
           onSourceChange={handleSourceChange}
           onDateRangeChange={handleDateRangeChange}
+          onDoneFilterChange={handleDoneFilterChange}
           totalCount={posts.length}
         />
       </div>
@@ -261,7 +299,12 @@ export default function Home() {
       {posts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {posts.map((post, index) => (
-            <PostCard key={`${post.article.url}-${index}`} post={post} />
+            <PostCard
+              key={`${post.article.url}-${index}`}
+              post={post}
+              isNew={newPostUrls.has(post.article.url)}
+              onToggleDone={() => handleToggleDone(post.article.url, post.isDone ?? false)}
+            />
           ))}
         </div>
       )}
