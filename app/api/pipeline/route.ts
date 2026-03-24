@@ -11,29 +11,24 @@ import {
 } from './article-processor';
 import { getSupabaseServer } from '@/app/lib/supabase';
 
-export const maxDuration = 300; // 5 minutes total for all articles
+export const maxDuration = 300;
 
 // ── Save posts to Supabase ────────────────────────────────────────────────
-async function savePostToDb(post: PostDraft): Promise<void> {
+async function savePostToDb(post: PostDraft, pageId: string): Promise<void> {
   try {
     const supabase = getSupabaseServer();
-    await supabase.from('sports_posts').upsert(
+    await supabase.from('posts').upsert(
       {
+        page_id: pageId,
         article_url: post.article.url,
         article_title: post.article.title,
         source: post.article.source,
         pub_date: post.article.pubDate,
         image_url: post.generatedImageUrl ?? post.article.imageUrl ?? null,
-        portrait_url: post.article.portraitUrl ?? null,
         description: post.article.description ?? null,
         summary: post.article.summary ?? null,
         emoji_title: post.emojiTitle,
-        emoji_title_vi: post.emojiTitleVi ?? '',
         facebook_text: post.facebookText,
-        match_time: post.matchTime ?? '',
-        match_teams: post.matchTeams ?? '',
-        best_player: post.bestPlayer ?? '',
-        match_highlight: post.matchHighlight ?? '',
         fetch_time: new Date().toISOString(),
       },
       { onConflict: 'article_url' },
@@ -50,7 +45,7 @@ async function filterNewArticles(articles: Article[]): Promise<Article[]> {
     const urls = articles.map((a) => a.url);
 
     const { data: existing } = await supabase
-      .from('sports_posts')
+      .from('posts')
       .select('article_url')
       .in('article_url', urls);
 
@@ -61,13 +56,22 @@ async function filterNewArticles(articles: Article[]): Promise<Article[]> {
     return newArticles;
   } catch (err) {
     console.error('[pipeline] DB filter failed, processing all:', err);
-    return articles; // Fallback: process everything if DB is unavailable
+    return articles;
   }
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
   const body = await request.json();
   const articles: Article[] = body.articles ?? [];
+  const pageId: string = body.pageId;
+  const systemPrompt: string = body.systemPrompt ?? 'You are a helpful social media assistant.';
+
+  if (!pageId) {
+    return new Response(JSON.stringify({ error: 'pageId is required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   const encoder = new TextEncoder();
 
@@ -101,37 +105,26 @@ export async function POST(request: NextRequest): Promise<Response> {
         title: `${newArticles.length} new articles (${articles.length - newArticles.length} skipped) — using ${engine}`,
       });
 
-      // Step 2: Initialize the AI engine
-      const notebookId = await initPipelineNotebook();
+      await initPipelineNotebook();
 
-      // Wrap emit to also save to DB
       const emitAndSave = async (post: PostDraft) => {
-        const postWithFetchTime = { ...post, fetchTime: new Date().toISOString() };
+        const postWithFetchTime = { ...post, fetchTime: new Date().toISOString(), pageId };
         emit({ type: 'post', post: postWithFetchTime });
-        await savePostToDb(post);
+        await savePostToDb(post, pageId);
       };
 
       if (engine === 'gemini') {
-        // ── OpenRouter batch path ──
         await processBatchGemini(
           newArticles,
+          systemPrompt,
           async (post) => { await emitAndSave(post); },
           (current, total, title) => emit({ type: 'progress', current, total, title }),
         );
       } else {
-        // ── NotebookLM / fallback per-article path ──
-        if (engine === 'notebooklm' && notebookId) {
-          emit({ type: 'progress', current: 0, total: newArticles.length, title: 'Adding article sources...' });
-          for (const article of newArticles) {
-            await addArticleSource(article);
-          }
-        }
-
         for (let i = 0; i < newArticles.length; i++) {
           const article = newArticles[i];
           emit({ type: 'progress', current: i + 1, total: newArticles.length, title: article.title });
           try {
-            console.log(`[pipeline] processing ${i + 1}/${newArticles.length}: ${article.title}`);
             const post = await processArticle(article);
             await emitAndSave(post);
           } catch (err) {
@@ -142,7 +135,6 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
       }
 
-      // Step 3: Cleanup (only for NotebookLM engine)
       await cleanupPipelineNotebook();
 
       emit({ type: 'done', total: newArticles.length, skipped: articles.length - newArticles.length });

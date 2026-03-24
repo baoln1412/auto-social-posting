@@ -1,10 +1,13 @@
 /**
- * GET /api/posts — Load saved crime posts from Supabase.
+ * GET /api/posts — Load posts from Supabase with pagination.
  *
- * Supports filters via query params:
- * - state: filter by US state (e.g. ?state=Texas)
- * - source: filter by source name (e.g. ?source=Law %26 Crime)
- * - days: filter by recency (e.g. ?days=3 or ?days=7), default: 7
+ * Query params:
+ * - pageId: filter by content page (required)
+ * - source: filter by source name
+ * - from/to: date range (UTC+7)
+ * - done: 'done' | 'not_done'
+ * - limit: items per page (default 30)
+ * - offset: pagination offset (default 0)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,28 +22,29 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const supabase = getSupabaseServer();
     const { searchParams } = new URL(request.url);
 
-    const stateFilter = searchParams.get('state');
+    const pageId = searchParams.get('pageId');
     const sourceFilter = searchParams.get('source');
     const fromDate = searchParams.get('from');
     const toDate = searchParams.get('to');
     const doneFilter = searchParams.get('done');
+    const limit = Math.min(parseInt(searchParams.get('limit') ?? '30', 10), 100);
+    const offset = parseInt(searchParams.get('offset') ?? '0', 10);
 
     // Build query
     let query = supabase
-      .from('sports_posts')
-      .select('*')
+      .from('posts')
+      .select('*', { count: 'exact' })
       .order('fetch_time', { ascending: false });
 
-    // Date range filter — boundaries in UTC+7 (Asia/Bangkok)
+    if (pageId) {
+      query = query.eq('page_id', pageId);
+    }
+
     if (fromDate) {
       query = query.gte('fetch_time', `${fromDate}T00:00:00+07:00`);
     }
     if (toDate) {
       query = query.lte('fetch_time', `${toDate}T23:59:59+07:00`);
-    }
-
-    if (stateFilter && stateFilter !== 'All') {
-      query = query.eq('state', stateFilter);
     }
 
     if (sourceFilter && sourceFilter !== 'All') {
@@ -53,11 +57,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       query = query.eq('is_done', false);
     }
 
-    const { data, error } = await query.limit(100);
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
 
     if (error) {
       console.error('[posts] Supabase query error:', error);
-      return NextResponse.json({ posts: [], error: error.message }, { status: 500 });
+      return NextResponse.json({ posts: [], totalCount: 0, error: error.message }, { status: 500 });
     }
 
     // Transform DB rows → PostDraft shape
@@ -69,46 +76,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         source: row.source,
         description: row.description ?? '',
         imageUrl: row.image_url ?? undefined,
-        portraitUrl: row.portrait_url ?? undefined,
-        summary: row.summary,
+        summary: row.summary ?? '',
       },
       emojiTitle: row.emoji_title,
-      emojiTitleVi: row.emoji_title_vi,
       facebookText: row.facebook_text,
-      matchTime: row.match_time,
-      matchTeams: row.match_teams,
-      bestPlayer: row.best_player,
-      matchHighlight: row.match_highlight,
-      commentBait: '',
-      nb2Prompt: '',
-      state: null,
       fetchTime: row.fetch_time,
       isDone: row.is_done ?? false,
+      pageId: row.page_id,
     }));
 
-    // Also return distinct filters for the UI
-    const { data: states } = await supabase
-      .from('sports_posts')
-      .select('state')
-      .order('state');
-
-    const { data: sources } = await supabase
-      .from('sports_posts')
-      .select('source')
-      .order('source');
-
-    const distinctStates = [...new Set((states ?? []).map((r) => r.state).filter(Boolean))];
+    // Get distinct sources for filter
+    let sourcesQuery = supabase.from('posts').select('source').order('source');
+    if (pageId) {
+      sourcesQuery = sourcesQuery.eq('page_id', pageId);
+    }
+    const { data: sources } = await sourcesQuery;
     const distinctSources = [...new Set((sources ?? []).map((r) => r.source).filter(Boolean))];
 
     return NextResponse.json({
       posts,
+      totalCount: count ?? 0,
+      limit,
+      offset,
       filters: {
-        states: distinctStates,
         sources: distinctSources,
       },
     });
   } catch (err) {
     console.error('[posts] Error:', err);
-    return NextResponse.json({ posts: [], error: 'Failed to load posts' }, { status: 500 });
+    return NextResponse.json({ posts: [], totalCount: 0, error: 'Failed to load posts' }, { status: 500 });
   }
 }

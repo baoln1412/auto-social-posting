@@ -1,10 +1,10 @@
 /**
  * /api/feeds — CRUD for RSS feed sources stored in Supabase.
  *
- * GET    → list all feeds (ordered by name)
- * POST   → add a new feed { name, url, crimeSpecific? }
+ * GET    → list feeds for a page (query param ?pageId=...)
+ * POST   → add a new feed { pageId, name, url, feedType?, scrapeSelector? }
  * DELETE → remove a feed by id (query param ?id=...)
- * PATCH  → toggle enabled/disabled by id (query param ?id=...)
+ * PATCH  → toggle enabled/disabled by id { id, enabled }
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -13,40 +13,56 @@ import { getSupabaseServer } from '@/app/lib/supabase';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-// GET — list all feeds
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const supabase = getSupabaseServer();
-    const { data, error } = await supabase
-      .from('rss_feeds')
-      .select('*')
-      .order('name');
+    const { searchParams } = new URL(request.url);
+    const pageId = searchParams.get('pageId');
 
+    const supabase = getSupabaseServer();
+    let query = supabase.from('rss_feeds').select('*').order('name');
+
+    if (pageId) {
+      query = query.eq('page_id', pageId);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
-    return NextResponse.json({ feeds: data ?? [] });
+
+    const feeds = (data ?? []).map((row) => ({
+      id: row.id,
+      pageId: row.page_id,
+      name: row.name,
+      url: row.url,
+      feedType: row.feed_type,
+      scrapeSelector: row.scrape_selector,
+      enabled: row.enabled,
+    }));
+
+    return NextResponse.json({ feeds });
   } catch (err) {
     console.error('[feeds] GET error:', err);
     return NextResponse.json({ feeds: [], error: 'Failed to load feeds' }, { status: 500 });
   }
 }
 
-// POST — add a new feed
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { name, url, crimeSpecific } = body;
+    const { pageId, name, url, feedType, scrapeSelector } = body;
 
-    if (!name || !url) {
-      return NextResponse.json({ error: 'name and url are required' }, { status: 400 });
+    if (!pageId || !name || !url) {
+      return NextResponse.json({ error: 'pageId, name, and url are required' }, { status: 400 });
     }
 
     const supabase = getSupabaseServer();
     const { data, error } = await supabase
       .from('rss_feeds')
       .insert({
+        page_id: pageId,
         name: name.trim(),
         url: url.trim(),
-        crime_specific: crimeSpecific ?? false,
+        feed_type: feedType ?? 'rss',
+        scrape_selector: scrapeSelector ?? null,
         enabled: true,
       })
       .select()
@@ -66,7 +82,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-// DELETE — remove a feed by id
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
@@ -84,7 +99,6 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-// PATCH — toggle enabled status
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();

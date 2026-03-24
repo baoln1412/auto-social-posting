@@ -1,314 +1,368 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import PostCard from '@/app/components/PostCard';
-import FilterBar from '@/app/components/FilterBar';
-import SourceManager from '@/app/components/SourceManager';
-import { PostDraft } from '@/app/types';
-
-type Status = 'idle' | 'loading' | 'fetching' | 'processing' | 'done' | 'error';
-
-
-
-function StatusBar({
-  status,
-  progress,
-  error,
-  postCount,
-}: {
-  status: Status;
-  progress: { current: number; total: number; title?: string } | null;
-  error: string | null;
-  postCount: number;
-}) {
-  if (status === 'idle') return null;
-
-  let message = '';
-  if (status === 'loading') message = '📂 Loading saved posts...';
-  else if (status === 'fetching') message = '📡 Fetching news feeds...';
-  else if (status === 'processing') {
-    message = progress?.title
-      ? `⚙️ ${progress.title}`
-      : progress
-        ? `⚙️ Processing article ${progress.current} of ${progress.total}...`
-        : '⚙️ Starting pipeline...';
-  } else if (status === 'done') message = `✅ ${postCount} articles ready`;
-  else if (status === 'error') message = `❌ ${error ?? 'An error occurred'}`;
-
-  const isLoading = status === 'loading' || status === 'fetching' || status === 'processing';
-  const isError = status === 'error';
-  const isDone = status === 'done';
-
-  return (
-    <div
-      className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium"
-      style={{
-        backgroundColor: isError ? '#3b0000' : isDone ? '#003b1a' : '#1a1a00',
-        border: `1px solid ${isError ? '#7f0000' : isDone ? '#006b30' : '#4a4a00'}`,
-        color: isError ? '#ff6b6b' : isDone ? '#6bffaa' : '#f0e523',
-      }}
-    >
-      {isLoading && (
-        <svg
-          className="animate-spin h-4 w-4 flex-shrink-0"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-      )}
-      <span>{message}</span>
-    </div>
-  );
-}
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ContentPage, PostDraft, Article } from './types';
+import PostCard from './components/PostCard';
+import SourceManager from './components/SourceManager';
+import PageTabs from './components/PageTabs';
+import SystemPromptConfig from './components/SystemPromptConfig';
+import ChannelManager from './components/ChannelManager';
+import Pagination from './components/Pagination';
 
 export default function Home() {
-  const [status, setStatus] = useState<Status>('idle');
+  // ── Pages ──────────────────────────────────────────────────────────
+  const [pages, setPages] = useState<ContentPage[]>([]);
+  const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [pagesLoading, setPagesLoading] = useState(true);
+
+  // ── Posts + pagination ─────────────────────────────────────────────
   const [posts, setPosts] = useState<PostDraft[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<{ current: number; total: number; title?: string } | null>(null);
-  const [newPostUrls, setNewPostUrls] = useState<Set<string>>(new Set());
+  const [totalCount, setTotalCount] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const limit = 30;
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [sources, setSources] = useState<string[]>([]);
 
-  // Filter state
-  const [selectedSource, setSelectedSource] = useState('All');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [doneFilter, setDoneFilter] = useState('All');
+  // ── Filters ────────────────────────────────────────────────────────
+  const [filterSource, setFilterSource] = useState('All');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+  const [filterDone, setFilterDone] = useState('all');
 
-  const isLoading = status === 'loading' || status === 'fetching' || status === 'processing';
+  // ── Pipeline ───────────────────────────────────────────────────────
+  const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [progress, setProgress] = useState('');
+  const progressRef = useRef<HTMLDivElement>(null);
 
-  // ── Derive filter options from loaded posts ────────────────────────────
-  const availableSources = useMemo(() => {
-    const set = new Set(posts.map((p) => p.article.source).filter(Boolean));
-    return [...set].sort();
-  }, [posts]);
-
-  // ── Load saved posts from Supabase ──────────────────────────────────────
-  const loadSavedPosts = useCallback(async (source: string, from: string, to: string, done: string = 'All') => {
+  // ── Load pages ─────────────────────────────────────────────────────
+  const loadPages = useCallback(async () => {
     try {
-      setStatus('loading');
-      setError(null);
+      const res = await fetch('/api/pages');
+      const data = await res.json();
+      const loaded: ContentPage[] = data.pages ?? [];
+      setPages(loaded);
+      if (loaded.length > 0 && !activePageId) {
+        setActivePageId(loaded[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to load pages:', err);
+    } finally {
+      setPagesLoading(false);
+    }
+  }, [activePageId]);
 
-      const params = new URLSearchParams();
-      if (source !== 'All') params.set('source', source);
-      if (from) params.set('from', from);
-      if (to) params.set('to', to);
-      if (done === 'Done') params.set('done', 'done');
-      else if (done === 'Not Done') params.set('done', 'not_done');
+  useEffect(() => { loadPages(); }, [loadPages]);
 
-      const res = await fetch(`/api/posts?${params.toString()}`);
-      if (!res.ok) throw new Error('Failed to load posts');
+  // ── Load posts ─────────────────────────────────────────────────────
+  const loadPosts = useCallback(async () => {
+    if (!activePageId) return;
+    setPostsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        pageId: activePageId,
+        limit: String(limit),
+        offset: String(offset),
+      });
+      if (filterSource !== 'All') params.set('source', filterSource);
+      if (filterFrom) params.set('from', filterFrom);
+      if (filterTo) params.set('to', filterTo);
+      if (filterDone !== 'all') params.set('done', filterDone);
 
+      const res = await fetch(`/api/posts?${params}`);
       const data = await res.json();
       setPosts(data.posts ?? []);
-      setStatus('done');
+      setTotalCount(data.totalCount ?? 0);
+      setSources(data.filters?.sources ?? []);
     } catch (err) {
-      console.warn('Could not load saved posts:', err);
-      setStatus('idle');
+      console.error('Failed to load posts:', err);
+    } finally {
+      setPostsLoading(false);
     }
-  }, []);
+  }, [activePageId, offset, filterSource, filterFrom, filterTo, filterDone]);
 
-  // Load saved posts on mount
-  useEffect(() => {
-    loadSavedPosts(selectedSource, fromDate, toDate, doneFilter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { loadPosts(); }, [loadPosts]);
 
-  // Filter handlers
-  const handleSourceChange = (s: string) => {
-    setSelectedSource(s);
-    loadSavedPosts(s, fromDate, toDate, doneFilter);
-  };
-  const handleDateRangeChange = (from: string, to: string) => {
-    setFromDate(from);
-    setToDate(to);
-    loadSavedPosts(selectedSource, from, to, doneFilter);
-  };
-  const handleDoneFilterChange = (d: string) => {
-    setDoneFilter(d);
-    loadSavedPosts(selectedSource, fromDate, toDate, d);
+  // Reset offset when filters change
+  useEffect(() => { setOffset(0); }, [filterSource, filterFrom, filterTo, filterDone, activePageId]);
+
+  // ── Active page ────────────────────────────────────────────────────
+  const activePage = pages.find((p) => p.id === activePageId);
+
+  // ── Add new page ───────────────────────────────────────────────────
+  const handleAddPage = async () => {
+    const name = prompt('Enter a name for the new content page:');
+    if (!name?.trim()) return;
+    try {
+      const res = await fetch('/api/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), systemPrompt: '' }),
+      });
+      const data = await res.json();
+      if (data.page) {
+        setPages((prev) => [...prev, data.page]);
+        setActivePageId(data.page.id);
+      }
+    } catch (err) {
+      console.error('Failed to create page:', err);
+    }
   };
 
-  // ── Toggle done status ─────────────────────────────────────────────────
+  // ── Save system prompt ─────────────────────────────────────────────
+  const handleSavePrompt = async (prompt: string) => {
+    if (!activePageId) return;
+    await fetch('/api/pages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: activePageId, systemPrompt: prompt }),
+    });
+    setPages((prev) =>
+      prev.map((p) => (p.id === activePageId ? { ...p, systemPrompt: prompt } : p))
+    );
+  };
+
+  // ── Toggle done ────────────────────────────────────────────────────
   const handleToggleDone = async (articleUrl: string, currentDone: boolean) => {
-    const newDone = !currentDone;
-    // Optimistic update
     setPosts((prev) =>
-      prev.map((p) =>
-        p.article.url === articleUrl ? { ...p, isDone: newDone } : p
-      )
+      prev.map((p) => (p.article.url === articleUrl ? { ...p, isDone: !currentDone } : p))
     );
     try {
-      const res = await fetch('/api/posts/toggle-done', {
+      await fetch('/api/posts/toggle-done', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ articleUrl, isDone: newDone }),
+        body: JSON.stringify({ articleUrl, isDone: !currentDone }),
       });
-      if (!res.ok) throw new Error('Failed to toggle done');
-    } catch (err) {
-      console.error('Toggle done failed:', err);
-      // Revert on failure
+    } catch {
       setPosts((prev) =>
-        prev.map((p) =>
-          p.article.url === articleUrl ? { ...p, isDone: currentDone } : p
-        )
+        prev.map((p) => (p.article.url === articleUrl ? { ...p, isDone: currentDone } : p))
       );
     }
   };
 
-  // ── Fetch NEW articles + pipeline ──────────────────────────────────────
-  async function handleFetchNew() {
-    setStatus('fetching');
-    setError(null);
-    setProgress(null);
+  // ── Run pipeline ───────────────────────────────────────────────────
+  const handleRunPipeline = async () => {
+    if (!activePageId || !activePage) return;
+    setPipelineRunning(true);
+    setProgress('Fetching articles...');
 
     try {
-      const newsRes = await fetch('/api/fetch-news');
-      if (!newsRes.ok) throw new Error('Failed to fetch news');
-      const { articles } = await newsRes.json();
+      // Step 1: Fetch articles
+      const fetchRes = await fetch(`/api/fetch-news?pageId=${activePageId}`);
+      const fetchData = await fetchRes.json();
+      const articles: Article[] = fetchData.articles ?? [];
 
-      setStatus('processing');
+      if (articles.length === 0) {
+        setProgress('No new articles found.');
+        setPipelineRunning(false);
+        return;
+      }
+
+      setProgress(`${articles.length} articles fetched. Processing with AI...`);
+
+      // Step 2: Run pipeline
       const pipelineRes = await fetch('/api/pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ articles }),
+        body: JSON.stringify({
+          articles,
+          pageId: activePageId,
+          systemPrompt: activePage.systemPrompt,
+        }),
       });
-      if (!pipelineRes.ok) throw new Error('Pipeline request failed');
 
-      const reader = pipelineRes.body!.getReader();
+      const reader = pipelineRes.body?.getReader();
+      if (!reader) throw new Error('No stream');
+
       const decoder = new TextDecoder();
       let buffer = '';
-      let newCount = 0;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
+        const lines = buffer.split('\n\n');
         buffer = lines.pop() ?? '';
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           try {
             const event = JSON.parse(line.slice(6));
-            if (event.type === 'post') {
-              setPosts((prev) => [event.post, ...prev]);
-              setNewPostUrls((prev) => new Set(prev).add(event.post.article.url));
-              newCount++;
-            } else if (event.type === 'progress') {
-              setProgress({ current: event.current, total: event.total, title: event.title });
+            if (event.type === 'progress') {
+              setProgress(`${event.current}/${event.total}: ${event.title}`);
+            } else if (event.type === 'post') {
+              setPosts((prev) => {
+                const exists = prev.some((p) => p.article.url === event.post.article.url);
+                if (exists) return prev;
+                return [event.post, ...prev];
+              });
             } else if (event.type === 'done') {
-              setStatus('done');
+              setProgress(`Done! ${event.total} posts generated.`);
             }
-          } catch {
-            // malformed event — skip
-          }
+          } catch {}
         }
       }
 
-      // Reload from DB to get clean data + filters
-      if (newCount > 0) {
-        await loadSavedPosts(selectedSource, fromDate, toDate, doneFilter);
-      } else {
-        setStatus('done');
-      }
+      // Reload posts
+      await loadPosts();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setStatus('error');
+      console.error('Pipeline error:', err);
+      setProgress(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setPipelineRunning(false);
     }
+  };
+
+  if (pagesLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#0d1117', color: '#f0e523' }}>
+        Loading...
+      </div>
+    );
   }
 
   return (
-    <main className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-black tracking-tight mb-2" style={{ color: '#ffffff' }}>
-          ⚽ SPORTS NEWS DRAFT TOOL
+    <div style={{ backgroundColor: '#0d1117', color: '#e2e8f0', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 16px' }}>
+        {/* Header */}
+        <h1 className="text-2xl font-bold mb-4" style={{ color: '#f0e523' }}>
+          ⚡ Auto Social Posting
         </h1>
-        <p className="text-base" style={{ color: '#9ca3af' }}>
-          Generate Facebook post drafts from today&apos;s headlines
-        </p>
-      </div>
 
-      {/* Source manager */}
-      <div className="mb-4">
-        <SourceManager />
-      </div>
+        {/* Page Tabs */}
+        <PageTabs
+          pages={pages}
+          activePageId={activePageId}
+          onSelect={(id) => setActivePageId(id)}
+          onAddPage={handleAddPage}
+        />
 
-      {/* Action bar */}
-      <div className="flex items-center gap-4 mb-4">
-        <button
-          onClick={handleFetchNew}
-          disabled={isLoading}
-          className="font-bold px-6 py-3 rounded-lg transition-opacity duration-150 text-sm"
-          style={{
-            backgroundColor: '#f0e523',
-            color: '#000000',
-            opacity: isLoading ? 0.6 : 1,
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {isLoading ? 'Processing...' : '🔄 Fetch New Articles'}
-        </button>
-        {posts.length > 0 && (
-          <span className="text-sm" style={{ color: '#64748b' }}>
-            Only new articles will be processed • Existing posts are loaded from database
-          </span>
+        {activePage && (
+          <div className="flex flex-col gap-4 mt-4">
+            {/* System Prompt Config */}
+            <SystemPromptConfig
+              key={activePage.id}
+              prompt={activePage.systemPrompt}
+              onSave={handleSavePrompt}
+            />
+
+            {/* Channel Manager */}
+            <ChannelManager pageId={activePage.id} />
+
+            {/* Source Manager */}
+            <SourceManager pageId={activePage.id} />
+
+            {/* Pipeline controls */}
+            <div
+              className="rounded-lg p-4 flex flex-col gap-3"
+              style={{ backgroundColor: '#0d1117', border: '1px solid #1e293b' }}
+            >
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRunPipeline}
+                  disabled={pipelineRunning}
+                  className="px-6 py-2.5 rounded-lg text-sm font-bold transition-all"
+                  style={{
+                    backgroundColor: pipelineRunning ? '#21262d' : '#f0e523',
+                    color: pipelineRunning ? '#8b949e' : '#000',
+                    cursor: pipelineRunning ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {pipelineRunning ? '⏳ Running...' : '🚀 Fetch & Generate Posts'}
+                </button>
+                <button
+                  onClick={loadPosts}
+                  disabled={postsLoading}
+                  className="px-4 py-2.5 rounded-lg text-sm font-medium"
+                  style={{ backgroundColor: '#21262d', color: '#c9d1d9', border: '1px solid #30363d' }}
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+              {progress && (
+                <div ref={progressRef} className="text-xs" style={{ color: '#f0e523' }}>
+                  {progress}
+                </div>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3 items-center">
+              <select
+                value={filterSource}
+                onChange={(e) => setFilterSource(e.target.value)}
+                className="text-sm px-3 py-2 rounded-lg"
+                style={{ backgroundColor: '#161b22', color: '#e2e8f0', border: '1px solid #30363d' }}
+              >
+                <option value="All">All Sources</option>
+                {sources.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <input
+                type="date"
+                value={filterFrom}
+                onChange={(e) => setFilterFrom(e.target.value)}
+                className="text-sm px-3 py-2 rounded-lg"
+                style={{ backgroundColor: '#161b22', color: '#e2e8f0', border: '1px solid #30363d', colorScheme: 'dark' }}
+              />
+              <span className="text-xs" style={{ color: '#8b949e' }}>to</span>
+              <input
+                type="date"
+                value={filterTo}
+                onChange={(e) => setFilterTo(e.target.value)}
+                className="text-sm px-3 py-2 rounded-lg"
+                style={{ backgroundColor: '#161b22', color: '#e2e8f0', border: '1px solid #30363d', colorScheme: 'dark' }}
+              />
+
+              <select
+                value={filterDone}
+                onChange={(e) => setFilterDone(e.target.value)}
+                className="text-sm px-3 py-2 rounded-lg"
+                style={{ backgroundColor: '#161b22', color: '#e2e8f0', border: '1px solid #30363d' }}
+              >
+                <option value="all">All Status</option>
+                <option value="not_done">Not Done</option>
+                <option value="done">Done</option>
+              </select>
+
+              <span className="text-xs ml-auto" style={{ color: '#8b949e' }}>
+                {totalCount} posts
+              </span>
+            </div>
+
+            {/* Posts list */}
+            {postsLoading ? (
+              <div className="text-center py-12" style={{ color: '#8b949e' }}>Loading posts...</div>
+            ) : posts.length === 0 ? (
+              <div className="text-center py-12 rounded-lg" style={{ backgroundColor: '#161b22', color: '#8b949e', border: '1px solid #1e293b' }}>
+                <p className="text-lg mb-2">No posts yet</p>
+                <p className="text-sm">Click &quot;Fetch &amp; Generate Posts&quot; to get started.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {posts.map((post) => (
+                  <PostCard
+                    key={post.article.url}
+                    post={post}
+                    pageId={activePage.id}
+                    onToggleDone={() => handleToggleDone(post.article.url, post.isDone ?? false)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            <Pagination
+              totalCount={totalCount}
+              limit={limit}
+              offset={offset}
+              onPageChange={setOffset}
+            />
+          </div>
         )}
       </div>
-
-      {/* Status bar */}
-      <div className="mb-4">
-        <StatusBar status={status} progress={progress} error={error} postCount={posts.length} />
-      </div>
-
-      {/* Filter bar — always show so user can change date range before first fetch */}
-      <div className="mb-6">
-        <FilterBar
-          sources={availableSources}
-          selectedSource={selectedSource}
-          fromDate={fromDate}
-          toDate={toDate}
-          doneFilter={doneFilter}
-          onSourceChange={handleSourceChange}
-          onDateRangeChange={handleDateRangeChange}
-          onDoneFilterChange={handleDoneFilterChange}
-          totalCount={posts.length}
-        />
-      </div>
-
-      {/* Post cards grid */}
-      {posts.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {posts.map((post, index) => (
-            <PostCard
-              key={`${post.article.url}-${index}`}
-              post={post}
-              isNew={newPostUrls.has(post.article.url)}
-              onToggleDone={() => handleToggleDone(post.article.url, post.isDone ?? false)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {status === 'done' && posts.length === 0 && (
-        <div
-          className="text-center py-16 rounded-lg"
-          style={{ backgroundColor: '#0d1117', border: '1px solid #1e293b' }}
-        >
-          <p className="text-lg mb-2" style={{ color: '#e2e8f0' }}>
-            No posts found
-          </p>
-          <p className="text-sm" style={{ color: '#64748b' }}>
-            Click &quot;Fetch New Articles&quot; to generate your first batch of sports news drafts.
-          </p>
-        </div>
-      )}
-    </main>
+    </div>
   );
 }

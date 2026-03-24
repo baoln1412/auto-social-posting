@@ -2,28 +2,58 @@ export interface Article {
   title: string;
   url: string;
   pubDate: string;
-  source: string;        // e.g. "CNN Crime"
-  description: string;   // RSS description/snippet
-  imageUrl?: string;     // og:image or first image from feed
-  portraitUrl?: string;  // second image or face image from article
+  source: string;
+  description: string;
+  imageUrl?: string;
+  portraitUrl?: string;
 }
 
 export interface ArticleWithSummary extends Article {
-  summary: string;       // 3-4 paragraphs from NotebookLM or RSS description
+  summary: string;
 }
 
 export interface PostDraft {
   article: ArticleWithSummary;
-  facebookText: string;  // full Facebook post draft (1400-2000 chars)
-  emojiTitle: string;    // English title with emphasis + emoji
-  emojiTitleVi: string;  // Vietnamese translation of the title
-  matchTime: string;     // Match time
-  matchTeams: string;    // Teams playing
-  bestPlayer: string;    // Best performed player
-  matchHighlight: string; // Match highlights
-  generatedImageUrl?: string; // Generated image via OpenRouter
-  fetchTime?: string;    // when the article was fetched (ISO timestamp)
-  isNew?: boolean;       // true for posts freshly fetched in this session
-  isDone?: boolean;      // true if user marked this post as done
+  facebookText: string;
+  emojiTitle: string;
+  generatedImageUrl?: string;
+  fetchTime?: string;
+  isNew?: boolean;
+  isDone?: boolean;
+  pageId?: string;
 }
 
+export interface ContentPage {
+  id: string;
+  name: string;
+  systemPrompt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PageChannel {
+  id: string;
+  pageId: string;
+  platform: 'facebook' | 'tiktok' | 'threads' | 'instagram';
+  platformPageId: string;
+  platformPageName: string;
+  accessToken: string;
+  connectedAt: string;
+}
+
+export interface FeedEntry {
+  id: string;
+  pageId: string;
+  name: string;
+  url: string;
+  feedType: 'rss' | 'atom' | 'web_scrape';
+  scrapeSelector?: string;
+  enabled: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  totalCount: number;
+  limit: number;
+  offset: number;
+}
