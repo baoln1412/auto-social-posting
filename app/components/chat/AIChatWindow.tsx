@@ -176,7 +176,7 @@ export default function AIChatWindow({ pageId, currentFilters, onFiltersChange, 
               <span className="chat-header-dot" />
               <div>
                 <p className="chat-header-title">AI Copilot</p>
-                <p className="chat-header-subtitle">Gemini · Tự động chuyển model khi hết quota</p>
+                <p className="chat-header-subtitle">OpenRouter · Nemotron-3-Super-120B</p>
               </div>
             </div>
             <button onClick={() => setIsOpen(false)} className="chat-close-btn">

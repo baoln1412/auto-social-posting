@@ -489,8 +489,9 @@ export async function processBatchGemini(
         continue;
       }
 
-      // Generate image with Gemini
+      // Generate image with Gemini (TEMPORARILY DISABLED)
       if (imagePrompt) {
+        /*
         try {
           onProgress(
             globalIndex + 1,
@@ -505,6 +506,8 @@ export async function processBatchGemini(
         } catch (err) {
           console.error(`[pipeline] Image generation failed for: ${batch[j].title}`, err);
         }
+        */
+        console.log(`[pipeline] Image generation temporarily disabled`);
       }
 
       // Generate platform-specific drafts if platform prompts are configured
