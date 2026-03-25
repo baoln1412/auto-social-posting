@@ -3,7 +3,7 @@
  *
  * GET    → list all pages
  * POST   → create a new page { name, systemPrompt }
- * PATCH  → update page { id, name?, systemPrompt? }
+ * PATCH  → update page { id, name?, systemPrompt?, platformPrompts?, keywordConfig? }
  * DELETE → remove page by id (query param ?id=...)
  */
 
@@ -27,6 +27,10 @@ export async function GET(): Promise<NextResponse> {
       id: row.id,
       name: row.name,
       systemPrompt: row.system_prompt,
+      userPrompt: row.user_prompt ?? '',
+      platformPrompts: row.platform_prompts ?? {},
+      keywordConfig: row.keyword_config ?? { tier1: [], tier2: [], minScore: 1 },
+      lastFetchTime: row.last_fetch_time,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -41,7 +45,7 @@ export async function GET(): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { name, systemPrompt } = body;
+    const { name, systemPrompt, userPrompt, platformPrompts, keywordConfig } = body;
 
     if (!name) {
       return NextResponse.json({ error: 'name is required' }, { status: 400 });
@@ -50,7 +54,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const supabase = getSupabaseServer();
     const { data, error } = await supabase
       .from('content_pages')
-      .insert({ name: name.trim(), system_prompt: systemPrompt ?? '' })
+      .insert({
+        name: name.trim(),
+        system_prompt: systemPrompt ?? '',
+        user_prompt: userPrompt ?? '',
+        platform_prompts: platformPrompts ?? {},
+        keyword_config: keywordConfig ?? { tier1: [], tier2: [], minScore: 1 },
+      })
       .select()
       .single();
 
@@ -61,6 +71,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         id: data.id,
         name: data.name,
         systemPrompt: data.system_prompt,
+        userPrompt: data.user_prompt ?? '',
+        platformPrompts: data.platform_prompts ?? {},
+        keywordConfig: data.keyword_config ?? { tier1: [], tier2: [], minScore: 1 },
+        lastFetchTime: data.last_fetch_time,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       },
@@ -74,7 +88,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { id, name, systemPrompt } = body;
+    const { id, name, systemPrompt, userPrompt, platformPrompts, keywordConfig, lastFetchTime } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
@@ -83,6 +97,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name.trim();
     if (systemPrompt !== undefined) updates.system_prompt = systemPrompt;
+    if (userPrompt !== undefined) updates.user_prompt = userPrompt;
+    if (platformPrompts !== undefined) updates.platform_prompts = platformPrompts;
+    if (keywordConfig !== undefined) updates.keyword_config = keywordConfig;
+    if (lastFetchTime !== undefined) updates.last_fetch_time = lastFetchTime;
 
     const supabase = getSupabaseServer();
     const { data, error } = await supabase
@@ -99,6 +117,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         id: data.id,
         name: data.name,
         systemPrompt: data.system_prompt,
+        userPrompt: data.user_prompt ?? '',
+        platformPrompts: data.platform_prompts ?? {},
+        keywordConfig: data.keyword_config ?? { tier1: [], tier2: [], minScore: 1 },
+        lastFetchTime: data.last_fetch_time,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       },

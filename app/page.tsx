@@ -28,6 +28,7 @@ export default function Home() {
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
   const [filterDone, setFilterDone] = useState('all');
+  const [filterKeyword, setFilterKeyword] = useState('');
 
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [progress, setProgress] = useState('');
@@ -59,6 +60,7 @@ export default function Home() {
       if (filterFrom) params.set('from', filterFrom);
       if (filterTo) params.set('to', filterTo);
       if (filterDone !== 'all') params.set('done', filterDone);
+      if (filterKeyword.trim()) params.set('keyword', filterKeyword.trim());
 
       const res = await fetch(`/api/posts?${params}`);
       const data = await res.json();
@@ -70,10 +72,10 @@ export default function Home() {
     } finally {
       setPostsLoading(false);
     }
-  }, [activePageId, offset, filterSource, filterFrom, filterTo, filterDone]);
+  }, [activePageId, offset, filterSource, filterFrom, filterTo, filterDone, filterKeyword]);
 
   useEffect(() => { loadPosts(); }, [loadPosts]);
-  useEffect(() => { setOffset(0); }, [filterSource, filterFrom, filterTo, filterDone, activePageId]);
+  useEffect(() => { setOffset(0); }, [filterSource, filterFrom, filterTo, filterDone, filterKeyword, activePageId]);
 
   const activePage = pages.find((p) => p.id === activePageId);
 
@@ -237,6 +239,13 @@ export default function Home() {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 items-center">
+          <input
+            type="text"
+            value={filterKeyword}
+            onChange={(e) => setFilterKeyword(e.target.value)}
+            placeholder="🔍 Search keywords..."
+            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground w-44"
+          />
           <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}
             className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground">
             <option value="All">All Sources</option>
@@ -253,6 +262,9 @@ export default function Home() {
             <option value="not_done">Drafts</option>
             <option value="done">Published</option>
           </select>
+          {filterKeyword && (
+            <button onClick={() => setFilterKeyword('')} className="text-xs text-muted-foreground hover:text-foreground underline">Clear</button>
+          )}
           <span className="text-xs ml-auto text-muted-foreground">{totalCount} posts</span>
         </div>
 
@@ -329,12 +341,13 @@ export default function Home() {
       {activePageId && (
         <AIChatWindow
           pageId={activePageId}
-          currentFilters={{ source: filterSource, from: filterFrom, to: filterTo, done: filterDone as DashboardFilters['done'] }}
+          currentFilters={{ source: filterSource, from: filterFrom, to: filterTo, done: filterDone as DashboardFilters['done'], keyword: filterKeyword }}
           onFiltersChange={(filters) => {
             if (filters.source !== undefined) setFilterSource(filters.source);
             if (filters.from !== undefined) setFilterFrom(filters.from);
             if (filters.to !== undefined) setFilterTo(filters.to);
             if (filters.done !== undefined) setFilterDone(filters.done);
+            if (filters.keyword !== undefined) setFilterKeyword(filters.keyword);
           }}
           onPostsRefresh={loadPosts}
         />

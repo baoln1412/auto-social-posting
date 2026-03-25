@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { Article, PostDraft } from '@/app/types';
+import { Article, PostDraft, KeywordConfig } from '@/app/types';
 import {
   initPipelineNotebook,
   addArticleSource,
@@ -8,6 +8,8 @@ import {
   cleanupPipelineNotebook,
   detectEngine,
   processBatchGemini,
+  filterRelevantArticles,
+  filterByKeywords,
 } from './article-processor';
 import { getSupabaseServer } from '@/app/lib/supabase';
 
@@ -17,22 +19,29 @@ export const maxDuration = 300;
 async function savePostToDb(post: PostDraft, pageId: string): Promise<void> {
   try {
     const supabase = getSupabaseServer();
-    await supabase.from('posts').upsert(
+    const { error } = await supabase.from('posts').upsert(
       {
         page_id: pageId,
         article_url: post.article.url,
         article_title: post.article.title,
         source: post.article.source,
         pub_date: post.article.pubDate,
-        image_url: post.generatedImageUrl ?? post.article.imageUrl ?? null,
+        image_url: post.article.imageUrl ?? null,
+        generated_image_url: post.generatedImageUrl ?? null,
         description: post.article.description ?? null,
         summary: post.article.summary ?? null,
         emoji_title: post.emojiTitle,
         facebook_text: post.facebookText,
+        platform_drafts: post.platformDrafts ?? {},
         fetch_time: new Date().toISOString(),
       },
       { onConflict: 'article_url' },
     );
+    if (error) {
+      console.error(`[pipeline] Supabase upsert error for "${post.article.title}":`, error.message, error.details, error.hint);
+    } else {
+      console.log(`[pipeline] Saved post: ${post.emojiTitle?.slice(0, 50) ?? post.article.title.slice(0, 50)}`);
+    }
   } catch (err) {
     console.error('[pipeline] Failed to save post:', err);
   }
@@ -60,11 +69,27 @@ async function filterNewArticles(articles: Article[]): Promise<Article[]> {
   }
 }
 
+// ── Update last fetch time on page ────────────────────────────────────────
+async function updateLastFetchTime(pageId: string): Promise<void> {
+  try {
+    const supabase = getSupabaseServer();
+    await supabase
+      .from('content_pages')
+      .update({ last_fetch_time: new Date().toISOString() })
+      .eq('id', pageId);
+  } catch (err) {
+    console.error('[pipeline] Failed to update last fetch time:', err);
+  }
+}
+
 export async function POST(request: NextRequest): Promise<Response> {
   const body = await request.json();
   const articles: Article[] = body.articles ?? [];
   const pageId: string = body.pageId;
   const systemPrompt: string = body.systemPrompt ?? 'You are a helpful social media assistant.';
+  const userPrompt: string = body.userPrompt ?? '';
+  const platformPrompts: Record<string, string> = body.platformPrompts ?? {};
+  const keywordConfig: KeywordConfig = body.keywordConfig ?? { tier1: [], tier2: [], minScore: 1 };
 
   if (!pageId) {
     return new Response(JSON.stringify({ error: 'pageId is required' }), {
@@ -102,28 +127,78 @@ export async function POST(request: NextRequest): Promise<Response> {
         type: 'progress',
         current: 0,
         total: newArticles.length,
-        title: `${newArticles.length} new articles (${articles.length - newArticles.length} skipped) — using ${engine}`,
+        title: `${newArticles.length} new articles found — filtering by keywords...`,
+      });
+
+      // Step 2: Filter by keywords (fast, local — runs FIRST)
+      const keywordFiltered = filterByKeywords(
+        newArticles,
+        keywordConfig,
+        (msg) => emit({ type: 'progress', current: 0, total: newArticles.length, title: msg }),
+      );
+
+      if (keywordFiltered.length === 0) {
+        emit({
+          type: 'progress',
+          current: 0,
+          total: 0,
+          title: 'No articles matched your keyword filters — try adjusting your keywords',
+        });
+        emit({ type: 'done', total: 0, skipped: articles.length });
+        controller.close();
+        return;
+      }
+
+      // Step 3: AI relevance filter (runs AFTER keyword filter)
+      const relevantArticles = await filterRelevantArticles(
+        keywordFiltered,
+        systemPrompt,
+        (msg) => emit({ type: 'progress', current: 0, total: keywordFiltered.length, title: msg }),
+      );
+
+      if (relevantArticles.length === 0) {
+        emit({
+          type: 'progress',
+          current: 0,
+          total: 0,
+          title: 'No relevant articles found for your niche — try different sources',
+        });
+        emit({ type: 'done', total: 0, skipped: articles.length });
+        controller.close();
+        return;
+      }
+
+      emit({
+        type: 'progress',
+        current: 0,
+        total: relevantArticles.length,
+        title: `${relevantArticles.length} relevant articles (${newArticles.length - relevantArticles.length} filtered) — generating posts...`,
       });
 
       await initPipelineNotebook();
 
+      let actualPostCount = 0;
       const emitAndSave = async (post: PostDraft) => {
         const postWithFetchTime = { ...post, fetchTime: new Date().toISOString(), pageId };
         emit({ type: 'post', post: postWithFetchTime });
         await savePostToDb(post, pageId);
+        actualPostCount++;
       };
 
+      // Step 4: Generate posts from relevant articles
       if (engine === 'gemini') {
         await processBatchGemini(
-          newArticles,
+          relevantArticles,
           systemPrompt,
           async (post) => { await emitAndSave(post); },
           (current, total, title) => emit({ type: 'progress', current, total, title }),
+          platformPrompts,
+          userPrompt,
         );
       } else {
-        for (let i = 0; i < newArticles.length; i++) {
-          const article = newArticles[i];
-          emit({ type: 'progress', current: i + 1, total: newArticles.length, title: article.title });
+        for (let i = 0; i < relevantArticles.length; i++) {
+          const article = relevantArticles[i];
+          emit({ type: 'progress', current: i + 1, total: relevantArticles.length, title: article.title });
           try {
             const post = await processArticle(article);
             await emitAndSave(post);
@@ -137,7 +212,11 @@ export async function POST(request: NextRequest): Promise<Response> {
 
       await cleanupPipelineNotebook();
 
-      emit({ type: 'done', total: newArticles.length, skipped: articles.length - newArticles.length });
+      // Update last fetch time
+      await updateLastFetchTime(pageId);
+
+      const totalSkipped = articles.length - relevantArticles.length;
+      emit({ type: 'done', total: actualPostCount, skipped: totalSkipped });
       controller.close();
     },
   });

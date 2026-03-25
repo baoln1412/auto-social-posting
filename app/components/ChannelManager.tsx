@@ -1,23 +1,27 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { PageChannel } from '@/app/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { PageChannel } from '../types';
 
 interface ChannelManagerProps {
   pageId: string;
 }
 
-const PLATFORM_CONFIG: Record<string, { icon: string; label: string; available: boolean }> = {
-  facebook: { icon: '📘', label: 'Facebook', available: true },
-  threads: { icon: '🔗', label: 'Threads', available: false },
-  tiktok: { icon: '🎵', label: 'TikTok', available: false },
-  instagram: { icon: '📸', label: 'Instagram', available: false },
+const PLATFORM_CONFIG: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+  facebook: { label: 'Facebook', icon: '📘', color: 'text-blue-600', bg: 'bg-blue-50' },
+  instagram: { label: 'Instagram', icon: '📸', color: 'text-pink-600', bg: 'bg-pink-50' },
+  threads: { label: 'Threads', icon: '🧵', color: 'text-stone-700', bg: 'bg-stone-100' },
+  tiktok: { label: 'TikTok', icon: '🎵', color: 'text-stone-700', bg: 'bg-stone-100' },
 };
+
+const COMING_SOON = ['instagram', 'threads', 'tiktok'];
 
 export default function ChannelManager({ pageId }: ChannelManagerProps) {
   const [channels, setChannels] = useState<PageChannel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddMenu, setShowAddMenu] = useState(false);
 
   const loadChannels = useCallback(async () => {
     try {
@@ -25,121 +29,93 @@ export default function ChannelManager({ pageId }: ChannelManagerProps) {
       const data = await res.json();
       setChannels(data.channels ?? []);
     } catch {
-      setChannels([]);
+      console.error('Failed to load channels');
     } finally {
       setLoading(false);
     }
   }, [pageId]);
 
-  useEffect(() => {
-    loadChannels();
-  }, [loadChannels]);
+  useEffect(() => { loadChannels(); }, [loadChannels]);
 
-  const handleConnect = (platform: string) => {
-    if (platform === 'facebook') {
-      window.location.href = `/api/auth/facebook?pageId=${pageId}`;
-    }
-    setShowAddMenu(false);
+  const handleConnect = () => {
+    window.location.href = `/api/auth/facebook?pageId=${pageId}`;
   };
 
   const handleDisconnect = async (channelId: string) => {
     if (!confirm('Disconnect this channel?')) return;
-    await fetch(`/api/facebook/status?channelId=${channelId}`, { method: 'DELETE' });
-    setChannels((prev) => prev.filter((c) => c.id !== channelId));
+    try {
+      const res = await fetch(`/api/facebook/status?channelId=${channelId}`, { method: 'DELETE' });
+      if (res.ok) setChannels((prev) => prev.filter((c) => c.id !== channelId));
+    } catch {
+      alert('Failed to disconnect');
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="rounded-lg px-4 py-3 text-sm" style={{ backgroundColor: '#0d1117', border: '1px solid #1e293b', color: '#8b949e' }}>
-        Loading channels...
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-lg overflow-hidden" style={{ backgroundColor: '#0d1117', border: '1px solid #1e293b' }}>
-      <div className="flex items-center justify-between px-4 py-3">
-        <span className="text-sm font-medium" style={{ color: '#e2e8f0' }}>
-          📡 Connected Channels
-          {channels.length > 0 && (
-            <span className="ml-2 px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: '#238636', color: '#fff' }}>
-              {channels.length}
-            </span>
-          )}
-        </span>
-        <div className="relative">
-          <button
-            onClick={() => setShowAddMenu(!showAddMenu)}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold"
-            style={{ backgroundColor: '#21262d', color: '#c9d1d9', border: '1px solid #30363d' }}
-          >
-            + Add Channel
-          </button>
-          {showAddMenu && (
-            <div
-              className="absolute right-0 top-full mt-1 rounded-lg py-1 z-50 min-w-[180px]"
-              style={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}
-            >
-              {Object.entries(PLATFORM_CONFIG).map(([key, cfg]) => (
-                <button
-                  key={key}
-                  onClick={() => cfg.available ? handleConnect(key) : null}
-                  disabled={!cfg.available}
-                  className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
-                  style={{
-                    color: cfg.available ? '#e2e8f0' : '#484f58',
-                    cursor: cfg.available ? 'pointer' : 'not-allowed',
-                  }}
+    <Card className="card-warm">
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base font-semibold">📡 Connected Channels</CardTitle>
+        <Button size="sm" variant="outline" onClick={handleConnect} className="border-primary text-primary hover:bg-primary/5">
+          + Add Channel
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading channels...</p>
+        ) : channels.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No channels connected. Click &quot;+ Add Channel&quot; to connect a Facebook page.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {channels.map((ch) => {
+              const cfg = PLATFORM_CONFIG[ch.platform] ?? PLATFORM_CONFIG.facebook;
+              return (
+                <div
+                  key={ch.id}
+                  className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
                 >
-                  <span>{cfg.icon}</span>
-                  <span>{cfg.label}</span>
-                  {!cfg.available && (
-                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: '#21262d', color: '#8b949e' }}>
-                      Soon
+                  <div className="flex items-center gap-3">
+                    <span className={`w-9 h-9 rounded-full flex items-center justify-center text-lg ${cfg.bg}`}>
+                      {cfg.icon}
                     </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {channels.length > 0 && (
-        <div className="px-4 pb-3 space-y-2">
-          {channels.map((ch) => {
-            const cfg = PLATFORM_CONFIG[ch.platform] ?? { icon: '📌', label: ch.platform };
-            return (
-              <div
-                key={ch.id}
-                className="flex items-center justify-between px-3 py-2 rounded-lg"
-                style={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}
-              >
-                <div className="flex items-center gap-2">
-                  <span>{cfg.icon}</span>
-                  <span className="text-sm" style={{ color: '#e2e8f0' }}>{ch.platformPageName}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: '#0e4429', color: '#3fb950' }}>
-                    Connected
-                  </span>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{ch.platformPageName}</p>
+                      <p className="text-xs text-muted-foreground">{cfg.label}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 text-[10px]">
+                      Connected
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDisconnect(ch.id)}
+                      className="text-muted-foreground hover:text-destructive text-xs"
+                    >
+                      ✕
+                    </Button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleDisconnect(ch.id)}
-                  className="text-xs px-2 py-1 rounded"
-                  style={{ color: '#f85149', backgroundColor: 'transparent' }}
-                >
-                  ✕
-                </button>
-              </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Coming soon badges */}
+        <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-border">
+          {COMING_SOON.map((platform) => {
+            const cfg = PLATFORM_CONFIG[platform];
+            return (
+              <Badge key={platform} variant="outline" className="text-xs text-muted-foreground gap-1.5 py-1">
+                {cfg.icon} {cfg.label}
+                <span className="text-[9px] opacity-60">Soon</span>
+              </Badge>
             );
           })}
         </div>
-      )}
-
-      {channels.length === 0 && (
-        <div className="px-4 pb-3 text-xs" style={{ color: '#8b949e' }}>
-          No channels connected. Click &quot;+ Add Channel&quot; to connect a Facebook page.
-        </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

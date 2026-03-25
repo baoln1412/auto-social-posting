@@ -15,6 +15,7 @@ export interface DashboardFilters {
   from?: string;
   to?: string;
   done?: 'all' | 'not_done' | 'done';
+  keyword?: string;
 }
 
 interface AIChatWindowProps {

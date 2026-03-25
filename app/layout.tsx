@@ -1,13 +1,10 @@
 import type { Metadata } from 'next';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import './globals.css';
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: 'Crime News Draft Tool',
-  description: 'Generate Facebook post drafts from crime news',
+  title: 'Auto Social Posting',
+  description: 'AI-powered content management and social media publishing platform',
 };
 
 export default function RootLayout({
@@ -16,12 +13,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
+    <html lang="en" suppressHydrationWarning>
       <body
-        style={{ backgroundColor: '#0a0a0a', color: '#ffffff' }}
+        className="bg-background text-foreground antialiased"
         suppressHydrationWarning
       >
-        {children}
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
       </body>
     </html>
   );

@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 
 interface Feed {
   id: string;
@@ -19,6 +23,12 @@ interface DiscoveredFeed {
 interface SourceManagerProps {
   pageId: string;
 }
+
+const FEED_BADGE: Record<string, { label: string; className: string }> = {
+  rss: { label: 'RSS', className: 'bg-blue-50 text-blue-600' },
+  atom: { label: 'ATOM', className: 'bg-emerald-50 text-emerald-600' },
+  web_scrape: { label: 'SCRAPE', className: 'bg-amber-50 text-amber-700' },
+};
 
 export default function SourceManager({ pageId }: SourceManagerProps) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
@@ -48,17 +58,13 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
     }
   }, [pageId]);
 
-  useEffect(() => {
-    loadFeeds();
-  }, [loadFeeds]);
+  useEffect(() => { loadFeeds(); }, [loadFeeds]);
 
   function guessName(url: string): string {
     try {
       const host = new URL(url).hostname.replace('www.', '');
       return host.split('.')[0].replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    } catch {
-      return '';
-    }
+    } catch { return ''; }
   }
 
   const handleDetect = async () => {
@@ -68,7 +74,6 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
     setError(null);
     setDiscovered([]);
     setDetectStatus('🔍 Scanning for RSS feeds...');
-
     try {
       const res = await fetch('/api/feeds/discover', {
         method: 'POST',
@@ -77,23 +82,22 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
       });
       const data = await res.json();
       const foundFeeds: DiscoveredFeed[] = data.feeds ?? [];
-
       if (foundFeeds.length === 0) {
-        setDetectStatus('⚠️ No RSS feed found. You can enter the URL manually and use "Web Scrape" type.');
+        setDetectStatus('⚠️ No RSS found. Enter URL manually with "Web Scrape" type.');
         setNewName(guessName(url));
         setNewFeedUrl(url);
         setNewFeedType('web_scrape');
       } else if (foundFeeds.length === 1) {
         setNewFeedUrl(foundFeeds[0].url);
         setNewName(foundFeeds[0].title || guessName(url));
-        setDetectStatus(`✅ Found feed: ${foundFeeds[0].url}`);
+        setDetectStatus(`✅ Found: ${foundFeeds[0].url}`);
         setNewFeedType('rss');
       } else {
         setDiscovered(foundFeeds);
         setDetectStatus(`Found ${foundFeeds.length} feeds — pick one:`);
       }
     } catch {
-      setDetectStatus('❌ Detection failed. Enter the URL manually.');
+      setDetectStatus('❌ Detection failed.');
       setNewName(guessName(url));
     } finally {
       setDetecting(false);
@@ -112,7 +116,6 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
     const feedUrl = newFeedUrl.trim();
     const name = newName.trim();
     if (!name || !feedUrl) return;
-
     setAdding(true);
     setError(null);
     try {
@@ -142,218 +145,162 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
   const handleToggle = async (id: string, enabled: boolean) => {
     setFeeds((prev) => prev.map((f) => (f.id === id ? { ...f, enabled } : f)));
     try {
-      const res = await fetch('/api/feeds', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, enabled }),
-      });
+      const res = await fetch('/api/feeds', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, enabled }) });
       if (!res.ok) throw new Error('Toggle failed');
-    } catch {
-      setFeeds((prev) => prev.map((f) => (f.id === id ? { ...f, enabled: !enabled } : f)));
-    }
+    } catch { setFeeds((prev) => prev.map((f) => (f.id === id ? { ...f, enabled: !enabled } : f))); }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Remove "${name}" from your feed sources?`)) return;
+    if (!confirm(`Remove "${name}"?`)) return;
     setFeeds((prev) => prev.filter((f) => f.id !== id));
     try {
       const res = await fetch(`/api/feeds?id=${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
-    } catch {
-      await loadFeeds();
-    }
+    } catch { await loadFeeds(); }
   };
 
   const enabledCount = feeds.filter((f) => f.enabled).length;
 
-  const FEED_TYPE_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-    rss: { label: 'RSS', color: '#60a5fa', bg: '#1e3a5f' },
-    atom: { label: 'ATOM', color: '#34d399', bg: '#064e3b' },
-    web_scrape: { label: 'SCRAPE', color: '#f59e0b', bg: '#78350f' },
-  };
-
-  const inputStyle = {
-    padding: '0.4rem 0.6rem',
-    borderRadius: '0.375rem',
-    border: '1px solid #374151',
-    backgroundColor: '#0d1117',
-    color: '#e2e8f0',
-    fontSize: '0.8rem',
-    outline: 'none',
-  };
-
   return (
-    <div style={{ backgroundColor: '#0d1117', border: '1px solid #1e293b', borderRadius: '0.75rem', overflow: 'hidden' }}>
+    <Card className="card-warm">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'none', border: 'none', cursor: 'pointer', color: '#e2e8f0' }}
+        className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-foreground hover:bg-accent/50 transition-colors rounded-t-xl"
       >
-        <span style={{ fontWeight: 700, fontSize: '0.875rem', letterSpacing: '0.05em' }}>
-          📡 FEED SOURCES
-          <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>
+        <span>
+          📡 Feed Sources
+          <span className="ml-2 text-xs text-muted-foreground font-normal">
             {enabledCount} active / {feeds.length} total
           </span>
         </span>
-        <span style={{ color: '#64748b', fontSize: '1.25rem', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-          ▾
+        <span className="text-muted-foreground text-xs">
+          {isOpen ? '▲' : '▼'}
         </span>
       </button>
 
       {isOpen && (
-        <div style={{ padding: '0 1rem 1rem', borderTop: '1px solid #1e293b' }}>
-          {loading && <p style={{ color: '#f0e523', fontSize: '0.8rem', padding: '0.75rem 0' }}>Loading feeds...</p>}
-          {error && <p style={{ color: '#ff6b6b', fontSize: '0.8rem', padding: '0.5rem 0' }}>⚠️ {error}</p>}
+        <CardContent className="pt-0 space-y-3">
+          {loading && <p className="text-sm text-primary">Loading feeds...</p>}
+          {error && <p className="text-sm text-destructive">⚠️ {error}</p>}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+          <div className="flex flex-col gap-2">
             {feeds.map((feed) => {
-              const badge = FEED_TYPE_BADGE[feed.feedType] ?? FEED_TYPE_BADGE.rss;
+              const badge = FEED_BADGE[feed.feedType] ?? FEED_BADGE.rss;
               return (
                 <div
                   key={feed.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.75rem',
-                    padding: '0.5rem 0.75rem', borderRadius: '0.5rem',
-                    backgroundColor: feed.enabled ? '#111827' : '#0a0a0a',
-                    border: `1px solid ${feed.enabled ? '#1e293b' : '#1a1a1a'}`,
-                    opacity: feed.enabled ? 1 : 0.5, transition: 'all 0.15s',
-                  }}
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${feed.enabled ? 'border-border bg-background' : 'border-border/50 bg-muted/30 opacity-50'}`}
                 >
+                  {/* Toggle switch */}
                   <button
                     onClick={() => handleToggle(feed.id, !feed.enabled)}
-                    title={feed.enabled ? 'Disable' : 'Enable'}
-                    style={{
-                      width: '2.5rem', height: '1.4rem', borderRadius: '0.7rem',
-                      border: 'none', cursor: 'pointer', position: 'relative',
-                      backgroundColor: feed.enabled ? '#22c55e' : '#374151',
-                      transition: 'background 0.2s', flexShrink: 0,
-                    }}
+                    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${feed.enabled ? 'bg-emerald-500' : 'bg-stone-300'}`}
                   >
-                    <span style={{
-                      position: 'absolute', top: '2px',
-                      left: feed.enabled ? '1.2rem' : '2px',
-                      width: '1rem', height: '1rem', borderRadius: '50%',
-                      backgroundColor: '#fff', transition: 'left 0.2s',
-                    }} />
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${feed.enabled ? 'left-[18px]' : 'left-0.5'}`} />
                   </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 600 }}>{feed.name}</span>
-                      <span style={{ fontSize: '0.6rem', padding: '1px 6px', borderRadius: '4px', backgroundColor: badge.bg, color: badge.color, fontWeight: 600 }}>
-                        {badge.label}
-                      </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-foreground">{feed.name}</span>
+                      <Badge variant="secondary" className={`text-[10px] ${badge.className}`}>{badge.label}</Badge>
                     </div>
-                    <p style={{ color: '#64748b', fontSize: '0.7rem', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{feed.url}</p>
+                    <p className="text-xs text-muted-foreground truncate">{feed.url}</p>
                   </div>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleDelete(feed.id, feed.name)}
-                    title="Remove"
-                    style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem', padding: '0.25rem', lineHeight: 1, flexShrink: 0 }}
-                    onMouseOver={(e) => ((e.target as HTMLElement).style.color = '#ff6b6b')}
-                    onMouseOut={(e) => ((e.target as HTMLElement).style.color = '#64748b')}
-                  >✕</button>
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                  >
+                    ✕
+                  </Button>
                 </div>
               );
             })}
           </div>
 
           {/* Add new feed */}
-          <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: '#111827', border: '1px solid #1e293b' }}>
-            <p style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
-              ➕ ADD NEW SOURCE
+          <div className="rounded-lg p-4 bg-muted/30 border border-border space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              ➕ Add New Source
             </p>
 
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <input
+            <div className="flex gap-2">
+              <Input
                 type="url"
                 placeholder="Paste any website or RSS URL..."
                 value={inputUrl}
                 onChange={(e) => setInputUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleDetect()}
-                style={{ ...inputStyle, flex: 1 }}
+                className="flex-1 text-sm"
               />
-              <button
+              <Button
                 onClick={handleDetect}
                 disabled={detecting || !inputUrl.trim()}
-                style={{
-                  padding: '0.4rem 0.75rem', borderRadius: '0.375rem', border: 'none',
-                  backgroundColor: '#3b82f6', color: '#fff', fontWeight: 600, fontSize: '0.8rem',
-                  cursor: detecting || !inputUrl.trim() ? 'not-allowed' : 'pointer',
-                  opacity: detecting || !inputUrl.trim() ? 0.5 : 1, whiteSpace: 'nowrap',
-                }}
+                size="sm"
+                variant="default"
               >
-                {detecting ? '🔍 Detecting...' : '🔍 Detect Feed'}
-              </button>
+                {detecting ? '🔍...' : '🔍 Detect'}
+              </Button>
             </div>
 
             {detectStatus && (
-              <p style={{ color: detectStatus.startsWith('✅') ? '#6bffaa' : detectStatus.startsWith('⚠️') || detectStatus.startsWith('❌') ? '#ff6b6b' : '#f0e523', fontSize: '0.75rem', margin: '0.25rem 0 0.5rem' }}>
+              <p className={`text-xs ${detectStatus.startsWith('✅') ? 'text-emerald-600' : detectStatus.startsWith('⚠️') || detectStatus.startsWith('❌') ? 'text-destructive' : 'text-primary'}`}>
                 {detectStatus}
               </p>
             )}
 
             {discovered.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: '0.5rem' }}>
+              <div className="flex flex-col gap-1">
                 {discovered.map((df, i) => (
-                  <button
+                  <Button
                     key={i}
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleSelectDiscovered(df)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.5rem',
-                      padding: '0.35rem 0.6rem', borderRadius: '0.375rem',
-                      border: '1px solid #374151', backgroundColor: '#0d1117',
-                      color: '#e2e8f0', fontSize: '0.75rem', cursor: 'pointer', textAlign: 'left',
-                    }}
+                    className="justify-start text-xs truncate"
                   >
-                    <span style={{ color: '#3b82f6' }}>⟶</span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {df.title ? `${df.title} — ` : ''}{df.url}
-                    </span>
-                  </button>
+                    <span className="text-primary mr-1">⟶</span>
+                    {df.title ? `${df.title} — ` : ''}{df.url}
+                  </Button>
                 ))}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <input
+            <div className="flex gap-2 flex-wrap">
+              <Input
                 type="text"
                 placeholder="Feed name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                style={{ ...inputStyle, flex: '1 1 120px' }}
+                className="flex-1 min-w-[120px] text-sm"
               />
-              <input
+              <Input
                 type="url"
                 placeholder="Feed URL"
                 value={newFeedUrl}
                 onChange={(e) => setNewFeedUrl(e.target.value)}
-                style={{ ...inputStyle, flex: '2 1 200px' }}
+                className="flex-[2] min-w-[200px] text-sm"
               />
               <select
                 value={newFeedType}
                 onChange={(e) => setNewFeedType(e.target.value)}
-                style={{ ...inputStyle, width: 'auto' }}
+                className="px-2 py-1.5 rounded-md text-sm border border-border bg-background text-foreground"
               >
                 <option value="rss">RSS</option>
                 <option value="atom">Atom</option>
                 <option value="web_scrape">Web Scrape</option>
               </select>
-              <button
+              <Button
                 onClick={handleAdd}
                 disabled={adding || !newName.trim() || !newFeedUrl.trim()}
-                style={{
-                  padding: '0.4rem 1rem', borderRadius: '0.375rem', border: 'none',
-                  backgroundColor: '#f0e523', color: '#000', fontWeight: 700, fontSize: '0.8rem',
-                  cursor: adding ? 'not-allowed' : 'pointer',
-                  opacity: adding || !newName.trim() || !newFeedUrl.trim() ? 0.5 : 1,
-                  whiteSpace: 'nowrap',
-                }}
+                size="sm"
               >
                 {adding ? 'Adding...' : 'Add'}
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 }

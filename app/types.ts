@@ -12,21 +12,39 @@ export interface ArticleWithSummary extends Article {
   summary: string;
 }
 
+export type PostStatus = 'draft' | 'scheduled' | 'published' | 'failed';
+
 export interface PostDraft {
+  id?: string;
   article: ArticleWithSummary;
   facebookText: string;
   emojiTitle: string;
   generatedImageUrl?: string;
+  platformDrafts?: Record<string, string>;
   fetchTime?: string;
   isNew?: boolean;
   isDone?: boolean;
   pageId?: string;
+  status?: PostStatus;
+  scheduledAt?: string;
+  publishedAt?: string;
+  engagement?: { likes: number; comments: number; shares: number };
+}
+
+export interface KeywordConfig {
+  tier1: string[];
+  tier2: string[];
+  minScore: number;
 }
 
 export interface ContentPage {
   id: string;
   name: string;
   systemPrompt: string;
+  userPrompt: string;
+  platformPrompts: Record<string, string>;
+  keywordConfig: KeywordConfig;
+  lastFetchTime?: string;
   createdAt: string;
   updatedAt: string;
 }

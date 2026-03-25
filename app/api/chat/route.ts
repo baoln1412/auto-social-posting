@@ -36,6 +36,10 @@ const tools: Tool[] = [
               enum: ['all', 'not_done', 'done'],
               description: '"all" for all posts, "not_done" for drafts, "done" for published',
             },
+            keyword: {
+              type: SchemaType.STRING,
+              description: 'Keyword to search for in post titles, content, summaries (case-insensitive)',
+            },
           },
         },
       },
@@ -46,7 +50,8 @@ const tools: Tool[] = [
         parameters: {
           type: SchemaType.OBJECT,
           properties: {
-            articleUrl: { type: SchemaType.STRING, description: 'The article URL of the post to regenerate' },
+            articleUrl: { type: SchemaType.STRING, description: 'The article URL of the post to regenerate (use this OR postId)' },
+            postId: { type: SchemaType.STRING, description: 'The post database ID (first 8 chars are shown on the card). Use this when the user references a post by ID.' },
             instructions: {
               type: SchemaType.STRING,
               description: 'Style or content instructions, e.g. "make it funnier" or "add more emojis"',
@@ -58,7 +63,7 @@ const tools: Tool[] = [
               description: 'Which field to regenerate',
             },
           },
-          required: ['articleUrl', 'instructions', 'field'],
+          required: ['instructions', 'field'],
         },
       },
       {
@@ -115,11 +120,19 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
 
       case 'regenerate_draft': {
         const supabase = getSupabaseServer();
-        const { data: post } = await supabase
+        // Resolve by postId prefix or full articleUrl
+        let query = supabase
           .from('posts')
-          .select('article_title, source, description, facebook_text, emoji_title, summary')
-          .eq('article_url', args.articleUrl)
-          .single();
+          .select('id, article_url, article_title, source, description, facebook_text, emoji_title, summary');
+        if (args.postId) {
+          // Support both full ID and 8-char prefix
+          query = query.ilike('id', `${args.postId}%`);
+        } else if (args.articleUrl) {
+          query = query.eq('article_url', args.articleUrl);
+        } else {
+          return JSON.stringify({ error: 'Provide either postId or articleUrl' });
+        }
+        const { data: post } = await query.single();
         if (!post) return JSON.stringify({ error: 'Post not found' });
 
         const genModel = genAI.getGenerativeModel({ model: FALLBACK_MODEL });

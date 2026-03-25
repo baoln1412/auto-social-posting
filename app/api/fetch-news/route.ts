@@ -52,6 +52,25 @@ async function loadFeeds(pageId: string): Promise<FeedEntry[]> {
   }
 }
 
+// ── Get last fetch time for a page ──────────────────────────────────────
+async function getLastFetchTime(pageId: string): Promise<Date | null> {
+  try {
+    const supabase = getSupabaseServer();
+    const { data } = await supabase
+      .from('content_pages')
+      .select('last_fetch_time')
+      .eq('id', pageId)
+      .single();
+
+    if (data?.last_fetch_time) {
+      return new Date(data.last_fetch_time);
+    }
+  } catch (err) {
+    console.warn('[fetch-news] Failed to get last fetch time:', err);
+  }
+  return null;
+}
+
 // ── Fuzzy title deduplication ────────────────────────────────────────────
 
 function normalizeTitle(title: string): string {
@@ -153,7 +172,7 @@ Return strictly a JSON object: { "uniqueIds": [0, 2, 5] }`;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const MAX_ARTICLES = 30;
 const IMG_SRC_REGEX_PATTERN = '<img[^>]+src="([^"]+)"';
 
@@ -204,14 +223,13 @@ function extractImages(item: any): { imageUrl?: string; portraitUrl?: string } {
 }
 
 // ── Fetch RSS/Atom feed ──────────────────────────────────────────────────
-async function fetchRssFeed(feed: FeedEntry): Promise<Article[]> {
+async function fetchRssFeed(feed: FeedEntry, cutoffTime: Date): Promise<Article[]> {
   try {
     const feedData = await Promise.race([
       parser.parseURL(feed.url),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 8000)),
     ]);
 
-    const now = Date.now();
     const articles: Article[] = [];
 
     for (const item of feedData.items ?? []) {
@@ -220,7 +238,9 @@ async function fetchRssFeed(feed: FeedEntry): Promise<Article[]> {
 
       const pubDateStr = item.pubDate ?? item.isoDate ?? new Date(0).toISOString();
       const pubDateMs = new Date(pubDateStr).getTime();
-      if (now - pubDateMs > SEVEN_DAYS_MS) continue;
+
+      // Only get articles published AFTER the cutoff time
+      if (pubDateMs < cutoffTime.getTime()) continue;
 
       const url = item.link ?? item.guid ?? '';
       if (!url) continue;
@@ -310,6 +330,7 @@ async function fetchWebScrape(feed: FeedEntry): Promise<Article[]> {
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const pageId = searchParams.get('pageId');
+  const forceRefresh = searchParams.get('force') === 'true';
 
   if (!pageId) {
     return NextResponse.json({ articles: [], error: 'pageId is required' }, { status: 400 });
@@ -321,13 +342,29 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ articles: [], message: 'No feeds configured for this page' });
   }
 
+  // Determine cutoff time: use last_fetch_time if available (incremental), else 24h ago
+  let cutoffTime: Date;
+  if (!forceRefresh) {
+    const lastFetch = await getLastFetchTime(pageId);
+    if (lastFetch) {
+      cutoffTime = lastFetch;
+      console.log(`[fetch-news] Incremental fetch: articles after ${lastFetch.toISOString()}`);
+    } else {
+      cutoffTime = new Date(Date.now() - TWENTY_FOUR_HOURS_MS);
+      console.log(`[fetch-news] First fetch: articles from last 24 hours`);
+    }
+  } else {
+    cutoffTime = new Date(Date.now() - TWENTY_FOUR_HOURS_MS);
+    console.log(`[fetch-news] Force refresh: articles from last 24 hours`);
+  }
+
   // Fetch all feeds concurrently
   const results = await Promise.allSettled(
     feeds.map((feed) => {
       if (feed.feedType === 'web_scrape') {
         return fetchWebScrape(feed);
       }
-      return fetchRssFeed(feed);
+      return fetchRssFeed(feed, cutoffTime);
     })
   );
 

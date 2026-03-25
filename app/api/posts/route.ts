@@ -6,6 +6,7 @@
  * - source: filter by source name
  * - from/to: date range (UTC+7)
  * - done: 'done' | 'not_done'
+ * - keyword: full-text keyword search across title, facebook text, summary
  * - limit: items per page (default 30)
  * - offset: pagination offset (default 0)
  */
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const fromDate = searchParams.get('from');
     const toDate = searchParams.get('to');
     const doneFilter = searchParams.get('done');
+    const keyword = searchParams.get('keyword');
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '30', 10), 100);
     const offset = parseInt(searchParams.get('offset') ?? '0', 10);
 
@@ -57,6 +59,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       query = query.eq('is_done', false);
     }
 
+    if (keyword && keyword.trim()) {
+      const q = `%${keyword.trim()}%`;
+      query = query.or(
+        `article_title.ilike.${q},facebook_text.ilike.${q},summary.ilike.${q},emoji_title.ilike.${q},description.ilike.${q}`
+      );
+    }
+
     // Apply pagination
     query = query.range(offset, offset + limit - 1);
 
@@ -69,6 +78,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Transform DB rows → PostDraft shape
     const posts: PostDraft[] = (data ?? []).map((row) => ({
+      id: row.id,
       article: {
         title: row.article_title,
         url: row.article_url,
@@ -80,8 +90,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
       emojiTitle: row.emoji_title,
       facebookText: row.facebook_text,
+      generatedImageUrl: row.generated_image_url ?? undefined,
+      platformDrafts: row.platform_drafts ?? {},
       fetchTime: row.fetch_time,
       isDone: row.is_done ?? false,
+      status: row.status ?? 'draft',
+      scheduledAt: row.scheduled_at ?? undefined,
+      publishedAt: row.published_at ?? undefined,
       pageId: row.page_id,
     }));
 
