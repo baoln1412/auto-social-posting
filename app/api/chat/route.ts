@@ -13,7 +13,7 @@ export const maxDuration = 120;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
 
-const PRIMARY_MODEL = 'gemini-2.0-flash-lite';
+const PRIMARY_MODEL = 'gemini-3.1-flash-lite-preview';
 const FALLBACK_MODEL = 'gemini-2.5-flash';
 
 // ── Tool declarations ──────────────────────────────────────────────────────
