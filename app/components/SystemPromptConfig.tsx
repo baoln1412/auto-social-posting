@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,12 +35,22 @@ export default function SystemPromptConfig({ prompt, userPrompt, platformPrompts
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  if (!isOpen && systemPromptVal !== prompt) {
+  // Always sync internal state when parent props change (e.g. page switch)
+  useEffect(() => {
     setSystemPromptVal(prompt);
-  }
-  if (!isOpen && userPromptVal !== userPrompt) {
+  }, [prompt]);
+
+  useEffect(() => {
     setUserPromptVal(userPrompt);
-  }
+  }, [userPrompt]);
+
+  useEffect(() => {
+    setOtherPrompts({
+      instagram: platformPrompts.instagram ?? '',
+      threads: platformPrompts.threads ?? '',
+      tiktok: platformPrompts.tiktok ?? '',
+    });
+  }, [platformPrompts]);
 
   const handleSave = async () => {
     setSaving(true);
