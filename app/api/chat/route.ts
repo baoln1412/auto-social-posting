@@ -120,13 +120,20 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
 
       case 'regenerate_draft': {
         const supabase = getSupabaseServer();
-        // Resolve by postId prefix or full articleUrl
+        // Resolve by postId (full UUID or 8-char prefix) or articleUrl
+        // NOTE: ilike does not work on UUID columns — must cast to text for prefix match
         let query = supabase
           .from('posts')
           .select('id, article_url, article_title, source, description, facebook_text, emoji_title, summary');
         if (args.postId) {
-          // Support both full ID and 8-char prefix
-          query = query.ilike('id', `${args.postId}%`);
+          const id = args.postId.trim();
+          if (id.length === 36 && id.includes('-')) {
+            // Full UUID — exact match
+            query = query.eq('id', id);
+          } else {
+            // Short prefix — cast UUID to text then use like
+            query = query.filter('id::text', 'like', `${id}%`);
+          }
         } else if (args.articleUrl) {
           query = query.eq('article_url', args.articleUrl);
         } else {
