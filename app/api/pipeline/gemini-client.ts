@@ -12,7 +12,7 @@ export function isAvailable(): boolean {
  * Generate text content using OpenRouter (nvidia/nemotron-3-super-120b-a12b:free).
  */
 export async function generateContent(systemPrompt: string, userMessage: string, asJson: boolean = false): Promise<string> {
-  const model = 'nvidia/nemotron-3-super-120b-a12b:free';
+  const model = 'stepfun/step-3.5-flash:free';
 
   const messages = [];
   if (systemPrompt) {

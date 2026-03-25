@@ -16,7 +16,7 @@ const openai = new OpenAI({
   }
 });
 
-const DEFAULT_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
+const DEFAULT_MODEL = 'stepfun/step-3.5-flash:free';
 
 // ── Tool declarations (OpenAI spec) ───────────────────────────────────────
 const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
