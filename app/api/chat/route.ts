@@ -120,6 +120,7 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
 
       case 'regenerate_draft': {
         const supabase = getSupabaseServer();
+        console.log('[regenerate_draft] Raw args:', args);
         // Resolve by postId (full UUID or 8-char prefix) or articleUrl
         // NOTE: ilike does not work on UUID columns — must cast to text for prefix match
         let query = supabase
@@ -127,20 +128,29 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
           .select('id, article_url, article_title, source, description, facebook_text, emoji_title, summary');
         if (args.postId) {
           const id = args.postId.replace(/^#+/, '').trim();
+          console.log(`[regenerate_draft] Cleaned postId: "${id}" (len: ${id.length})`);
           if (id.length === 36 && id.includes('-')) {
+            console.log('[regenerate_draft] Using exact match (.eq)');
             // Full UUID — exact match
             query = query.eq('id', id);
           } else {
+            console.log('[regenerate_draft] Using prefix match (.like cast)');
             // Short prefix — cast UUID to text then use like
             query = query.filter('id::text', 'like', `${id}%`);
           }
         } else if (args.articleUrl) {
+          console.log('[regenerate_draft] Using articleUrl:', args.articleUrl);
           query = query.eq('article_url', args.articleUrl);
         } else {
           return JSON.stringify({ error: 'Provide either postId or articleUrl' });
         }
-        const { data: post } = await query.single();
-        if (!post) return JSON.stringify({ error: 'Post not found' });
+        
+        const { data: post, error } = await query.single();
+        console.log('[regenerate_draft] Supabase Result. targetId:', post?.id, 'Error:', error);
+        
+        if (!post) {
+          return JSON.stringify({ error: `Post not found in database. Error: ${error?.message || 'null'}` });
+        }
 
         const genModel = genAI.getGenerativeModel({ model: FALLBACK_MODEL });
         const prompt = `You are a Vietnamese social media content writer. Regenerate ONLY the "${args.field}" field.
