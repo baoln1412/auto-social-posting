@@ -1,21 +1,22 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ContentPage, PostDraft, Article } from './types';
+import { ContentPage, PostDraft, Article, PostStatus, KeywordConfig } from './types';
+import AppLayout from './components/layout/AppLayout';
 import PostCard from './components/PostCard';
-import SourceManager from './components/SourceManager';
-import PageTabs from './components/PageTabs';
-import SystemPromptConfig from './components/SystemPromptConfig';
-import ChannelManager from './components/ChannelManager';
 import Pagination from './components/Pagination';
+import ContentCalendar from './components/calendar/ContentCalendar';
+import AnalyticsDashboard from './components/analytics/AnalyticsDashboard';
+import SettingsView from './components/settings/SettingsView';
+import { Button } from '@/components/ui/button';
+import AIChatWindow, { DashboardFilters } from './components/chat/AIChatWindow';
 
 export default function Home() {
-  // ── Pages ──────────────────────────────────────────────────────────
   const [pages, setPages] = useState<ContentPage[]>([]);
   const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState('content');
   const [pagesLoading, setPagesLoading] = useState(true);
 
-  // ── Posts + pagination ─────────────────────────────────────────────
   const [posts, setPosts] = useState<PostDraft[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -23,27 +24,22 @@ export default function Home() {
   const [postsLoading, setPostsLoading] = useState(false);
   const [sources, setSources] = useState<string[]>([]);
 
-  // ── Filters ────────────────────────────────────────────────────────
   const [filterSource, setFilterSource] = useState('All');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
   const [filterDone, setFilterDone] = useState('all');
 
-  // ── Pipeline ───────────────────────────────────────────────────────
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [progress, setProgress] = useState('');
-  const progressRef = useRef<HTMLDivElement>(null);
 
-  // ── Load pages ─────────────────────────────────────────────────────
+  // ── Load pages ──
   const loadPages = useCallback(async () => {
     try {
       const res = await fetch('/api/pages');
       const data = await res.json();
       const loaded: ContentPage[] = data.pages ?? [];
       setPages(loaded);
-      if (loaded.length > 0 && !activePageId) {
-        setActivePageId(loaded[0].id);
-      }
+      if (loaded.length > 0 && !activePageId) setActivePageId(loaded[0].id);
     } catch (err) {
       console.error('Failed to load pages:', err);
     } finally {
@@ -53,16 +49,12 @@ export default function Home() {
 
   useEffect(() => { loadPages(); }, [loadPages]);
 
-  // ── Load posts ─────────────────────────────────────────────────────
+  // ── Load posts ──
   const loadPosts = useCallback(async () => {
     if (!activePageId) return;
     setPostsLoading(true);
     try {
-      const params = new URLSearchParams({
-        pageId: activePageId,
-        limit: String(limit),
-        offset: String(offset),
-      });
+      const params = new URLSearchParams({ pageId: activePageId, limit: String(limit), offset: String(offset) });
       if (filterSource !== 'All') params.set('source', filterSource);
       if (filterFrom) params.set('from', filterFrom);
       if (filterTo) params.set('to', filterTo);
@@ -81,85 +73,100 @@ export default function Home() {
   }, [activePageId, offset, filterSource, filterFrom, filterTo, filterDone]);
 
   useEffect(() => { loadPosts(); }, [loadPosts]);
-
-  // Reset offset when filters change
   useEffect(() => { setOffset(0); }, [filterSource, filterFrom, filterTo, filterDone, activePageId]);
 
-  // ── Active page ────────────────────────────────────────────────────
   const activePage = pages.find((p) => p.id === activePageId);
 
-  // ── Add new page ───────────────────────────────────────────────────
+  // ── Page actions ──
   const handleAddPage = async () => {
     const name = prompt('Enter a name for the new content page:');
     if (!name?.trim()) return;
+
     try {
       const res = await fetch('/api/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), systemPrompt: '' }),
+        body: JSON.stringify({ name: name.trim() }),
       });
       const data = await res.json();
       if (data.page) {
         setPages((prev) => [...prev, data.page]);
         setActivePageId(data.page.id);
+        setActiveView('settings');
       }
     } catch (err) {
       console.error('Failed to create page:', err);
     }
   };
 
-  // ── Save system prompt ─────────────────────────────────────────────
-  const handleSavePrompt = async (prompt: string) => {
+  const handleSavePrompt = async (newPrompt: string, newUserPrompt: string, platformPrompts: Record<string, string>) => {
     if (!activePageId) return;
     await fetch('/api/pages', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: activePageId, systemPrompt: prompt }),
+      body: JSON.stringify({ id: activePageId, systemPrompt: newPrompt, userPrompt: newUserPrompt, platformPrompts }),
     });
     setPages((prev) =>
-      prev.map((p) => (p.id === activePageId ? { ...p, systemPrompt: prompt } : p))
+      prev.map((p) =>
+        p.id === activePageId ? { ...p, systemPrompt: newPrompt, userPrompt: newUserPrompt, platformPrompts } : p
+      )
     );
   };
 
-  // ── Toggle done ────────────────────────────────────────────────────
-  const handleToggleDone = async (articleUrl: string, currentDone: boolean) => {
-    setPosts((prev) =>
-      prev.map((p) => (p.article.url === articleUrl ? { ...p, isDone: !currentDone } : p))
+  const handleSaveKeywordConfig = async (config: KeywordConfig) => {
+    if (!activePageId) return;
+    await fetch('/api/pages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: activePageId, keywordConfig: config }),
+    });
+    setPages((prev) =>
+      prev.map((p) =>
+        p.id === activePageId ? { ...p, keywordConfig: config } : p
+      )
     );
+  };
+
+  const handleRenamePage = async () => {
+    if (!activePage) return;
+    const name = prompt('Enter new page name:', activePage.name);
+    if (!name?.trim() || name.trim() === activePage.name) return;
+    await fetch('/api/pages', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: activePageId, name: name.trim() }) });
+    setPages((prev) => prev.map((p) => (p.id === activePageId ? { ...p, name: name.trim() } : p)));
+  };
+
+  const handleDeletePage = async () => {
+    if (!activePage || !confirm(`Delete "${activePage.name}"? This cannot be undone.`)) return;
+    await fetch(`/api/pages?id=${activePageId}`, { method: 'DELETE' });
+    setPages((prev) => prev.filter((p) => p.id !== activePageId));
+    setActivePageId(pages.find((p) => p.id !== activePageId)?.id ?? null);
+  };
+
+  // ── Status change ──
+  const handleStatusChange = async (articleUrl: string, status: PostStatus, scheduledAt?: string) => {
+    setPosts((prev) => prev.map((p) => (p.article.url === articleUrl ? { ...p, status } : p)));
     try {
-      await fetch('/api/posts/toggle-done', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ articleUrl, isDone: !currentDone }),
-      });
-    } catch {
-      setPosts((prev) =>
-        prev.map((p) => (p.article.url === articleUrl ? { ...p, isDone: currentDone } : p))
-      );
-    }
+      await fetch('/api/posts/status', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ articleUrl, status, scheduledAt }) });
+    } catch { loadPosts(); }
   };
 
-  // ── Run pipeline ───────────────────────────────────────────────────
+  const handleToggleDone = async (articleUrl: string, currentDone: boolean) => {
+    const newStatus: PostStatus = currentDone ? 'draft' : 'published';
+    handleStatusChange(articleUrl, newStatus);
+  };
+
+  // ── Pipeline ──
   const handleRunPipeline = async () => {
     if (!activePageId || !activePage) return;
     setPipelineRunning(true);
     setProgress('Fetching articles...');
-
     try {
-      // Step 1: Fetch articles
       const fetchRes = await fetch(`/api/fetch-news?pageId=${activePageId}`);
       const fetchData = await fetchRes.json();
       const articles: Article[] = fetchData.articles ?? [];
+      if (articles.length === 0) { setProgress('No new articles found.'); setPipelineRunning(false); return; }
+      setProgress(`${articles.length} articles fetched. Filtering & processing with AI...`);
 
-      if (articles.length === 0) {
-        setProgress('No new articles found.');
-        setPipelineRunning(false);
-        return;
-      }
-
-      setProgress(`${articles.length} articles fetched. Processing with AI...`);
-
-      // Step 2: Run pipeline
       const pipelineRes = await fetch('/api/pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -167,202 +174,171 @@ export default function Home() {
           articles,
           pageId: activePageId,
           systemPrompt: activePage.systemPrompt,
+          userPrompt: activePage.userPrompt ?? '',
+          platformPrompts: activePage.platformPrompts ?? {},
+          keywordConfig: activePage.keywordConfig ?? { tier1: [], tier2: [], minScore: 1 },
         }),
       });
-
       const reader = pipelineRes.body?.getReader();
       if (!reader) throw new Error('No stream');
 
       const decoder = new TextDecoder();
       let buffer = '';
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n\n');
         buffer = lines.pop() ?? '';
-
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           try {
             const event = JSON.parse(line.slice(6));
-            if (event.type === 'progress') {
-              setProgress(`${event.current}/${event.total}: ${event.title}`);
-            } else if (event.type === 'post') {
+            if (event.type === 'progress') setProgress(`${event.current}/${event.total}: ${event.title}`);
+            else if (event.type === 'post') {
               setPosts((prev) => {
-                const exists = prev.some((p) => p.article.url === event.post.article.url);
-                if (exists) return prev;
+                if (prev.some((p) => p.article.url === event.post.article.url)) return prev;
                 return [event.post, ...prev];
               });
-            } else if (event.type === 'done') {
-              setProgress(`Done! ${event.total} posts generated.`);
-            }
+            } else if (event.type === 'done') setProgress(`Done! ${event.total} posts generated.`);
           } catch {}
         }
       }
-
-      // Reload posts
       await loadPosts();
     } catch (err) {
-      console.error('Pipeline error:', err);
-      setProgress(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setPipelineRunning(false);
-    }
+      setProgress(`Error: ${err instanceof Error ? err.message : 'Unknown'}`);
+    } finally { setPipelineRunning(false); }
   };
 
   if (pagesLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#0d1117', color: '#f0e523' }}>
+      <div className="flex items-center justify-center min-h-screen bg-background text-primary font-semibold">
         Loading...
       </div>
     );
   }
 
-  return (
-    <div style={{ backgroundColor: '#0d1117', color: '#e2e8f0', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 16px' }}>
-        {/* Header */}
-        <h1 className="text-2xl font-bold mb-4" style={{ color: '#f0e523' }}>
-          ⚡ Auto Social Posting
-        </h1>
+  // ── Content View ──
+  const renderContentView = () => {
+    if (!activePage) return null;
+    return (
+      <div className="flex flex-col gap-5 max-w-3xl">
+        {/* Pipeline controls */}
+        <div className="flex items-center gap-3">
+          <Button onClick={handleRunPipeline} disabled={pipelineRunning} size="default"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
+            {pipelineRunning ? '⏳ Running...' : '🚀 Fetch & Generate Posts'}
+          </Button>
+          <Button onClick={loadPosts} disabled={postsLoading} variant="outline" size="default">
+            🔄 Refresh
+          </Button>
+          {progress && <span className="text-xs text-primary font-medium">{progress}</span>}
+        </div>
 
-        {/* Page Tabs */}
-        <PageTabs
-          pages={pages}
-          activePageId={activePageId}
-          onSelect={(id) => setActivePageId(id)}
-          onAddPage={handleAddPage}
-        />
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}
+            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground">
+            <option value="All">All Sources</option>
+            {sources.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)}
+            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground" />
+          <span className="text-xs text-muted-foreground">to</span>
+          <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)}
+            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground" />
+          <select value={filterDone} onChange={(e) => setFilterDone(e.target.value)}
+            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground">
+            <option value="all">All Status</option>
+            <option value="not_done">Drafts</option>
+            <option value="done">Published</option>
+          </select>
+          <span className="text-xs ml-auto text-muted-foreground">{totalCount} posts</span>
+        </div>
 
-        {activePage && (
-          <div className="flex flex-col gap-4 mt-4">
-            {/* System Prompt Config */}
-            <SystemPromptConfig
-              key={activePage.id}
-              prompt={activePage.systemPrompt}
-              onSave={handleSavePrompt}
-            />
-
-            {/* Channel Manager */}
-            <ChannelManager pageId={activePage.id} />
-
-            {/* Source Manager */}
-            <SourceManager pageId={activePage.id} />
-
-            {/* Pipeline controls */}
-            <div
-              className="rounded-lg p-4 flex flex-col gap-3"
-              style={{ backgroundColor: '#0d1117', border: '1px solid #1e293b' }}
-            >
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleRunPipeline}
-                  disabled={pipelineRunning}
-                  className="px-6 py-2.5 rounded-lg text-sm font-bold transition-all"
-                  style={{
-                    backgroundColor: pipelineRunning ? '#21262d' : '#f0e523',
-                    color: pipelineRunning ? '#8b949e' : '#000',
-                    cursor: pipelineRunning ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {pipelineRunning ? '⏳ Running...' : '🚀 Fetch & Generate Posts'}
-                </button>
-                <button
-                  onClick={loadPosts}
-                  disabled={postsLoading}
-                  className="px-4 py-2.5 rounded-lg text-sm font-medium"
-                  style={{ backgroundColor: '#21262d', color: '#c9d1d9', border: '1px solid #30363d' }}
-                >
-                  🔄 Refresh
-                </button>
-              </div>
-              {progress && (
-                <div ref={progressRef} className="text-xs" style={{ color: '#f0e523' }}>
-                  {progress}
-                </div>
-              )}
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap gap-3 items-center">
-              <select
-                value={filterSource}
-                onChange={(e) => setFilterSource(e.target.value)}
-                className="text-sm px-3 py-2 rounded-lg"
-                style={{ backgroundColor: '#161b22', color: '#e2e8f0', border: '1px solid #30363d' }}
-              >
-                <option value="All">All Sources</option>
-                {sources.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-
-              <input
-                type="date"
-                value={filterFrom}
-                onChange={(e) => setFilterFrom(e.target.value)}
-                className="text-sm px-3 py-2 rounded-lg"
-                style={{ backgroundColor: '#161b22', color: '#e2e8f0', border: '1px solid #30363d', colorScheme: 'dark' }}
+        {/* Posts */}
+        {postsLoading ? (
+          <div className="text-center py-16 text-muted-foreground">Loading posts...</div>
+        ) : posts.length === 0 ? (
+          <div className="text-center py-16 rounded-xl border border-dashed border-border bg-card text-muted-foreground">
+            <p className="text-lg mb-2 font-medium">No posts yet</p>
+            <p className="text-sm">Click &quot;Fetch &amp; Generate Posts&quot; to get started.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {posts.map((post) => (
+              <PostCard
+                key={post.article.url}
+                post={post}
+                pageId={activePage.id}
+                onToggleDone={() => handleToggleDone(post.article.url, post.isDone ?? false)}
+                onStatusChange={handleStatusChange}
               />
-              <span className="text-xs" style={{ color: '#8b949e' }}>to</span>
-              <input
-                type="date"
-                value={filterTo}
-                onChange={(e) => setFilterTo(e.target.value)}
-                className="text-sm px-3 py-2 rounded-lg"
-                style={{ backgroundColor: '#161b22', color: '#e2e8f0', border: '1px solid #30363d', colorScheme: 'dark' }}
-              />
-
-              <select
-                value={filterDone}
-                onChange={(e) => setFilterDone(e.target.value)}
-                className="text-sm px-3 py-2 rounded-lg"
-                style={{ backgroundColor: '#161b22', color: '#e2e8f0', border: '1px solid #30363d' }}
-              >
-                <option value="all">All Status</option>
-                <option value="not_done">Not Done</option>
-                <option value="done">Done</option>
-              </select>
-
-              <span className="text-xs ml-auto" style={{ color: '#8b949e' }}>
-                {totalCount} posts
-              </span>
-            </div>
-
-            {/* Posts list */}
-            {postsLoading ? (
-              <div className="text-center py-12" style={{ color: '#8b949e' }}>Loading posts...</div>
-            ) : posts.length === 0 ? (
-              <div className="text-center py-12 rounded-lg" style={{ backgroundColor: '#161b22', color: '#8b949e', border: '1px solid #1e293b' }}>
-                <p className="text-lg mb-2">No posts yet</p>
-                <p className="text-sm">Click &quot;Fetch &amp; Generate Posts&quot; to get started.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {posts.map((post) => (
-                  <PostCard
-                    key={post.article.url}
-                    post={post}
-                    pageId={activePage.id}
-                    onToggleDone={() => handleToggleDone(post.article.url, post.isDone ?? false)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Pagination */}
-            <Pagination
-              totalCount={totalCount}
-              limit={limit}
-              offset={offset}
-              onPageChange={setOffset}
-            />
+            ))}
           </div>
         )}
+
+        <Pagination totalCount={totalCount} limit={limit} offset={offset} onPageChange={setOffset} />
       </div>
-    </div>
+    );
+  };
+
+  // ── Render view ──
+  const renderView = () => {
+    if (!activePage) return (
+      <div className="text-center py-20 text-muted-foreground">
+        <p className="text-lg mb-2">No pages yet</p>
+        <Button onClick={handleAddPage}>Create your first page</Button>
+      </div>
+    );
+
+    switch (activeView) {
+      case 'calendar': return <ContentCalendar pageId={activePage.id} />;
+      case 'analytics': return <AnalyticsDashboard pageId={activePage.id} />;
+      case 'settings': return (
+        <SettingsView
+          pageId={activePage.id}
+          pageName={activePage.name}
+          systemPrompt={activePage.systemPrompt}
+          userPrompt={activePage.userPrompt ?? ''}
+          platformPrompts={activePage.platformPrompts ?? {}}
+          keywordConfig={activePage.keywordConfig ?? { tier1: [], tier2: [], minScore: 1 }}
+          onSavePrompt={handleSavePrompt}
+          onSaveKeywordConfig={handleSaveKeywordConfig}
+          onDeletePage={handleDeletePage}
+          onRenamePage={handleRenamePage}
+        />
+      );
+      default: return renderContentView();
+    }
+  };
+
+  return (
+    <AppLayout
+      pages={pages}
+      activePageId={activePageId}
+      activeView={activeView}
+      activePageName={activePage?.name ?? ''}
+      onViewChange={setActiveView}
+      onPageChange={setActivePageId}
+      onAddPage={handleAddPage}
+    >
+      {renderView()}
+
+      {/* AI Chat Copilot — always visible on content view */}
+      {activePageId && (
+        <AIChatWindow
+          pageId={activePageId}
+          currentFilters={{ source: filterSource, from: filterFrom, to: filterTo, done: filterDone as DashboardFilters['done'] }}
+          onFiltersChange={(filters) => {
+            if (filters.source !== undefined) setFilterSource(filters.source);
+            if (filters.from !== undefined) setFilterFrom(filters.from);
+            if (filters.to !== undefined) setFilterTo(filters.to);
+            if (filters.done !== undefined) setFilterDone(filters.done);
+          }}
+          onPostsRefresh={loadPosts}
+        />
+      )}
+    </AppLayout>
   );
 }
