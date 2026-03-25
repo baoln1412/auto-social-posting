@@ -126,7 +126,7 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
           .from('posts')
           .select('id, article_url, article_title, source, description, facebook_text, emoji_title, summary');
         if (args.postId) {
-          const id = args.postId.trim();
+          const id = args.postId.replace(/^#+/, '').trim();
           if (id.length === 36 && id.includes('-')) {
             // Full UUID — exact match
             query = query.eq('id', id);
