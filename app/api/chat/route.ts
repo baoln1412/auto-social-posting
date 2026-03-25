@@ -225,10 +225,14 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        const history = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
+        // Build history from all messages except the last (current user message),
+        // then drop any leading 'model' entries — Gemini requires history to start with 'user'.
+        const rawHistory = messages.slice(0, -1).map((m: { role: string; content: string }) => ({
           role: m.role === 'user' ? 'user' : 'model',
-          parts: [{ text: m.content }],
+          parts: [{ text: m.content || ' ' }], // guard against empty strings
         }));
+        const firstUserIdx = rawHistory.findIndex((m: { role: string }) => m.role === 'user');
+        const history = firstUserIdx >= 0 ? rawHistory.slice(firstUserIdx) : [];
 
         const lastMessage = messages[messages.length - 1];
         const userText = `[pageId: ${pageId}, current filters: ${JSON.stringify(currentFilters)}]\n${lastMessage.content}`;
