@@ -166,24 +166,38 @@ Return ONLY the regenerated value as plain text. MUST BE IN VIETNAMESE.`;
           emoji_title: 'emoji_title',
           summary: 'summary',
         };
-        await supabase.from('posts').update({ [columnMap[args.field]]: newText }).eq('article_url', args.articleUrl);
-        return JSON.stringify({ action: 'regenerated', field: args.field, newText, articleUrl: args.articleUrl });
+        await supabase.from('posts').update({ [columnMap[args.field]]: newText }).eq('id', post.id);
+        return JSON.stringify({ action: 'regenerated', field: args.field, newText, articleUrl: post.article_url });
       }
 
       case 'schedule_post': {
         const supabase = getSupabaseServer();
-        const { error } = await supabase
-          .from('posts')
-          .update({ status: 'scheduled', scheduled_at: args.scheduledAt })
-          .eq('article_url', args.articleUrl);
+        let query = supabase.from('posts').update({ status: 'scheduled', scheduled_at: args.scheduledAt });
+        
+        if (args.postId) {
+          const id = args.postId.replace(/^#+/, '').trim();
+          query = (id.length === 36 && id.includes('-')) 
+            ? query.eq('id', id)
+            : query.filter('id::text', 'like', `${id}%`);
+        } else if (args.articleUrl) {
+          query = query.eq('article_url', args.articleUrl);
+        } else {
+          return JSON.stringify({ error: 'Provide either postId or articleUrl' });
+        }
+        
+        const { error } = await query;
         return error
           ? JSON.stringify({ error: error.message })
-          : JSON.stringify({ action: 'scheduled', articleUrl: args.articleUrl, scheduledAt: args.scheduledAt });
+          : JSON.stringify({ action: 'scheduled', scheduledAt: args.scheduledAt });
       }
 
       case 'scrape_custom_url': {
         const resp = await fetch(args.url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AutoSocialBot/1.0)' },
+          headers: { 
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+          },
           signal: AbortSignal.timeout(15000),
         });
         const html = await resp.text();
