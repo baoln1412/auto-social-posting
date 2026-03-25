@@ -2,10 +2,8 @@ import { getSupabaseServer } from '@/app/lib/supabase';
 
 export const BATCH_SIZE = 5;
 
-// We use the provided key as the new environment key: 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
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? '';
 
-// We now always assume OpenRouter is available
 export function isAvailable(): boolean {
   return !!OPENROUTER_API_KEY;
 }

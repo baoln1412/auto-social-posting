@@ -5,8 +5,7 @@ import { getSupabaseServer } from '@/app/lib/supabase';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-// Use the provided OpenRouter API Key
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? '';
 
 const openai = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
