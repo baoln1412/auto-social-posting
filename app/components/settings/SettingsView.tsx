@@ -4,6 +4,7 @@ import SystemPromptConfig from '../SystemPromptConfig';
 import KeywordFilterConfig from '../KeywordFilterConfig';
 import ChannelManager from '../ChannelManager';
 import SourceManager from '../SourceManager';
+import BackfillButton from '../BackfillButton';
 import { KeywordConfig } from '../../types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -73,6 +74,23 @@ export default function SettingsView({
         config={keywordConfig}
         onSave={onSaveKeywordConfig}
       />
+
+      {/* ── Maintenance ────────────────────────────────────────── */}
+      <Card className="card-warm">
+        <CardHeader>
+          <CardTitle className="text-base">🔧 Maintenance</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-sm font-medium text-foreground mb-0.5">Backfill enrichment data</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Re-process existing posts to fill in fields that were added or changed
+              after the posts were first generated. Safe to run at any time.
+            </p>
+            <BackfillButton pageId={pageId} />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Channel Manager */}
       <ChannelManager pageId={pageId} />
