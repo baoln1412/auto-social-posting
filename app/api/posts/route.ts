@@ -87,6 +87,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         description: row.description ?? '',
         imageUrl: row.image_url ?? undefined,
         summary: row.summary ?? '',
+        location: row.article_location ?? undefined,
       },
       emojiTitle: row.emoji_title,
       facebookText: row.facebook_text,

@@ -257,7 +257,7 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
               backgroundPosition: 'center',
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
           {generatedImageUrl && (
             <div className="absolute top-3 left-4">
               <Badge className="bg-primary text-primary-foreground text-[10px]">
@@ -265,19 +265,38 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
               </Badge>
             </div>
           )}
-          <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-xs text-white">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">{source}</span>
-              <span className="opacity-60">•</span>
-              <span className="opacity-80">{formattedDate}</span>
+          {/* ── Metadata bar (bottom of image) ── */}
+          <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between gap-2 text-xs text-white">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className="font-semibold shrink-0">{source}</span>
+              {article.location && (
+                <>
+                  <span className="opacity-50">·</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-600/90 text-yellow-300 font-bold text-[11px] shrink-0 backdrop-blur-sm">
+                    📍 {article.location}
+                  </span>
+                </>
+              )}
+              <span className="opacity-50">·</span>
+              <span className="opacity-80 shrink-0">{formattedDate}</span>
+              {post.fetchTime && (
+                <>
+                  <span className="opacity-50">·</span>
+                  <span className="opacity-60 shrink-0 hidden sm:inline">
+                    Fetched: {new Date(post.fetchTime).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(post.fetchTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                </>
+              )}
               {isNew && <Badge className="bg-primary text-primary-foreground text-[10px] animate-pulse">🆕 NEW</Badge>}
             </div>
-            <a href={url} target="_blank" rel="noopener noreferrer" className="px-2 py-1 rounded bg-white/20 hover:bg-white/30 transition-colors backdrop-blur-sm text-xs">
+            <a href={url} target="_blank" rel="noopener noreferrer"
+              className="shrink-0 px-2.5 py-1 rounded-md bg-amber-500/90 hover:bg-amber-400 transition-colors backdrop-blur-sm text-xs font-semibold text-black">
               Source ↗
             </a>
           </div>
         </div>
       )}
+
 
       <CardContent className="p-5 space-y-4">
         {/* Title + status */}

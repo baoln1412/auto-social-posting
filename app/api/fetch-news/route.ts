@@ -92,6 +92,102 @@ function isCrimeArticle(
   return crimeRegex.test(text);
 }
 
+// ── US State / Location detector ─────────────────────────────────────────
+
+const US_LOCATIONS: [RegExp, string][] = [
+  // States — full names (checked before abbreviations to avoid false positives)
+  [/\bAlabama\b/i, 'Alabama'],
+  [/\bAlaska\b/i, 'Alaska'],
+  [/\bArizona\b/i, 'Arizona'],
+  [/\bArkansas\b/i, 'Arkansas'],
+  [/\bCalifornia\b/i, 'California'],
+  [/\bColorado\b/i, 'Colorado'],
+  [/\bConnecticut\b/i, 'Connecticut'],
+  [/\bDelaware\b/i, 'Delaware'],
+  [/\bFlorida\b/i, 'Florida'],
+  [/\bGeorgia\b/i, 'Georgia'],
+  [/\bHawaii\b/i, 'Hawaii'],
+  [/\bIdaho\b/i, 'Idaho'],
+  [/\bIllinois\b/i, 'Illinois'],
+  [/\bIndiana\b/i, 'Indiana'],
+  [/\bIowa\b/i, 'Iowa'],
+  [/\bKansas\b/i, 'Kansas'],
+  [/\bKentucky\b/i, 'Kentucky'],
+  [/\bLouisiana\b/i, 'Louisiana'],
+  [/\bMaine\b/i, 'Maine'],
+  [/\bMaryland\b/i, 'Maryland'],
+  [/\bMassachusetts\b/i, 'Massachusetts'],
+  [/\bMichigan\b/i, 'Michigan'],
+  [/\bMinnesota\b/i, 'Minnesota'],
+  [/\bMississippi\b/i, 'Mississippi'],
+  [/\bMissouri\b/i, 'Missouri'],
+  [/\bMontana\b/i, 'Montana'],
+  [/\bNebraska\b/i, 'Nebraska'],
+  [/\bNevada\b/i, 'Nevada'],
+  [/\bNew\s+Hampshire\b/i, 'New Hampshire'],
+  [/\bNew\s+Jersey\b/i, 'New Jersey'],
+  [/\bNew\s+Mexico\b/i, 'New Mexico'],
+  [/\bNew\s+York\b/i, 'New York'],
+  [/\bNorth\s+Carolina\b/i, 'North Carolina'],
+  [/\bNorth\s+Dakota\b/i, 'North Dakota'],
+  [/\bOhio\b/i, 'Ohio'],
+  [/\bOklahoma\b/i, 'Oklahoma'],
+  [/\bOregon\b/i, 'Oregon'],
+  [/\bPennsylvania\b/i, 'Pennsylvania'],
+  [/\bRhode\s+Island\b/i, 'Rhode Island'],
+  [/\bSouth\s+Carolina\b/i, 'South Carolina'],
+  [/\bSouth\s+Dakota\b/i, 'South Dakota'],
+  [/\bTennessee\b/i, 'Tennessee'],
+  [/\bTexas\b/i, 'Texas'],
+  [/\bUtah\b/i, 'Utah'],
+  [/\bVermont\b/i, 'Vermont'],
+  [/\bVirginia\b(?!\s+Beach)/i, 'Virginia'],
+  [/\bVirginia\s+Beach\b/i, 'Virginia Beach'],
+  [/\bWashington\s+(?:State|D\.?C\.?)\b/i, 'Washington'],
+  [/\bWest\s+Virginia\b/i, 'West Virginia'],
+  [/\bWisconsin\b/i, 'Wisconsin'],
+  [/\bWyoming\b/i, 'Wyoming'],
+  // High-traffic crime news cities (checked after states)
+  [/\bLos\s+Angeles\b/i, 'Los Angeles, CA'],
+  [/\bChicago\b/i, 'Chicago, IL'],
+  [/\bHouston\b/i, 'Houston, TX'],
+  [/\bPhoenix\b/i, 'Phoenix, AZ'],
+  [/\bPhiladelphia\b/i, 'Philadelphia, PA'],
+  [/\bSan\s+Antonio\b/i, 'San Antonio, TX'],
+  [/\bSan\s+Diego\b/i, 'San Diego, CA'],
+  [/\bDallas\b/i, 'Dallas, TX'],
+  [/\bSan\s+Jose\b/i, 'San Jose, CA'],
+  [/\bAustin\b/i, 'Austin, TX'],
+  [/\bJacksonville\b/i, 'Jacksonville, FL'],
+  [/\bFort\s+Worth\b/i, 'Fort Worth, TX'],
+  [/\bColumbus\b/i, 'Columbus, OH'],
+  [/\bCharlotte\b/i, 'Charlotte, NC'],
+  [/\bIndianapolis\b/i, 'Indianapolis, IN'],
+  [/\bSan\s+Francisco\b/i, 'San Francisco, CA'],
+  [/\bSeattle\b/i, 'Seattle, WA'],
+  [/\bDenver\b/i, 'Denver, CO'],
+  [/\bNashville\b/i, 'Nashville, TN'],
+  [/\bOklahoma\s+City\b/i, 'Oklahoma City, OK'],
+  [/\bEl\s+Paso\b/i, 'El Paso, TX'],
+  [/\bWashington\s+DC\b|\bD\.C\.\b/i, 'Washington D.C.'],
+  [/\bLas\s+Vegas\b/i, 'Las Vegas, NV'],
+  [/\bMemphis\b/i, 'Memphis, TN'],
+  [/\bAtlanta\b/i, 'Atlanta, GA'],
+  [/\bBaltimore\b/i, 'Baltimore, MD'],
+  [/\bMiami\b/i, 'Miami, FL'],
+  [/\bMinneapolis\b/i, 'Minneapolis, MN'],
+  [/\bNew\s+Orleans\b/i, 'New Orleans, LA'],
+  [/\bDetroit\b/i, 'Detroit, MI'],
+];
+
+function detectUsLocation(title: string, description: string): string | undefined {
+  const text = `${title} ${description}`;
+  for (const [regex, name] of US_LOCATIONS) {
+    if (regex.test(text)) return name;
+  }
+  return undefined;
+}
+
 // ── Get last fetch time for a page ──────────────────────────────────────
 async function getLastFetchTime(pageId: string): Promise<Date | null> {
   try {
@@ -298,6 +394,7 @@ async function fetchRssFeed(feed: FeedEntry, cutoffTime: Date): Promise<Article[
       if (!url) continue;
 
       const { imageUrl, portraitUrl } = extractImages(item);
+      const location = detectUsLocation(title, getDescription(item));
 
       articles.push({
         title,
@@ -307,6 +404,7 @@ async function fetchRssFeed(feed: FeedEntry, cutoffTime: Date): Promise<Article[
         description: getDescription(item),
         ...(imageUrl && { imageUrl }),
         ...(portraitUrl && { portraitUrl }),
+        ...(location && { location }),
       });
     }
 
@@ -353,12 +451,14 @@ async function fetchWebScrape(feed: FeedEntry): Promise<Article[]> {
       // Skip non-article links
       if (href.includes('#') || href.includes('javascript:') || href.includes('mailto:')) return;
 
+      const location = detectUsLocation(title, '');
       articles.push({
         title,
         url: href,
         pubDate: new Date().toISOString(),
         source: feed.name,
         description: '',
+        ...(location && { location }),
       });
     });
 

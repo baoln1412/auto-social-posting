@@ -6,6 +6,8 @@ export interface Article {
   description: string;
   imageUrl?: string;
   portraitUrl?: string;
+  /** US state or city detected from the article text, e.g. 'Georgia' */
+  location?: string;
 }
 
 export interface ArticleWithSummary extends Article {

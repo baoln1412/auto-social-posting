@@ -30,6 +30,7 @@ async function savePostToDb(post: PostDraft, pageId: string): Promise<void> {
         facebook_text: post.facebookText,
         platform_drafts: post.platformDrafts ?? {},
         fetch_time: new Date().toISOString(),
+        article_location: post.article.location ?? null,
       },
       { onConflict: 'article_url' },
     );
