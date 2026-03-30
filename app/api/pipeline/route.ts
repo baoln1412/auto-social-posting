@@ -2,11 +2,7 @@ import { NextRequest } from 'next/server';
 import { Article, PostDraft, KeywordConfig } from '@/app/types';
 import {
   initPipelineNotebook,
-  addArticleSource,
-  processArticle,
-  buildFallbackPost,
   cleanupPipelineNotebook,
-  detectEngine,
   processBatchGemini,
   filterRelevantArticles,
   filterByKeywords,
@@ -106,8 +102,6 @@ export async function POST(request: NextRequest): Promise<Response> {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       }
 
-      const engine = detectEngine();
-
       // Step 1: Filter out articles already in the database
       const newArticles = await filterNewArticles(articles);
 
@@ -185,30 +179,15 @@ export async function POST(request: NextRequest): Promise<Response> {
         actualPostCount++;
       };
 
-      // Step 4: Generate posts from relevant articles
-      if (engine === 'gemini') {
-        await processBatchGemini(
-          relevantArticles,
-          systemPrompt,
-          async (post) => { await emitAndSave(post); },
-          (current, total, title) => emit({ type: 'progress', current, total, title }),
-          platformPrompts,
-          userPrompt,
-        );
-      } else {
-        for (let i = 0; i < relevantArticles.length; i++) {
-          const article = relevantArticles[i];
-          emit({ type: 'progress', current: i + 1, total: relevantArticles.length, title: article.title });
-          try {
-            const post = await processArticle(article);
-            await emitAndSave(post);
-          } catch (err) {
-            console.error(`[pipeline] fallback for "${article.title}":`, err);
-            const post = buildFallbackPost(article);
-            await emitAndSave(post);
-          }
-        }
-      }
+      // Step 4: Generate posts from relevant articles (one by one)
+      await processBatchGemini(
+        relevantArticles,
+        systemPrompt,
+        async (post) => { await emitAndSave(post); },
+        (current, total, title) => emit({ type: 'progress', current, total, title }),
+        platformPrompts,
+        userPrompt,
+      );
 
       await cleanupPipelineNotebook();
 

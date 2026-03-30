@@ -1,10 +1,9 @@
 import { Article, ArticleWithSummary, PostDraft, KeywordConfig } from '@/app/types';
 import {
-  generateContent as geminiGenerate,
-  generateImage as geminiGenerateImage,
-  isAvailable as isGeminiAvailable,
-  BATCH_SIZE,
-} from './gemini-client';
+  generateContent as aiGenerate,
+  generateImage as aiGenerateImage,
+  isAvailable as isAiAvailable,
+} from './openrouter-client';
 
 // ── Keyword-based filter — fast local scoring ─────────────────────────────
 
@@ -123,20 +122,20 @@ function buildRelevanceFilterPrompt(articles: Article[], systemPrompt: string): 
 }
 
 /**
- * Filter articles by relevance using Gemini AI (runs AFTER keyword filter).
+ * Filter articles by relevance using AI (runs AFTER keyword filter).
  */
 export async function filterRelevantArticles(
   articles: Article[],
   systemPrompt: string,
   onProgress: (msg: string) => void,
 ): Promise<Article[]> {
-  if (!isGeminiAvailable() || articles.length === 0) return articles;
+  if (!isAiAvailable() || articles.length === 0) return articles;
 
   onProgress(`🔍 AI-filtering ${articles.length} articles for relevance...`);
 
   try {
     const filterPrompt = buildRelevanceFilterPrompt(articles, systemPrompt);
-    const raw = await geminiGenerate(
+    const raw = await aiGenerate(
       'You are a content relevance classifier. Return ONLY valid JSON arrays of numbers.',
       filterPrompt,
       true
@@ -168,13 +167,10 @@ function isVietnamesePrompt(systemPrompt: string): boolean {
   return viKeywords.some(k => lower.includes(k));
 }
 
-function buildBatchContentPrompt(articles: Article[], systemPrompt: string): string {
-  const articleBlocks = articles
-    .map(
-      (a, i) =>
-        `--- ARTICLE ${i + 1} ---\nTitle: ${a.title}\nSource: ${a.source}\nURL: ${a.url}\nDescription: ${a.description}`,
-    )
-    .join('\n\n');
+// ── Single article content prompt ─────────────────────────────────────────
+
+function buildSingleArticlePrompt(article: Article, systemPrompt: string): string {
+  const articleBlock = `Title: ${article.title}\nSource: ${article.source}\nURL: ${article.url}\nDescription: ${article.description}`;
 
   const isVi = isVietnamesePrompt(systemPrompt);
 
@@ -189,7 +185,7 @@ function buildBatchContentPrompt(articles: Article[], systemPrompt: string): str
       'Đối tượng: Người Việt 16-35 tuổi, du học sinh / đang sống / chuẩn bị đi Úc.',
       'Giọng văn: Gần gũi, đời, hơi "cợt nhẹ" (dùng từ như: mấy ní, bão giá, bay màu, xót ví, luật mới chấn động).',
       '',
-      '📋 CẤU TRÚC BẮT BUỘC CHO MỖI BÀI:',
+      '📋 CẤU TRÚC BẮT BUỘC:',
       '1. [HOOK & HEADLINE]: 1 dòng IN HOA + 1-2 emoji mạnh (🚨📢💸✈️🇦🇺). Gây tò mò, FOMO.',
       '2. [SAPO]: 2-3 câu diễn giải headline bằng ngôn ngữ đời thường.',
       '3. [KEY POINTS]: Dùng heading IN HOA + bullet 🔹 gạch 3-5 chi tiết cốt lõi.',
@@ -198,59 +194,167 @@ function buildBatchContentPrompt(articles: Article[], systemPrompt: string): str
       '6. [CTA]: 1 câu hỏi tương tác + kêu gọi follow "Australia 101 - Chuyện Úc chút chút!"',
       '7. [HASHTAGS]: 5-8 hashtags (#Australia101 #ChuyenUcChutChut #TinTucUc + keyword).',
       '',
-      '📝 OUTPUT FORMAT: Trả về CHỈ JSON array hợp lệ, KHÔNG markdown, KHÔNG preamble:',
-      '[{"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}, ...]',
+      '📝 OUTPUT FORMAT: Trả về CHỈ 1 JSON object hợp lệ, KHÔNG markdown, KHÔNG preamble:',
+      '{"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}',
       '',
       '⚠️ QUY TẮC:',
-      '- emojiTitle: BẰNG TIẾNG VIỆT, hấp dẫn, có emoji. VÍ DỤ: "🚨 ÚC TĂNG LƯƠNG TỐI THIỂU – DU HỌC SINH ĐƯỢC LỢI GÌ?"',
+      '- emojiTitle: BẰNG TIẾNG VIỆT, hấp dẫn, có emoji.',
       '- facebookText: BẰNG TIẾNG VIỆT, 200-350 từ, theo đúng cấu trúc 7 phần ở trên.',
       '- summary: BẰNG TIẾNG VIỆT, 2-3 câu tóm tắt.',
       '- imagePrompt: (CHỈ MỤC NÀY VIẾT BẰNG TIẾNG ANH) Prompt tạo hình ảnh minh họa.',
-    '',
-    '📌 VÍ DỤ MẪU OUTPUT (BẮT BUỘC PHẢI THEO ĐÚNG PHONG CÁCH NÀY):',
-    '[{',
-    '  "emojiTitle": "🚨 ÚC TĂNG LƯƠNG TỐI THIỂU LÊN $24.10/GIỜ – MẤY NÍ ƠI CẬP NHẬT NGAY!",',
-    '  "facebookText": "🚨 ÚC CHÍNH THỨC TĂNG LƯƠNG TỐI THIỂU – DU HỌC SINH ĐƯỢC LỢI GÌ?\\n\\nTin vui cho mấy ní đang làm part-time ở Úc nè! Fair Work Commission vừa công bố tăng lương tối thiểu, có hiệu lực từ 1/7.\\n\\n📌 NHỮNG ĐIỂM CHÍNH CẦN LƯU Ý:\\n\\n🔹 Lương tối thiểu tăng lên $24.10/giờ (trước đó $23.23)\\n🔹 Áp dụng cho TẤT CẢ người lao động, kể cả du học sinh\\n🔹 Casual loading vẫn giữ 25%, tức casual sẽ nhận khoảng $30.13/giờ\\n🔹 Các ngành hospitality, retail, aged care đều được hưởng\\n\\n👉 TÓM LẠI LÀ:\\n\\nMấy ní làm part-time sẽ được tăng lương tự động. Nhưng LƯU Ý: nếu chủ không tăng, mấy ní có quyền khiếu nại lên Fair Work Ombudsman nha!\\n\\n💡 LỜI KHUYÊN:\\nCheck payslip kỹ từ ngày 1/7. Nếu thấy lương vẫn cũ → liên hệ Fair Work ngay, đừng ngại!\\n\\nMấy ní thấy lương ở Úc có đủ sống không? Comment cho mình biết nha! 👇\\nFollow Australia 101 - Chuyện Úc chút chút! để cập nhật tin mới mỗi ngày!\\n\\n#Australia101 #ChuyenUcChutChut #TinTucUc #LuongToiThieu #DuHocUc #FairWork",',
-    '  "summary": "Úc chính thức tăng lương tối thiểu lên $24.10/giờ từ 1/7. Du học sinh làm part-time sẽ được hưởng mức lương mới. Casual loading vẫn 25%.",',
-    '  "imagePrompt": "Modern Australian cityscape with diverse young workers in a cafe and retail setting, warm lighting, minimum wage increase announcement banner, Australian flag colors, professional photography style"',
-    '}]',
-    '',
-    '🚫 TUYỆT ĐỐI KHÔNG:',
-    '- Viết emojiTitle bằng tiếng Anh (SAI: "📰 Australia increases minimum wage")',
-    '- Viết facebookText bằng tiếng Anh',
-    '- Viết summary bằng tiếng Anh',
-    '- Dùng văn phong học thuật, báo chí khô khan',
-    '- Bỏ qua cấu trúc 7 phần bắt buộc',
-    '',
-    'CÁC BÀI VIẾT CẦN XỬ LÝ (DỊCH VÀ VIẾT LẠI BẰNG TIẾNG VIỆT):',
-    articleBlocks,
-  ].join('\n');
+      '',
+      '🚫 TUYỆT ĐỐI KHÔNG:',
+      '- Viết emojiTitle bằng tiếng Anh',
+      '- Viết facebookText bằng tiếng Anh',
+      '- Viết summary bằng tiếng Anh',
+      '- Dùng văn phong học thuật, báo chí khô khan',
+      '- Bỏ qua cấu trúc 7 phần bắt buộc',
+      '',
+      'BÀI VIẾT CẦN XỬ LÝ (DỊCH VÀ VIẾT LẠI BẰNG TIẾNG VIỆT):',
+      articleBlock,
+    ].join('\n');
   }
 
-  // English / generic prompt — follow the system prompt's own structure
+  // English / generic prompt
   return [
     'You are a social media content creator. Follow the system prompt instructions EXACTLY.',
     '',
-    'For each article below, create a JSON object with:',
+    'For the article below, create a JSON object with:',
     '- emojiTitle: A dramatic, attention-grabbing headline with 1-2 strong emojis (🚨, 💀, ⚖️, 📢, ❗)',
-    '- facebookText: A full Facebook post (200-350 words) following the exact structure in the system prompt. Use line breaks, emojis as bullets, ALL CAPS for headings.',
+    '- facebookText: A full Facebook post (200-350 words) with line breaks, emojis as bullets, ALL CAPS for headings.',
     '- summary: 2-3 sentence summary.',
-    '- imagePrompt: A detailed prompt for AI image generation. Describe the scene, mood, colors, style. Make it dramatic and news-worthy.',
+    '- imagePrompt: A detailed prompt for AI image generation.',
     '',
-    'Return ONLY a valid JSON array (no markdown, no preamble):',
-    '[{"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}, ...]',
+    'Return ONLY a valid JSON object (no markdown, no preamble):',
+    '{"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}',
     '',
-    'EXAMPLE OUTPUT:',
-    '[{',
-    '  "emojiTitle": "🚨 BREAKING: Man Arrested After High-Speed Chase Through Downtown 💀",',
-    '  "facebookText": "🚨 BREAKING: HIGH-SPEED CHASE ENDS IN DRAMATIC ARREST\\n\\nA tense standoff unfolded today as police chased a suspect through downtown.\\n\\n📌 WHAT WE KNOW SO FAR:\\n\\n🔹 Chase started at 2pm after a reported robbery\\n🔹 Multiple units involved\\n🔹 Suspect crashed near Main St\\n🔹 No bystanders injured\\n\\n😱 THE SHOCKING PART:\\nThe suspect was a wanted fugitive with 3 active warrants.\\n\\n⚖️ WHERE THINGS STAND:\\nSuspect in custody facing multiple felony charges.\\n\\nWhat do you think? 👇\\n\\n#BreakingNews #TrueCrime",',
-    '  "summary": "A high-speed police chase ended in arrest after a robbery suspect crashed downtown.",',
-    '  "imagePrompt": "Dramatic nighttime city street with police car lights reflecting off wet pavement, cinematic mood, crime scene atmosphere"',
-    '}]',
-    '',
-    'ARTICLES TO PROCESS:',
-    articleBlocks,
+    'ARTICLE TO PROCESS:',
+    articleBlock,
   ].join('\n');
+}
+
+// ── Single article JSON parser ────────────────────────────────────────────
+
+function extractJsonMatch(raw: string): string | null {
+  // First, try to extract from markdown code fences
+  const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+  if (fenceMatch) {
+    const content = fenceMatch[1].trim();
+    if (content.startsWith('[') || content.startsWith('{')) {
+      return content;
+    }
+  }
+
+  // Then try to find raw JSON object or array
+  const objMatch = raw.match(/\{[\s\S]*\}/);
+  if (objMatch) return objMatch[0];
+  const arrayMatch = raw.match(/\[[\s\S]*\]/);
+  if (arrayMatch) return arrayMatch[0];
+  return null;
+}
+
+function parseSingleAiResponse(
+  raw: string,
+  article: Article,
+): { post: PostDraft | null; imagePrompt: string | null } {
+  console.log(`[pipeline] AI output for "${article.title.slice(0, 50)}":`, raw.substring(0, 300) + '...');
+  const jsonMatch = extractJsonMatch(raw);
+  if (!jsonMatch) {
+    console.error(`[pipeline] ❌ Could not find JSON in AI output for: ${article.title.slice(0, 60)}`);
+    return { post: null, imagePrompt: null };
+  }
+
+  try {
+    let parsed = JSON.parse(jsonMatch);
+    // Handle case where AI returns an array with one item
+    if (Array.isArray(parsed)) {
+      parsed = parsed[0];
+    }
+
+    if (!parsed || !parsed.emojiTitle || !parsed.facebookText) {
+      console.warn(`[pipeline] ⚠️ Missing emojiTitle/facebookText for: ${article.title.slice(0, 60)}`);
+      return { post: null, imagePrompt: null };
+    }
+
+    // Detect AI-generated rejection posts — the AI sometimes correctly identifies
+    // irrelevant articles and generates a "skip" title instead of a real post.
+    // IMPORTANT: Only check emojiTitle (not facebookText) to avoid false positives
+    // from legitimate content that mentions words like "skip" or "not relevant".
+    const titleLower = parsed.emojiTitle.toLowerCase();
+    const rejectionTitleSignals = [
+      'không liên quan',   // "not related" in Vietnamese
+      'bỏ qua',            // "skip" in Vietnamese
+      'không phải tin tức', // "not news" in Vietnamese
+      'không thuộc chủ đề', // "off-topic" in Vietnamese
+      'off-topic',
+      'not relevant to',
+      'skip this article',
+      'irrelevant article',
+    ];
+    const isRejection = rejectionTitleSignals.some(signal => titleLower.includes(signal));
+    if (isRejection) {
+      console.log(`[pipeline] 🚫 AI rejected article as irrelevant (title: "${parsed.emojiTitle.slice(0, 60)}")`);
+      return { post: null, imagePrompt: null };
+    }
+
+    const articleWithSummary: ArticleWithSummary = {
+      ...article,
+      summary: parsed.summary ?? article.description,
+    };
+
+    return {
+      post: {
+        article: articleWithSummary,
+        emojiTitle: parsed.emojiTitle,
+        facebookText: parsed.facebookText,
+        generatedImageUrl: undefined,
+        platformDrafts: {},
+      },
+      imagePrompt: parsed.imagePrompt ?? null,
+    };
+  } catch (err) {
+    console.error(`[pipeline] ❌ JSON.parse failed for "${article.title.slice(0, 50)}":`, err);
+    return { post: null, imagePrompt: null };
+  }
+}
+
+// ── Fallback post builder ─────────────────────────────────────────────────
+
+export function buildFallbackPost(article: Article): PostDraft {
+  const desc = article.description || 'Story developing...';
+  const facebookText = `📰 ${article.title}\n\n${desc}\n\n👉 Follow for updates!`;
+  const articleWithSummary: ArticleWithSummary = { ...article, summary: desc };
+
+  return {
+    article: articleWithSummary,
+    emojiTitle: `📰 ${article.title}`,
+    facebookText,
+    generatedImageUrl: undefined,
+    platformDrafts: {},
+  };
+}
+
+// ── AI engine detection ───────────────────────────────────────────────────
+
+export type AiEngine = 'ai' | 'fallback';
+
+export function detectEngine(): AiEngine {
+  if (isAiAvailable()) return 'ai';
+  return 'fallback';
+}
+
+// ── Main processor ────────────────────────────────────────────────────────
+
+export async function initPipelineNotebook(): Promise<string | null> {
+  if (isAiAvailable()) {
+    console.log('[pipeline] Using OpenRouter AI engine');
+    return 'ai';
+  }
+  return null;
+}
+
+export async function addArticleSource(): Promise<boolean> {
+  return false;
 }
 
 /**
@@ -284,113 +388,6 @@ function buildPlatformDraftPrompt(
   ].join('\n');
 }
 
-// ── Fallback post builder ─────────────────────────────────────────────────
-
-export function buildFallbackPost(article: Article): PostDraft {
-  const desc = article.description || 'Story developing...';
-  const facebookText = `📰 ${article.title}\n\n${desc}\n\n👉 Follow for updates!`;
-  const articleWithSummary: ArticleWithSummary = { ...article, summary: desc };
-
-  return {
-    article: articleWithSummary,
-    emojiTitle: `📰 ${article.title}`,
-    facebookText,
-    generatedImageUrl: undefined,
-    platformDrafts: {},
-  };
-}
-
-// ── AI engine detection ───────────────────────────────────────────────────
-
-export type AiEngine = 'gemini' | 'fallback';
-
-export function detectEngine(): AiEngine {
-  if (isGeminiAvailable()) return 'gemini';
-  return 'fallback';
-}
-
-// ── Main processor ────────────────────────────────────────────────────────
-
-export async function initPipelineNotebook(): Promise<string | null> {
-  if (isGeminiAvailable()) {
-    console.log('[pipeline] Using Gemini API engine');
-    return 'gemini';
-  }
-  return null;
-}
-
-export async function addArticleSource(): Promise<boolean> {
-  return false;
-}
-
-function extractJsonMatch(raw: string): string | null {
-  // First, try to extract from markdown code fences (```json...``` or ```...```)
-  const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-  if (fenceMatch) {
-    const content = fenceMatch[1].trim();
-    // Verify it looks like JSON
-    if (content.startsWith('[') || content.startsWith('{')) {
-      return content;
-    }
-  }
-
-  // Then try to find raw JSON array or object
-  const arrayMatch = raw.match(/\[[\s\S]*\]/);
-  if (arrayMatch) return arrayMatch[0];
-  const objMatch = raw.match(/\{[\s\S]*\}/);
-  if (objMatch) return objMatch[0];
-  return null;
-}
-
-function parseBatchAiResponse(
-  raw: string,
-  articles: Article[],
-): { post: PostDraft | null; imagePrompt: string | null }[] {
-  console.log('[pipeline] Raw AI output snippet:', raw.substring(0, 500) + '...');
-  const jsonMatch = extractJsonMatch(raw);
-  if (!jsonMatch) {
-    console.error('[pipeline] ❌ extractJsonMatch returned null — could not find JSON in Gemini output');
-    console.error('[pipeline] Raw output (first 2000 chars):', raw.substring(0, 2000));
-    return articles.map(() => ({ post: null, imagePrompt: null }));
-  }
-
-  try {
-    let parsed = JSON.parse(jsonMatch);
-    if (!Array.isArray(parsed)) {
-      parsed = [parsed];
-    }
-    console.log(`[pipeline] ✅ Parsed ${parsed.length} items from JSON`);
-
-    return articles.map((article, i) => {
-      const item = parsed[i];
-      if (!item || !item.emojiTitle || !item.facebookText) {
-        console.warn(`[pipeline] ⚠️ Missing emojiTitle/facebookText for article ${i}: ${article.title.slice(0, 50)}`);
-        return { post: null, imagePrompt: null };
-      }
-
-      const articleWithSummary: ArticleWithSummary = {
-        ...article,
-        summary: item.summary ?? article.description,
-      };
-
-      return {
-        post: {
-          article: articleWithSummary,
-          emojiTitle: item.emojiTitle,
-          facebookText: item.facebookText,
-          generatedImageUrl: undefined,
-          platformDrafts: {},
-        },
-        imagePrompt: item.imagePrompt ?? null,
-      };
-    });
-  } catch (err) {
-    console.error('[pipeline] ❌ JSON.parse failed:', err);
-    console.error('[pipeline] JSON match (first 1000 chars):', jsonMatch.substring(0, 1000));
-    return articles.map(() => ({ post: null, imagePrompt: null }));
-  }
-}
-
 /**
  * Generate platform-specific drafts for connected platforms.
  */
@@ -407,7 +404,7 @@ async function generatePlatformDrafts(
 
     try {
       const userPrompt = buildPlatformDraftPrompt(article, facebookText, platform, prompt, systemPrompt);
-      const draft = await geminiGenerate(prompt, userPrompt);
+      const draft = await aiGenerate(prompt, userPrompt);
       drafts[platform] = draft.trim();
       console.log(`[pipeline] Generated ${platform} draft for: ${article.title.slice(0, 50)}`);
     } catch (err) {
@@ -419,9 +416,9 @@ async function generatePlatformDrafts(
 }
 
 /**
- * Process a batch of articles with Gemini.
- * systemPrompt comes from the content page's configuration.
- * platformPrompts contains per-platform system prompts for generating variants.
+ * Process articles ONE BY ONE with AI.
+ * Each article gets its own API call — if one fails, only that article uses fallback.
+ * No batch delays needed since we're making individual calls.
  */
 export async function processBatchGemini(
   articles: Article[],
@@ -431,105 +428,75 @@ export async function processBatchGemini(
   platformPrompts?: Record<string, string>,
   storedUserPrompt?: string,
 ): Promise<void> {
-  for (let batchStart = 0; batchStart < articles.length; batchStart += BATCH_SIZE) {
-    const batch = articles.slice(batchStart, batchStart + BATCH_SIZE);
-    const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
-    const totalBatches = Math.ceil(articles.length / BATCH_SIZE);
+  for (let i = 0; i < articles.length; i++) {
+    const article = articles[i];
 
-    onProgress(
-      batchStart + 1,
-      articles.length,
-      `Gemini batch ${batchNum}/${totalBatches} (${batch.length} articles)`,
-    );
+    onProgress(i + 1, articles.length, `🔄 Processing ${i + 1}/${articles.length}: ${article.title.slice(0, 60)}...`);
 
-    let results: { post: PostDraft | null; imagePrompt: string | null }[];
+    let post: PostDraft | null = null;
+
     try {
-      // Use stored user prompt if available; otherwise fall back to hardcoded builder
+      // Build prompt for this single article
       let userPrompt: string;
       if (storedUserPrompt && storedUserPrompt.trim()) {
-        // Build article blocks for injection
-        const articleBlocks = batch
-          .map(
-            (a, i) =>
-              `--- ARTICLE ${i + 1} ---\nTitle: ${a.title}\nSource: ${a.source}\nURL: ${a.url}\nDescription: ${a.description}`,
-          )
-          .join('\n\n');
-        userPrompt = storedUserPrompt.replace('{articles}', articleBlocks);
-        console.log(`[pipeline] Using STORED user prompt (${userPrompt.length} chars)`);
+        const articleBlock = `--- ARTICLE ---\nTitle: ${article.title}\nSource: ${article.source}\nURL: ${article.url}\nDescription: ${article.description}`;
+        userPrompt = storedUserPrompt.replace('{articles}', articleBlock);
+        console.log(`[pipeline] [${i + 1}/${articles.length}] Using STORED user prompt for: ${article.title.slice(0, 50)}`);
       } else {
-        userPrompt = buildBatchContentPrompt(batch, systemPrompt);
-        console.log(`[pipeline] Using HARDCODED built prompt (${userPrompt.length} chars)`);
+        userPrompt = buildSingleArticlePrompt(article, systemPrompt);
+        console.log(`[pipeline] [${i + 1}/${articles.length}] Using BUILT prompt for: ${article.title.slice(0, 50)}`);
       }
-      const raw = await geminiGenerate(systemPrompt, userPrompt, true);
-      console.log(`[pipeline] Gemini raw output length: ${raw.length}`);
-      console.log(`[pipeline] Gemini raw output first 1000 chars: ${raw.substring(0, 1000)}`);
-      results = parseBatchAiResponse(raw, batch);
-      const successCount = results.filter(r => r.post !== null).length;
-      console.log(`[pipeline] Parsed ${successCount}/${batch.length} posts from batch ${batchNum}`);
 
-      if (batchNum < totalBatches) {
-        console.log(`[pipeline] Waiting 15s to respect Gemini RPM limit...`);
-        await new Promise((resolve) => setTimeout(resolve, 15000));
+      const raw = await aiGenerate(systemPrompt, userPrompt, true);
+      console.log(`[pipeline] [${i + 1}/${articles.length}] AI output length: ${raw.length}`);
+
+      const result = parseSingleAiResponse(raw, article);
+
+      if (result.post) {
+        post = result.post;
+        console.log(`[pipeline] ✅ [${i + 1}/${articles.length}] Generated: ${post.emojiTitle.slice(0, 60)}`);
+      } else {
+        console.warn(`[pipeline] ⚠️ [${i + 1}/${articles.length}] AI parse failed, using fallback`);
       }
     } catch (err) {
-      console.error(`[pipeline] Gemini batch ${batchNum} failed:`, err);
-      let errMsg = err instanceof Error ? err.message : String(err);
-      if (errMsg.includes('429')) errMsg = 'Quota Exceeded (429). Please wait a minute or upgrade your Gemini API plan.';
-      onProgress(batchStart + 1, articles.length, `❌ AI Error: ${errMsg}`);
-      results = batch.map(() => ({ post: null, imagePrompt: null }));
-      if (errMsg.includes('Quota Exceeded')) break;
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[pipeline] ❌ [${i + 1}/${articles.length}] AI error for "${article.title.slice(0, 50)}":`, errMsg);
+      onProgress(i + 1, articles.length, `⚠️ AI error for "${article.title.slice(0, 40)}" — using fallback`);
+
+      // If it's a quota error, wait and continue (don't break — try next article)
+      if (errMsg.includes('429')) {
+        onProgress(i + 1, articles.length, `⏳ Rate limited — waiting 30s before next article...`);
+        await new Promise((resolve) => setTimeout(resolve, 30000));
+      }
     }
 
-    for (let j = 0; j < batch.length; j++) {
-      const globalIndex = batchStart + j;
-      const { post, imagePrompt } = results[j];
-      if (!post) {
-        console.warn(`[pipeline] Skipping article (parse failed): ${batch[j].title}`);
-        onProgress(globalIndex + 1, articles.length, `⚠️ Bỏ qua bài viết (Lỗi parser): ${batch[j].title.slice(0, 40)}`);
-        continue;
-      }
+    // Use fallback if AI failed
+    if (!post) {
+      post = buildFallbackPost(article);
+      console.log(`[pipeline] 🔄 [${i + 1}/${articles.length}] Fallback post created for: ${article.title.slice(0, 50)}`);
+    }
 
-      // Generate image with Gemini (TEMPORARILY DISABLED)
-      if (imagePrompt) {
-        /*
-        try {
-          onProgress(
-            globalIndex + 1,
-            articles.length,
-            `🎨 Đang tạo hình ảnh: ${post.emojiTitle.slice(0, 40)}...`,
-          );
-          const imageUrl = await geminiGenerateImage(imagePrompt);
-          if (imageUrl) {
-            post.generatedImageUrl = imageUrl;
-            console.log(`[pipeline] Generated image for: ${post.emojiTitle.slice(0, 50)}`);
-          }
-        } catch (err) {
-          console.error(`[pipeline] Image generation failed for: ${batch[j].title}`, err);
-        }
-        */
-        console.log(`[pipeline] Image generation temporarily disabled`);
+    // Generate platform-specific drafts if configured
+    if (platformPrompts && Object.keys(platformPrompts).length > 0) {
+      try {
+        onProgress(i + 1, articles.length, `📱 Generating platform drafts: ${post.emojiTitle.slice(0, 40)}...`);
+        post.platformDrafts = await generatePlatformDrafts(
+          article,
+          post.facebookText,
+          platformPrompts,
+          systemPrompt,
+        );
+      } catch (err) {
+        console.error(`[pipeline] Platform drafts failed for: ${article.title.slice(0, 50)}`, err);
       }
+    }
 
-      // Generate platform-specific drafts if platform prompts are configured
-      if (platformPrompts && Object.keys(platformPrompts).length > 0) {
-        try {
-          onProgress(
-            globalIndex + 1,
-            articles.length,
-            `📱 Đang tạo bản nháp đa nền tảng: ${post.emojiTitle.slice(0, 40)}...`,
-          );
-          post.platformDrafts = await generatePlatformDrafts(
-            batch[j],
-            post.facebookText,
-            platformPrompts,
-            systemPrompt,
-          );
-        } catch (err) {
-          console.error(`[pipeline] Platform drafts failed for: ${batch[j].title}`, err);
-        }
-      }
+    // Emit and save immediately
+    await onPost(post, i);
 
-      await onPost(post, globalIndex);
+    // Small delay between articles to be kind to OpenRouter free tier (2s instead of 15s)
+    if (i < articles.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
 }

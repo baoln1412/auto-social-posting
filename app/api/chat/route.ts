@@ -5,18 +5,21 @@ import { getSupabaseServer } from '@/app/lib/supabase';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? '';
 
+// Google Gemini via OpenAI-compatible endpoint
 const openai = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: OPENROUTER_API_KEY,
-  defaultHeaders: {
-    'HTTP-Referer': 'https://github.com/baoln1412/auto-social-posting', 
-    'X-Title': 'Auto Social Posting',
-  }
+  baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+  apiKey: GEMINI_API_KEY,
 });
 
-const DEFAULT_MODEL = 'stepfun/step-3.5-flash:free';
+// Gemini models — flash for tool calling, lite for simple chat
+const TOOL_MODELS = [
+  'gemini-2.5-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+];
+
+const CHAT_MODEL = 'gemini-3.1-flash-lite-preview';
 
 // ── Tool declarations (OpenAI spec) ───────────────────────────────────────
 const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -116,6 +119,21 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'get_dashboard_data',
+      description: 'Fetch current dashboard data including recent posts, stats, and sources. Use this when the user asks about current content, asks "what posts do I have", wants a summary of their dashboard, or asks about stats.',
+      parameters: {
+        type: 'object',
+        properties: {
+          pageId: { type: 'string', description: 'The page ID to fetch data for' },
+          limit: { type: 'number', description: 'Number of recent posts to fetch (default 10)' },
+        },
+        required: ['pageId'],
+      },
+    },
+  },
 ];
 
 // ── Tool execution ─────────────────────────────────────────────────────────
@@ -157,7 +175,7 @@ Existing content: ${post.facebook_text ?? post.emoji_title ?? post.summary ?? ''
 Return ONLY the regenerated value as plain text. MUST BE IN VIETNAMESE.`;
         
         const result = await openai.chat.completions.create({
-          model: DEFAULT_MODEL,
+          model: 'gemini-3.1-flash-lite-preview',
           messages: [{ role: 'user', content: prompt }],
         });
 
@@ -204,7 +222,7 @@ Return ONLY the regenerated value as plain text. MUST BE IN VIETNAMESE.`;
         
         const prompt = `User wants: "${args.instructions}"\n\nPage content from ${args.url}:\n${text}\n\nProvide a concise Vietnamese summary focused on what the user asked.`;
         const result = await openai.chat.completions.create({
-          model: DEFAULT_MODEL,
+          model: 'gemini-3.1-flash-lite-preview',
           messages: [{ role: 'user', content: prompt }],
         });
         const summary = result.choices[0]?.message?.content?.trim() || '';
@@ -233,6 +251,62 @@ Return ONLY the regenerated value as plain text. MUST BE IN VIETNAMESE.`;
           : JSON.stringify({ error: 'Pipeline failed to start' });
       }
 
+      case 'get_dashboard_data': {
+        const supabase = getSupabaseServer();
+        const pageId = args.pageId;
+        const limit = args.limit ?? 10;
+
+        // Fetch recent posts
+        const { data: posts } = await supabase
+          .from('posts')
+          .select('id, article_title, source, emoji_title, status, pub_date, fetch_time')
+          .eq('page_id', pageId)
+          .order('fetch_time', { ascending: false })
+          .limit(limit);
+
+        // Fetch basic stats
+        const { count: totalPosts } = await supabase
+          .from('posts')
+          .select('*', { count: 'exact', head: true })
+          .eq('page_id', pageId);
+
+        const { count: draftCount } = await supabase
+          .from('posts')
+          .select('*', { count: 'exact', head: true })
+          .eq('page_id', pageId)
+          .eq('status', 'draft');
+
+        const { count: publishedCount } = await supabase
+          .from('posts')
+          .select('*', { count: 'exact', head: true })
+          .eq('page_id', pageId)
+          .eq('status', 'published');
+
+        // Get unique sources
+        const { data: sourcesData } = await supabase
+          .from('posts')
+          .select('source')
+          .eq('page_id', pageId);
+        const uniqueSources = [...new Set((sourcesData ?? []).map((s: { source: string }) => s.source))];
+
+        return JSON.stringify({
+          action: 'dashboard_data',
+          stats: {
+            total: totalPosts ?? 0,
+            drafts: draftCount ?? 0,
+            published: publishedCount ?? 0,
+            sources: uniqueSources,
+          },
+          recentPosts: (posts ?? []).map((p: any) => ({
+            id: p.id.slice(0, 8),
+            title: p.emoji_title ?? p.article_title,
+            source: p.source,
+            status: p.status ?? 'draft',
+            date: p.pub_date,
+          })),
+        });
+      }
+
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -241,15 +315,35 @@ Return ONLY the regenerated value as plain text. MUST BE IN VIETNAMESE.`;
   }
 }
 
-const SYSTEM_INSTRUCTION = `You are an AI copilot embedded in a Vietnamese social media content management dashboard called "Auto Social Posting". Help the user:
-- Filter and find posts (use update_dashboard_filters tool)
-- Regenerate post drafts with custom instructions (use regenerate_draft tool)
-- Schedule posts to channels (use schedule_post tool)
-- Fetch data from custom URLs and summarize (use scrape_custom_url tool)
-- Push scraped content through the pipeline after user confirms (use push_to_pipeline tool)
+const SYSTEM_INSTRUCTION = `You are an AI copilot embedded in a Vietnamese social media content management dashboard called "Auto Social Posting". You have access to these tools:
 
-Always respond in the same language the user uses. Default to Vietnamese. Be concise and action-oriented.
-When a tool runs successfully, acknowledge the action and ask if the user wants to do anything else.`;
+1. **update_dashboard_filters** — Filter posts by source, date, status, keyword. USE THIS when user says "lọc", "filter", "show", "tìm", "hiện".
+2. **regenerate_draft** — Rewrite a post's title/content/summary. USE THIS when user says "viết lại", "edit", "sửa", "thay đổi".
+3. **schedule_post** — Schedule a post for a specific time.
+4. **scrape_custom_url** — Fetch & summarize a URL.
+5. **push_to_pipeline** — Push scraped content through the pipeline.
+6. **get_dashboard_data** — Get current posts, stats, sources. USE THIS when user asks "có bao nhiêu bài", "thống kê", "stats", "how many posts", "list posts".
+
+IMPORTANT RULES:
+- ALWAYS use a tool when the user's intent matches one. Don't just respond with text.
+- Respond in the same language the user uses. Default to Vietnamese.
+- Be concise and action-oriented.
+- When a tool runs successfully, acknowledge the action and explain what happened.`;
+
+// ── Detect if user intent requires tools ──────────────────────────────────
+function detectToolIntent(text: string): boolean {
+  const toolKeywords = [
+    'lọc', 'filter', 'show', 'tìm', 'hiện', 'source', 'nguồn',
+    'viết lại', 'edit', 'sửa', 'thay đổi', 'regenerate', 'rewrite',
+    'schedule', 'lên lịch', 'đặt lịch',
+    'scrape', 'fetch', 'url', 'http',
+    'pipeline', 'push',
+    'thống kê', 'stats', 'bao nhiêu', 'how many', 'list', 'recent',
+    'dashboard', 'bài viết',
+  ];
+  const lower = text.toLowerCase();
+  return toolKeywords.some(kw => lower.includes(kw));
+}
 
 // ── POST Handler ───────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
@@ -277,44 +371,92 @@ export async function POST(req: NextRequest) {
         }
 
         const lastMessage = messages[messages.length - 1];
-        const userText = `[pageId: ${pageId}, current filters: ${JSON.stringify(currentFilters)}]\n${lastMessage.content}`;
+        const userText = `[Context — pageId: ${pageId}, current filters: ${JSON.stringify(currentFilters)}]\n\nUser message: ${lastMessage.content}`;
         openaiMessages.push({ role: 'user', content: userText });
 
-        const streamRes = await openai.chat.completions.create({
-          model: DEFAULT_MODEL,
-          messages: openaiMessages,
-          tools: tools,
-          tool_choice: 'auto',
-          stream: true,
-        });
+        const needsTools = detectToolIntent(lastMessage.content);
 
+        // Try models in order for tool-calling requests
         let fullContent = '';
         let toolCalls: any[] = [];
-        let functionCallResult: Record<string, any> | undefined = undefined;
+        let modelUsed = '';
 
-        for await (const chunk of streamRes) {
-          const delta = chunk.choices[0]?.delta;
-          
-          if (delta?.content) {
-            fullContent += delta.content;
-            send({ type: 'text_delta', content: delta.content });
-          }
-          
-          if (delta?.tool_calls) {
-            for (const toolCallDelta of delta.tool_calls) {
-              const idx = toolCallDelta.index;
-              if (!toolCalls[idx]) {
-                toolCalls[idx] = {
-                  id: toolCallDelta.id || `call_${idx}`,
-                  type: 'function',
-                  function: { name: toolCallDelta.function?.name || '', arguments: '' }
-                };
+        if (needsTools) {
+          // Try each model until we get tool calls
+          for (const model of TOOL_MODELS) {
+            try {
+              console.log(`[chat] Trying model ${model} for tool calling...`);
+              const streamRes = await openai.chat.completions.create({
+                model,
+                messages: openaiMessages,
+                tools: tools,
+                tool_choice: 'auto',
+                stream: true,
+              });
+
+              fullContent = '';
+              toolCalls = [];
+
+              for await (const chunk of streamRes) {
+                const delta = chunk.choices[0]?.delta;
+                
+                if (delta?.content) {
+                  fullContent += delta.content;
+                  send({ type: 'text_delta', content: delta.content });
+                }
+                
+                if (delta?.tool_calls) {
+                  for (const toolCallDelta of delta.tool_calls) {
+                    const idx = toolCallDelta.index;
+                    if (!toolCalls[idx]) {
+                      toolCalls[idx] = {
+                        id: toolCallDelta.id || `call_${idx}`,
+                        type: 'function',
+                        function: { name: toolCallDelta.function?.name || '', arguments: '' }
+                      };
+                    }
+                    if (toolCallDelta.function?.name) {
+                      toolCalls[idx].function.name = toolCallDelta.function.name;
+                    }
+                    if (toolCallDelta.function?.arguments) {
+                      toolCalls[idx].function.arguments += toolCallDelta.function.arguments;
+                    }
+                  }
+                }
               }
-              if (toolCallDelta.function?.arguments) {
-                toolCalls[idx].function.arguments += toolCallDelta.function.arguments;
+
+              modelUsed = model;
+
+              // If we got tool calls, break out of the retry loop
+              if (toolCalls.length > 0 && toolCalls.some(tc => tc?.function?.name)) {
+                console.log(`[chat] ✅ Model ${model} returned tool calls: ${toolCalls.map(tc => tc?.function?.name).join(', ')}`);
+                break;
+              } else {
+                console.log(`[chat] ⚠️ Model ${model} did not return tool calls, trying next...`);
+                // Only retry if we haven't streamed much text yet
+                if (fullContent.length > 50) break;
               }
+            } catch (err) {
+              console.error(`[chat] Model ${model} failed:`, err);
+              continue;
             }
           }
+        } else {
+          // Simple chat — use the default model without tools
+          const streamRes = await openai.chat.completions.create({
+            model: CHAT_MODEL,
+            messages: openaiMessages,
+            stream: true,
+          });
+
+          for await (const chunk of streamRes) {
+            const delta = chunk.choices[0]?.delta;
+            if (delta?.content) {
+              fullContent += delta.content;
+              send({ type: 'text_delta', content: delta.content });
+            }
+          }
+          modelUsed = CHAT_MODEL;
         }
 
         // If tools were called, execute them and make a follow-up request
@@ -331,6 +473,15 @@ export async function POST(req: NextRequest) {
             try {
               const argsStr = call.function.arguments || '{}';
               const args = JSON.parse(argsStr);
+
+              // Auto-inject pageId if the tool needs it and it wasn't provided
+              if (call.function.name === 'get_dashboard_data' && !args.pageId && pageId) {
+                args.pageId = pageId;
+              }
+              if (call.function.name === 'push_to_pipeline' && !args.pageId && pageId) {
+                args.pageId = pageId;
+              }
+
               const result = await executeTool(call.function.name, args);
               const parsed = JSON.parse(result);
               
@@ -356,7 +507,7 @@ export async function POST(req: NextRequest) {
           if (resultsCount > 0) {
             // Follow up request to let agent respond with tool results
             const followUpRes = await openai.chat.completions.create({
-              model: DEFAULT_MODEL,
+              model: modelUsed || CHAT_MODEL,
               messages: openaiMessages,
               stream: true,
             });

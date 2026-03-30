@@ -1,5 +1,5 @@
 /**
- * PATCH /api/posts — Toggle the `is_done` status of a crime post.
+ * PATCH /api/posts/toggle-done — Toggle the `is_done` status of a post.
  *
  * Body: { articleUrl: string, isDone: boolean }
  */

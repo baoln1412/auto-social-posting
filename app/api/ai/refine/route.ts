@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { generateContent } from '../../pipeline/gemini-client';
+import { generateContent } from '../../pipeline/openrouter-client';
 
 /**
  * AI Draft Refinement endpoint.
@@ -17,11 +17,11 @@ export async function POST(request: Request) {
     }
 
     const systemPrompt =
-      'You are a Vietnamese football social media editor. ' +
+      'You are a social media content editor. ' +
       'The user will give you a Facebook post draft and an instruction to improve it. ' +
       'Return ONLY the improved draft text (no explanations, no markdown, no quotes). ' +
-      'Keep it in Vietnamese, 1000-1500 characters, 3-4 paragraphs separated by blank lines. ' +
-      'Preserve the "Nguồn:" line at the end if it exists.';
+      'Keep the same language as the original draft. ' +
+      'Preserve the overall structure and any branding/source lines at the end.';
 
     const userMessage = `--- CURRENT DRAFT ---\n${draft}\n\n--- INSTRUCTION ---\n${instruction}`;
 

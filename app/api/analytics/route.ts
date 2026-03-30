@@ -1,10 +1,5 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseServer } from '@/app/lib/supabase';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -12,6 +7,8 @@ export async function GET(req: Request) {
   if (!pageId) return NextResponse.json({ error: 'pageId required' }, { status: 400 });
 
   try {
+    const supabase = getSupabaseServer();
+
     // Total counts by status
     const { data: allPosts } = await supabase
       .from('posts')

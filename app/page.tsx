@@ -237,6 +237,60 @@ export default function Home() {
           {progress && <span className="text-xs text-primary font-medium">{progress}</span>}
         </div>
 
+        {/* Applied keyword summary */}
+        {activePage?.keywordConfig && (() => {
+          const kc = activePage.keywordConfig;
+          const t1 = (kc.tier1 ?? []).length;
+          const t2 = (kc.tier2 ?? []).length;
+          const crime = (kc.crimeKeywords ?? []).length;
+          const excl = (kc.excludeKeywords ?? []).length;
+          const pol = (kc.politicalKeywords ?? []).length;
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">🔑 Keywords:</span>
+              {t1 > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono">
+                  {t1} tier-1 (+3pts)
+                </span>
+              )}
+              {t2 > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
+                  {t2} tier-2 (+1pt)
+                </span>
+              )}
+              {kc.useCrimeFilter ? (
+                <>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-mono">
+                    🚨 {crime} crime
+                  </span>
+                  {excl > 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-mono">
+                      🚫 {excl} exclude
+                    </span>
+                  )}
+                  {pol > 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-mono">
+                      🏛 {pol} political ban
+                    </span>
+                  )}
+                </>
+              ) : (
+                t1 === 0 && t2 === 0 && (
+                  <span className="text-xs text-muted-foreground italic">No keyword filter configured</span>
+                )
+              )}
+              <span className="text-xs text-muted-foreground">· min score: {kc.minScore ?? 1}</span>
+              <button
+                onClick={() => setActiveView('settings')}
+                className="text-xs text-primary underline hover:no-underline ml-1"
+              >
+                Configure →
+              </button>
+            </div>
+          );
+        })()}
+
+
         {/* Filters */}
         <div className="flex flex-wrap gap-3 items-center">
           <input

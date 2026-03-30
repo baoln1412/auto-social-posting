@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Parser from 'rss-parser';
 import * as cheerio from 'cheerio';
-import { Article } from '@/app/types';
+import { Article, KeywordConfig } from '@/app/types';
 import { getSupabaseServer } from '@/app/lib/supabase';
-import { generateContent } from '@/app/api/pipeline/gemini-client';
+import { generateContent } from '@/app/api/pipeline/openrouter-client';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -24,6 +24,8 @@ interface FeedEntry {
   url: string;
   feedType: string;
   scrapeSelector?: string;
+  /** True = every article from this feed is crime-related (skips keyword check) */
+  crimeSpecific?: boolean;
 }
 
 // ── Load feeds for a specific page ──────────────────────────────────────
@@ -32,7 +34,7 @@ async function loadFeeds(pageId: string): Promise<FeedEntry[]> {
     const supabase = getSupabaseServer();
     const { data, error } = await supabase
       .from('rss_feeds')
-      .select('name, url, feed_type, scrape_selector')
+      .select('name, url, feed_type, scrape_selector, crime_specific')
       .eq('page_id', pageId)
       .eq('enabled', true)
       .order('name');
@@ -45,11 +47,49 @@ async function loadFeeds(pageId: string): Promise<FeedEntry[]> {
       url: row.url,
       feedType: row.feed_type,
       scrapeSelector: row.scrape_selector,
+      crimeSpecific: row.crime_specific ?? false,
     }));
   } catch (err) {
     console.warn('[fetch-news] Failed to load feeds:', err);
     return [];
   }
+}
+
+// ── Load keyword config for a specific page ──────────────────────────────
+async function loadPageKeywordConfig(pageId: string): Promise<KeywordConfig | null> {
+  try {
+    const supabase = getSupabaseServer();
+    const { data } = await supabase
+      .from('content_pages')
+      .select('keyword_config')
+      .eq('id', pageId)
+      .single();
+
+    return data?.keyword_config ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Crime / exclude / political article filter ────────────────────────────
+
+function buildRegex(keywords: string[]): RegExp {
+  const escaped = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(escaped.join('|'), 'i');
+}
+
+function isCrimeArticle(
+  article: Article,
+  crimeSpecificFeed: boolean,
+  crimeRegex: RegExp,
+  excludeRegex: RegExp | null,
+  politicalRegex: RegExp | null,
+): boolean {
+  const text = `${article.title} ${article.description}`;
+  if (excludeRegex?.test(text)) return false;
+  if (politicalRegex?.test(text)) return false;
+  if (crimeSpecificFeed) return true;
+  return crimeRegex.test(text);
 }
 
 // ── Get last fetch time for a page ──────────────────────────────────────
@@ -138,6 +178,11 @@ function fuzzyDedup(articles: Article[]): Article[] {
 // ── LLM Semantic deduplication ───────────────────────────────────────────
 async function llmSemanticDedup(articles: Article[]): Promise<Article[]> {
   if (articles.length === 0) return [];
+  // Skip LLM dedup for small batches — not worth the risk of losing articles
+  if (articles.length <= 5) {
+    console.log(`[fetch-news] Skipping LLM dedup for ${articles.length} articles (too few)`);
+    return articles;
+  }
 
   const batch = articles.slice(0, 40);
   const payloadStr = JSON.stringify(batch.map((a, idx) => ({
@@ -160,12 +205,19 @@ Return strictly a JSON object: { "uniqueIds": [0, 2, 5] }`;
     if (result.uniqueIds && Array.isArray(result.uniqueIds)) {
       const uniqueIds = new Set(result.uniqueIds);
       const kept = batch.filter((_, idx) => uniqueIds.has(idx));
+      // Safety: if LLM removed more than 70% of articles, it's probably a bad response
+      if (kept.length < batch.length * 0.3) {
+        console.warn(`[fetch-news] LLM dedup removed ${batch.length - kept.length}/${batch.length} articles (>70%) — ignoring bad result`);
+        return articles;
+      }
       console.log(`[fetch-news] LLM Dedup: In=${batch.length}, Out=${kept.length}`);
       const remaining = articles.slice(40);
       return [...kept, ...remaining];
+    } else {
+      console.warn('[fetch-news] LLM dedup returned unexpected format, keeping all articles');
     }
   } catch (err) {
-    console.error('[fetch-news] LLM dedup failed, using input list:', err);
+    console.error('[fetch-news] LLM dedup failed, keeping all articles:', err);
   }
 
   return articles;
@@ -227,7 +279,7 @@ async function fetchRssFeed(feed: FeedEntry, cutoffTime: Date): Promise<Article[
   try {
     const feedData = await Promise.race([
       parser.parseURL(feed.url),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 8000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 15000)),
     ]);
 
     const articles: Article[] = [];
@@ -336,10 +388,29 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ articles: [], error: 'pageId is required' }, { status: 400 });
   }
 
-  const feeds = await loadFeeds(pageId);
+  const [feeds, keywordConfig] = await Promise.all([
+    loadFeeds(pageId),
+    loadPageKeywordConfig(pageId),
+  ]);
 
   if (feeds.length === 0) {
     return NextResponse.json({ articles: [], message: 'No feeds configured for this page' });
+  }
+
+  // Build crime filter regexes (only if page has useCrimeFilter enabled)
+  let crimeRegex: RegExp | null = null;
+  let excludeRegex: RegExp | null = null;
+  let politicalRegex: RegExp | null = null;
+  const useCrimeFilter = keywordConfig?.useCrimeFilter === true;
+
+  if (useCrimeFilter && keywordConfig) {
+    const ck = keywordConfig.crimeKeywords ?? [];
+    const ek = keywordConfig.excludeKeywords ?? [];
+    const pk = keywordConfig.politicalKeywords ?? [];
+    if (ck.length > 0) crimeRegex = buildRegex(ck);
+    if (ek.length > 0) excludeRegex = buildRegex(ek);
+    if (pk.length > 0) politicalRegex = buildRegex(pk);
+    console.log(`[fetch-news] Crime filter ON — ${ck.length} crime / ${ek.length} exclude / ${pk.length} political keywords`);
   }
 
   // Determine cutoff time: use last_fetch_time if available (incremental), else 24h ago
@@ -368,10 +439,35 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     })
   );
 
+  // Per-feed result logging + optional crime filter
+  const feedResults: { name: string; status: string; count: number; crimeFiltered?: number }[] = [];
   let allArticles: Article[] = [];
-  for (const result of results) {
-    if (result.status !== 'fulfilled') continue;
-    allArticles.push(...result.value);
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const feed = feeds[i];
+    if (result.status === 'fulfilled') {
+      let articles = result.value;
+      let crimeFiltered = 0;
+
+      // Apply crime filter if enabled and we have a crime regex
+      if (useCrimeFilter && crimeRegex) {
+        const before = articles.length;
+        articles = articles.filter((a) =>
+          isCrimeArticle(a, feed.crimeSpecific ?? false, crimeRegex!, excludeRegex, politicalRegex)
+        );
+        crimeFiltered = before - articles.length;
+        if (crimeFiltered > 0) {
+          console.log(`[fetch-news] 🔍 ${feed.name}: crime filter removed ${crimeFiltered}/${before}`);
+        }
+      }
+
+      feedResults.push({ name: feed.name, status: 'ok', count: articles.length, crimeFiltered });
+      allArticles.push(...articles);
+      console.log(`[fetch-news] ✅ ${feed.name}: ${articles.length} articles`);
+    } else {
+      feedResults.push({ name: feed.name, status: 'failed', count: 0 });
+      console.error(`[fetch-news] ❌ ${feed.name}: ${result.reason}`);
+    }
   }
 
   // Deduplicate by exact URL
@@ -385,7 +481,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Fuzzy title dedup
   let deduped = fuzzyDedup(urlDeduped);
 
-  // Semantic LLM dedup
+  // Semantic LLM dedup (with safety guardrails)
   deduped = await llmSemanticDedup(deduped);
 
   // Sort by pubDate descending
@@ -394,5 +490,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const articles = deduped.slice(0, MAX_ARTICLES);
 
   console.log(`[fetch-news] ${urlDeduped.length} after URL dedup → ${articles.length} returned`);
-  return NextResponse.json({ articles });
+  return NextResponse.json({ articles, feedResults });
 }
