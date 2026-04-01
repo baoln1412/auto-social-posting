@@ -315,7 +315,7 @@ Return ONLY the regenerated value as plain text. MUST BE IN VIETNAMESE.`;
   }
 }
 
-const SYSTEM_INSTRUCTION = `You are an AI copilot embedded in a Vietnamese social media content management dashboard called "Auto Social Posting". You have access to these tools:
+const SYSTEM_INSTRUCTION = `You are an AI copilot embedded in a Vietnamese social media content management dashboard called "Total Football". You have access to these tools:
 
 1. **update_dashboard_filters** — Filter posts by source, date, status, keyword. USE THIS when user says "lọc", "filter", "show", "tìm", "hiện".
 2. **regenerate_draft** — Rewrite a post's title/content/summary. USE THIS when user says "viết lại", "edit", "sửa", "thay đổi".

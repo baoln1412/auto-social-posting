@@ -11,6 +11,60 @@ import { getSupabaseServer } from '@/app/lib/supabase';
 
 export const maxDuration = 300;
 
+interface ChannelConfig {
+  id: string;
+  systemPrompt: string;
+  userPrompt: string;
+  keywordConfig: KeywordConfig;
+  platformPageName: string;
+}
+
+// ── Load connected channels for a page ───────────────────────────────────────
+async function loadChannels(
+  pageId: string,
+  defaultSystemPrompt: string,
+  defaultUserPrompt: string,
+  defaultKeywordConfig: KeywordConfig,
+): Promise<ChannelConfig[]> {
+  try {
+    const supabase = getSupabaseServer();
+    const { data, error } = await supabase
+      .from('page_channels')
+      .select('id, platform_page_name, system_prompt, user_prompt, keyword_config')
+      .eq('page_id', pageId)
+      .eq('platform', 'facebook');
+
+    if (error || !data || data.length === 0) {
+      // No connected channels — run with default config using a virtual channel
+      return [{
+        id: 'default',
+        platformPageName: 'Default',
+        systemPrompt: defaultSystemPrompt,
+        userPrompt: defaultUserPrompt,
+        keywordConfig: defaultKeywordConfig,
+      }];
+    }
+
+    return data.map((ch) => ({
+      id: ch.id,
+      platformPageName: ch.platform_page_name,
+      // Use channel override if set, otherwise fall back to page defaults
+      systemPrompt: ch.system_prompt ?? defaultSystemPrompt,
+      userPrompt: ch.user_prompt ?? defaultUserPrompt,
+      keywordConfig: ch.keyword_config ?? defaultKeywordConfig,
+    }));
+  } catch (err) {
+    console.error('[pipeline] Failed to load channels:', err);
+    return [{
+      id: 'default',
+      platformPageName: 'Default',
+      systemPrompt: defaultSystemPrompt,
+      userPrompt: defaultUserPrompt,
+      keywordConfig: defaultKeywordConfig,
+    }];
+  }
+}
+
 // ── Save posts to Supabase ────────────────────────────────────────────────
 async function savePostToDb(post: PostDraft, pageId: string): Promise<void> {
   try {
@@ -44,7 +98,7 @@ async function savePostToDb(post: PostDraft, pageId: string): Promise<void> {
   }
 }
 
-// ── Filter out already-processed articles ─────────────────────────────────
+// ── Filter out already-processed articles ─────────────────────────────────────
 async function filterNewArticles(articles: Article[]): Promise<Article[]> {
   try {
     const supabase = getSupabaseServer();
@@ -118,84 +172,102 @@ export async function POST(request: NextRequest): Promise<Response> {
         return;
       }
 
+      // Step 2: Load channels (each may have its own prompts/keywords)
+      const channels = await loadChannels(pageId, systemPrompt, userPrompt, keywordConfig);
+      const multiChannel = channels.length > 1;
+
       emit({
         type: 'progress',
         current: 0,
         total: newArticles.length,
-        title: `${newArticles.length} new articles found — filtering by keywords...`,
-      });
-
-      // Step 2: Filter by keywords (fast, local — runs FIRST)
-      const keywordFiltered = filterByKeywords(
-        newArticles,
-        keywordConfig,
-        (msg) => emit({ type: 'progress', current: 0, total: newArticles.length, title: msg }),
-      );
-
-      if (keywordFiltered.length === 0) {
-        emit({
-          type: 'progress',
-          current: 0,
-          total: 0,
-          title: 'No articles matched your keyword filters — try adjusting your keywords',
-        });
-        emit({ type: 'done', total: 0, skipped: articles.length });
-        controller.close();
-        return;
-      }
-
-      // Step 3: AI relevance filter (runs AFTER keyword filter)
-      const relevantArticles = await filterRelevantArticles(
-        keywordFiltered,
-        systemPrompt,
-        (msg) => emit({ type: 'progress', current: 0, total: keywordFiltered.length, title: msg }),
-      );
-
-      if (relevantArticles.length === 0) {
-        emit({
-          type: 'progress',
-          current: 0,
-          total: 0,
-          title: 'No relevant articles found for your niche — try different sources',
-        });
-        emit({ type: 'done', total: 0, skipped: articles.length });
-        controller.close();
-        return;
-      }
-
-      emit({
-        type: 'progress',
-        current: 0,
-        total: relevantArticles.length,
-        title: `${relevantArticles.length} relevant articles (${newArticles.length - relevantArticles.length} filtered) — generating posts...`,
+        title: `${newArticles.length} new articles — running pipeline${multiChannel ? ` across ${channels.length} channels` : ''}...`,
       });
 
       await initPipelineNotebook();
 
       let actualPostCount = 0;
-      const emitAndSave = async (post: PostDraft) => {
-        const postWithFetchTime = { ...post, fetchTime: new Date().toISOString(), pageId };
-        emit({ type: 'post', post: postWithFetchTime });
-        await savePostToDb(post, pageId);
-        actualPostCount++;
-      };
 
-      // Step 4: Generate posts from relevant articles (one by one)
-      await processBatchGemini(
-        relevantArticles,
-        systemPrompt,
-        async (post) => { await emitAndSave(post); },
-        (current, total, title) => emit({ type: 'progress', current, total, title }),
-        platformPrompts,
-        userPrompt,
-      );
+      // Step 3: Run per-channel pipeline
+      for (const channel of channels) {
+        const channelLabel = multiChannel ? ` [${channel.platformPageName}]` : '';
+
+        emit({
+          type: 'progress',
+          current: 0,
+          total: newArticles.length,
+          title: `🔑${channelLabel} Filtering by keywords...`,
+        });
+
+        // Keyword filter using this channel's config
+        const keywordFiltered = filterByKeywords(
+          newArticles,
+          channel.keywordConfig,
+          (msg) => emit({ type: 'progress', current: 0, total: newArticles.length, title: `${channelLabel} ${msg}` }),
+        );
+
+        if (keywordFiltered.length === 0) {
+          emit({
+            type: 'progress',
+            current: 0,
+            total: 0,
+            title: `${channelLabel} No articles matched keyword filters`,
+          });
+          continue;
+        }
+
+        // AI relevance filter
+        const relevantArticles = await filterRelevantArticles(
+          keywordFiltered,
+          channel.systemPrompt,
+          (msg) => emit({ type: 'progress', current: 0, total: keywordFiltered.length, title: `${channelLabel} ${msg}` }),
+        );
+
+        if (relevantArticles.length === 0) {
+          emit({
+            type: 'progress',
+            current: 0,
+            total: 0,
+            title: `${channelLabel} No relevant articles found`,
+          });
+          continue;
+        }
+
+        emit({
+          type: 'progress',
+          current: 0,
+          total: relevantArticles.length,
+          title: `${channelLabel} ${relevantArticles.length} relevant articles — generating posts...`,
+        });
+
+        const emitAndSave = async (post: PostDraft) => {
+          // Tag the post with which channel generated it (stored in platformDrafts)
+          if (multiChannel && channel.id !== 'default') {
+            post.platformDrafts = {
+              ...post.platformDrafts,
+              [`channel_${channel.id}`]: post.facebookText,
+            };
+          }
+          const postWithMeta = { ...post, fetchTime: new Date().toISOString(), pageId };
+          emit({ type: 'post', post: postWithMeta });
+          await savePostToDb(post, pageId);
+          actualPostCount++;
+        };
+
+        // Step 4: Generate posts using this channel's prompts
+        await processBatchGemini(
+          relevantArticles,
+          channel.systemPrompt,
+          async (post) => { await emitAndSave(post); },
+          (current, total, title) => emit({ type: 'progress', current, total, title: `${channelLabel} ${title}` }),
+          platformPrompts,
+          channel.userPrompt,
+        );
+      }
 
       await cleanupPipelineNotebook();
-
-      // Update last fetch time
       await updateLastFetchTime(pageId);
 
-      const totalSkipped = articles.length - relevantArticles.length;
+      const totalSkipped = articles.length - newArticles.length;
       emit({ type: 'done', total: actualPostCount, skipped: totalSkipped });
       controller.close();
     },

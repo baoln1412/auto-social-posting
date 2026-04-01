@@ -10,6 +10,7 @@ import AnalyticsDashboard from './components/analytics/AnalyticsDashboard';
 import SettingsView from './components/settings/SettingsView';
 import { Button } from '@/components/ui/button';
 import AIChatWindow, { DashboardFilters } from './components/chat/AIChatWindow';
+import BulkDeleteModal from './components/BulkDeleteModal';
 
 export default function Home() {
   const [pages, setPages] = useState<ContentPage[]>([]);
@@ -32,6 +33,7 @@ export default function Home() {
 
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [progress, setProgress] = useState('');
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
 
   // ── Load pages ──
   const loadPages = useCallback(async () => {
@@ -242,9 +244,6 @@ export default function Home() {
           const kc = activePage.keywordConfig;
           const t1 = (kc.tier1 ?? []).length;
           const t2 = (kc.tier2 ?? []).length;
-          const crime = (kc.crimeKeywords ?? []).length;
-          const excl = (kc.excludeKeywords ?? []).length;
-          const pol = (kc.politicalKeywords ?? []).length;
           return (
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">🔑 Keywords:</span>
@@ -258,26 +257,8 @@ export default function Home() {
                   {t2} tier-2 (+1pt)
                 </span>
               )}
-              {kc.useCrimeFilter ? (
-                <>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-mono">
-                    🚨 {crime} crime
-                  </span>
-                  {excl > 0 && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-mono">
-                      🚫 {excl} exclude
-                    </span>
-                  )}
-                  {pol > 0 && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-mono">
-                      🏛 {pol} political ban
-                    </span>
-                  )}
-                </>
-              ) : (
-                t1 === 0 && t2 === 0 && (
-                  <span className="text-xs text-muted-foreground italic">No keyword filter configured</span>
-                )
+              {t1 === 0 && t2 === 0 && (
+                <span className="text-xs text-muted-foreground italic">No keyword filter configured</span>
               )}
               <span className="text-xs text-muted-foreground">· min score: {kc.minScore ?? 1}</span>
               <button
@@ -319,8 +300,29 @@ export default function Home() {
           {filterKeyword && (
             <button onClick={() => setFilterKeyword('')} className="text-xs text-muted-foreground hover:text-foreground underline">Clear</button>
           )}
-          <span className="text-xs ml-auto text-muted-foreground">{totalCount} posts</span>
+          <div style={{ flex: 1 }} />
+          <span className="text-xs text-muted-foreground">{totalCount} posts</span>
+          <button
+            onClick={() => setShowBulkDelete(true)}
+            style={{
+              padding: '6px 12px', borderRadius: '8px',
+              border: '1px solid #7f1d1d', backgroundColor: '#1a0a0a',
+              color: '#ef4444', fontSize: '12px', fontWeight: 600,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            🗑️ Delete by Date
+          </button>
         </div>
+
+        {/* Bulk Delete Modal */}
+        {showBulkDelete && activePage && (
+          <BulkDeleteModal
+            pageId={activePage.id}
+            onClose={() => setShowBulkDelete(false)}
+            onDeleted={(count: number) => { loadPosts(); alert(`✅ Deleted ${count} post${count !== 1 ? 's' : ''}.`); }}
+          />
+        )}
 
         {/* Posts */}
         {postsLoading ? (

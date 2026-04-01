@@ -21,6 +21,11 @@ export interface PostDraft {
   article: ArticleWithSummary;
   facebookText: string;
   emojiTitle: string;
+  emojiTitleVi?: string;
+  matchTime?: string;
+  matchTeams?: string;
+  bestPlayer?: string;
+  matchHighlight?: string;
   generatedImageUrl?: string;
   platformDrafts?: Record<string, string>;
   fetchTime?: string;
@@ -37,14 +42,6 @@ export interface KeywordConfig {
   tier1: string[];
   tier2: string[];
   minScore: number;
-  /** Enable crime/exclude/political hard-filters at the fetch stage */
-  useCrimeFilter?: boolean;
-  /** Articles must match at least one of these to pass (unless feed is crimeSpecific) */
-  crimeKeywords?: string[];
-  /** Articles matching any of these are always excluded */
-  excludeKeywords?: string[];
-  /** Articles matching any of these are always excluded */
-  politicalKeywords?: string[];
 }
 
 export interface ContentPage {
@@ -67,7 +64,12 @@ export interface PageChannel {
   platformPageName: string;
   accessToken: string;
   connectedAt: string;
+  /** Per-channel overrides — null means use parent ContentPage config */
+  systemPrompt?: string | null;
+  userPrompt?: string | null;
+  keywordConfig?: KeywordConfig | null;
 }
+
 
 export interface FeedEntry {
   id: string;

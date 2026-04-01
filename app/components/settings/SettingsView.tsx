@@ -93,7 +93,13 @@ export default function SettingsView({
       </Card>
 
       {/* Channel Manager */}
-      <ChannelManager pageId={pageId} />
+      <ChannelManager
+        pageId={pageId}
+        defaultSystemPrompt={systemPrompt}
+        defaultUserPrompt={userPrompt}
+        defaultKeywordConfig={keywordConfig}
+      />
+
 
       {/* Feed Sources */}
       <SourceManager pageId={pageId} />

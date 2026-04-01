@@ -48,9 +48,13 @@ export async function GET(request: NextRequest) {
         platformPageId: c.platform_page_id,
         platformPageName: c.platform_page_name,
         connectedAt: c.connected_at,
+        systemPrompt: c.system_prompt ?? null,
+        userPrompt: c.user_prompt ?? null,
+        keywordConfig: c.keyword_config ?? null,
       })),
       tokenValid,
     });
+
   } catch (err) {
     console.error('[facebook-status] Error:', err);
     return NextResponse.json({ channels: [], connected: false, error: 'Failed' }, { status: 500 });

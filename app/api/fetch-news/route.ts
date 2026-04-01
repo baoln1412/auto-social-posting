@@ -55,42 +55,7 @@ async function loadFeeds(pageId: string): Promise<FeedEntry[]> {
   }
 }
 
-// ── Load keyword config for a specific page ──────────────────────────────
-async function loadPageKeywordConfig(pageId: string): Promise<KeywordConfig | null> {
-  try {
-    const supabase = getSupabaseServer();
-    const { data } = await supabase
-      .from('content_pages')
-      .select('keyword_config')
-      .eq('id', pageId)
-      .single();
 
-    return data?.keyword_config ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// ── Crime / exclude / political article filter ────────────────────────────
-
-function buildRegex(keywords: string[]): RegExp {
-  const escaped = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  return new RegExp(escaped.join('|'), 'i');
-}
-
-function isCrimeArticle(
-  article: Article,
-  crimeSpecificFeed: boolean,
-  crimeRegex: RegExp,
-  excludeRegex: RegExp | null,
-  politicalRegex: RegExp | null,
-): boolean {
-  const text = `${article.title} ${article.description}`;
-  if (excludeRegex?.test(text)) return false;
-  if (politicalRegex?.test(text)) return false;
-  if (crimeSpecificFeed) return true;
-  return crimeRegex.test(text);
-}
 
 // ── US State / Location detector ─────────────────────────────────────────
 
@@ -488,30 +453,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ articles: [], error: 'pageId is required' }, { status: 400 });
   }
 
-  const [feeds, keywordConfig] = await Promise.all([
-    loadFeeds(pageId),
-    loadPageKeywordConfig(pageId),
-  ]);
-
-  if (feeds.length === 0) {
-    return NextResponse.json({ articles: [], message: 'No feeds configured for this page' });
-  }
-
-  // Build crime filter regexes (only if page has useCrimeFilter enabled)
-  let crimeRegex: RegExp | null = null;
-  let excludeRegex: RegExp | null = null;
-  let politicalRegex: RegExp | null = null;
-  const useCrimeFilter = keywordConfig?.useCrimeFilter === true;
-
-  if (useCrimeFilter && keywordConfig) {
-    const ck = keywordConfig.crimeKeywords ?? [];
-    const ek = keywordConfig.excludeKeywords ?? [];
-    const pk = keywordConfig.politicalKeywords ?? [];
-    if (ck.length > 0) crimeRegex = buildRegex(ck);
-    if (ek.length > 0) excludeRegex = buildRegex(ek);
-    if (pk.length > 0) politicalRegex = buildRegex(pk);
-    console.log(`[fetch-news] Crime filter ON — ${ck.length} crime / ${ek.length} exclude / ${pk.length} political keywords`);
-  }
+  const feeds = await loadFeeds(pageId);
 
   // Determine cutoff time: use last_fetch_time if available (incremental), else 24h ago
   let cutoffTime: Date;
@@ -539,29 +481,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     })
   );
 
-  // Per-feed result logging + optional crime filter
-  const feedResults: { name: string; status: string; count: number; crimeFiltered?: number }[] = [];
+  // Per-feed result logging
+  const feedResults: { name: string; status: string; count: number }[] = [];
   let allArticles: Article[] = [];
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
     const feed = feeds[i];
     if (result.status === 'fulfilled') {
       let articles = result.value;
-      let crimeFiltered = 0;
 
-      // Apply crime filter if enabled and we have a crime regex
-      if (useCrimeFilter && crimeRegex) {
-        const before = articles.length;
-        articles = articles.filter((a) =>
-          isCrimeArticle(a, feed.crimeSpecific ?? false, crimeRegex!, excludeRegex, politicalRegex)
-        );
-        crimeFiltered = before - articles.length;
-        if (crimeFiltered > 0) {
-          console.log(`[fetch-news] 🔍 ${feed.name}: crime filter removed ${crimeFiltered}/${before}`);
-        }
-      }
-
-      feedResults.push({ name: feed.name, status: 'ok', count: articles.length, crimeFiltered });
+      feedResults.push({ name: feed.name, status: 'ok', count: articles.length });
       allArticles.push(...articles);
       console.log(`[fetch-news] ✅ ${feed.name}: ${articles.length} articles`);
     } else {

@@ -156,7 +156,7 @@ function PlatformDraftSection({
 }
 
 export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pageId }: PostCardProps) {
-  const { article, facebookText, emojiTitle, generatedImageUrl, platformDrafts } = post;
+  const { article, facebookText, emojiTitle, emojiTitleVi, matchTime, matchTeams, bestPlayer, matchHighlight, generatedImageUrl, platformDrafts } = post;
   const { title, pubDate, source, imageUrl, url } = article;
   const status = post.status ?? (post.isDone ? 'published' : 'draft');
 
@@ -305,6 +305,17 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
           <Badge variant="secondary" className={`shrink-0 text-[10px] ${statusCfg.className}`}>
             {statusCfg.label}
           </Badge>
+        </div>
+
+        {emojiTitleVi && (
+          <h4 className="text-sm font-semibold text-muted-foreground mt-1">{emojiTitleVi}</h4>
+        )}
+
+        <div className="grid grid-cols-2 gap-2 text-xs bg-muted/30 p-3 rounded-lg border border-border">
+          {matchTime && matchTime !== 'N/A' && <div><strong className="text-muted-foreground mr-1">Time:</strong> {matchTime}</div>}
+          {matchTeams && matchTeams !== 'N/A' && <div><strong className="text-muted-foreground mr-1">Teams:</strong> {matchTeams}</div>}
+          {bestPlayer && bestPlayer !== 'N/A' && <div><strong className="text-muted-foreground mr-1">Best Player:</strong> {bestPlayer}</div>}
+          {matchHighlight && matchHighlight !== 'N/A' && <div className="col-span-2"><strong className="text-muted-foreground mr-1">Highlight:</strong> {matchHighlight}</div>}
         </div>
 
         <p className="text-xs text-muted-foreground truncate" title={title}>

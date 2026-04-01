@@ -3,8 +3,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Auto Social Posting',
-  description: 'AI-powered content management and social media publishing platform',
+  title: 'Total Football',
+  description: 'AI-powered sports content management and social media publishing platform',
 };
 
 export default function RootLayout({

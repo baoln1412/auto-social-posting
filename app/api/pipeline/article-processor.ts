@@ -60,47 +60,6 @@ function buildRelevanceFilterPrompt(articles: Article[], systemPrompt: string): 
     )
     .join('\n\n');
 
-  const isVi = isVietnamesePrompt(systemPrompt);
-
-  if (isVi) {
-    return [
-      'You are a content relevance classifier for a Vietnamese-Australian media page.',
-      '',
-      'TARGET NICHE:',
-      '- Industry: Tin tức & đời sống Úc (du học, du lịch, làm việc, định cư, lifestyle)',
-      '- Audience: Người Việt 16-35 tuổi; Du học sinh / chuẩn bị đi Úc / đang sống ở Úc',
-      '- They care about: chi phí sống, việc làm, visa, đời sống thực tế ở Úc, luật mới, nhập cư, giáo dục, y tế, nhà ở, văn hóa Úc',
-      '',
-      'RELEVANT topics include (but not limited to):',
-      '- Australian immigration, visa, residency policies',
-      '- Cost of living in Australia (rent, food, utilities, transport)',
-      '- Jobs, employment, minimum wage, work rights in Australia',
-      '- Australian education, universities, student life',
-      '- Housing market, rental market in Australia',
-      '- Health, Medicare, healthcare in Australia',
-      '- Australian government policies affecting residents/students',
-      '- Australian lifestyle, culture, travel within Australia',
-      '- Australian economy, inflation, interest rates',
-      '- Safety, weather, natural disasters in Australia',
-      '- Technology and social trends in Australia',
-      '',
-      'NOT RELEVANT topics include:',
-      '- US politics, UK news, other countries not related to Australia',
-      '- Sports results (unless major Australian events)',
-      '- Celebrity gossip unrelated to Australia',
-      '- Pure entertainment/gaming news',
-      '- Wars/conflicts not involving Australia',
-      '',
-      'For each article below, classify it as RELEVANT or NOT_RELEVANT.',
-      'Return ONLY a JSON array of article numbers that ARE relevant.',
-      'Example: [1, 3, 5, 7]',
-      'If none are relevant, return: []',
-      '',
-      'ARTICLES:',
-      articleList,
-    ].join('\n');
-  }
-
   // Generic relevance filter — derive niche from system prompt
   const nicheHint = systemPrompt.substring(0, 500);
   return [
@@ -161,75 +120,26 @@ export async function filterRelevantArticles(
   }
 }
 
-function isVietnamesePrompt(systemPrompt: string): boolean {
-  const viKeywords = ['tiếng việt', 'việt', 'bằng tiếng', 'mấy ní', 'bão giá', 'chuyện úc', 'du học', 'người việt'];
-  const lower = systemPrompt.toLowerCase();
-  return viKeywords.some(k => lower.includes(k));
-}
+
 
 // ── Single article content prompt ─────────────────────────────────────────
 
 function buildSingleArticlePrompt(article: Article, systemPrompt: string): string {
-  const articleBlock = `Title: ${article.title}\nSource: ${article.source}\nURL: ${article.url}\nDescription: ${article.description}`;
-
-  const isVi = isVietnamesePrompt(systemPrompt);
-
-  if (isVi) {
-    return [
-      '🚨🚨🚨 CRITICAL LANGUAGE REQUIREMENT 🚨🚨🚨',
-      '▶▶▶ YOU MUST WRITE 100% IN VIETNAMESE (TIẾNG VIỆT). ◀◀◀',
-      '▶▶▶ ZERO ENGLISH IN emojiTitle, facebookText, summary. ◀◀◀',
-      '▶▶▶ NẾU BẠN VIẾT TIẾNG ANH, OUTPUT SẼ BỊ TỪ CHỐI VÀ XÓA. ◀◀◀',
-      '',
-      'BẠN LÀ TRỢ LÝ SÁNG TẠO NỘI DUNG CHO TRANG FACEBOOK "Australia 101 - Chuyện Úc chút chút!"',
-      'Đối tượng: Người Việt 16-35 tuổi, du học sinh / đang sống / chuẩn bị đi Úc.',
-      'Giọng văn: Gần gũi, đời, hơi "cợt nhẹ" (dùng từ như: mấy ní, bão giá, bay màu, xót ví, luật mới chấn động).',
-      '',
-      '📋 CẤU TRÚC BẮT BUỘC:',
-      '1. [HOOK & HEADLINE]: 1 dòng IN HOA + 1-2 emoji mạnh (🚨📢💸✈️🇦🇺). Gây tò mò, FOMO.',
-      '2. [SAPO]: 2-3 câu diễn giải headline bằng ngôn ngữ đời thường.',
-      '3. [KEY POINTS]: Dùng heading IN HOA + bullet 🔹 gạch 3-5 chi tiết cốt lõi.',
-      '4. [HỆ QUẢ]: Tin này ảnh hưởng gì đến ví tiền/visa/quyền lợi của du học sinh?',
-      '5. [LỜI KHUYÊN]: 1-2 câu khuyên thiết thực.',
-      '6. [CTA]: 1 câu hỏi tương tác + kêu gọi follow "Australia 101 - Chuyện Úc chút chút!"',
-      '7. [HASHTAGS]: 5-8 hashtags (#Australia101 #ChuyenUcChutChut #TinTucUc + keyword).',
-      '',
-      '📝 OUTPUT FORMAT: Trả về CHỈ 1 JSON object hợp lệ, KHÔNG markdown, KHÔNG preamble:',
-      '{"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}',
-      '',
-      '⚠️ QUY TẮC:',
-      '- emojiTitle: BẰNG TIẾNG VIỆT, hấp dẫn, có emoji.',
-      '- facebookText: BẰNG TIẾNG VIỆT, 200-350 từ, theo đúng cấu trúc 7 phần ở trên.',
-      '- summary: BẰNG TIẾNG VIỆT, 2-3 câu tóm tắt.',
-      '- imagePrompt: (CHỈ MỤC NÀY VIẾT BẰNG TIẾNG ANH) Prompt tạo hình ảnh minh họa.',
-      '',
-      '🚫 TUYỆT ĐỐI KHÔNG:',
-      '- Viết emojiTitle bằng tiếng Anh',
-      '- Viết facebookText bằng tiếng Anh',
-      '- Viết summary bằng tiếng Anh',
-      '- Dùng văn phong học thuật, báo chí khô khan',
-      '- Bỏ qua cấu trúc 7 phần bắt buộc',
-      '',
-      'BÀI VIẾT CẦN XỬ LÝ (DỊCH VÀ VIẾT LẠI BẰNG TIẾNG VIỆT):',
-      articleBlock,
-    ].join('\n');
-  }
-
-  // English / generic prompt
   return [
-    'You are a social media content creator. Follow the system prompt instructions EXACTLY.',
+    '=== ROLE ===',
+    'You are an expert Football Social Media Specialist.',
+    'Process each independent sports article to produce a Facebook post json object.',
+    'CRITICAL REQUIREMENT 1: The `facebookText` MUST be highly detailed, comprehensive, and LONG (strictly between 1000 and 1500 characters in length). Expand extensively on the background context, emotional impact, tactical analysis or news implications. You MUST properly split the text into 3-4 well-structured paragraphs using \\n\\n for clear spacing. Do not write a single block of text.',
+    'CRITICAL REQUIREMENT 2: The `facebookText` MUST be written in natural Vietnamese. For match news, include time and teams. For general news, focus on the individuals and impact. End with an engaging question.',
+    'Extract `matchTime`, `matchTeams`, `bestPlayer`, `matchHighlight`, and `summary` (3-sentence English fact). If any of these are not applicable (e.g. a transfer news article has no matchTime), you MUST output "N/A".',
+    'Return ONLY a valid JSON object (no markdown formatting, no preamble):',
+    '{"emojiTitle":"...","emojiTitleVi":"...","facebookText":"...","matchTime":"...","matchTeams":"...","bestPlayer":"...","matchHighlight":"...","summary":"..."}',
     '',
-    'For the article below, create a JSON object with:',
-    '- emojiTitle: A dramatic, attention-grabbing headline with 1-2 strong emojis (🚨, 💀, ⚖️, 📢, ❗)',
-    '- facebookText: A full Facebook post (200-350 words) with line breaks, emojis as bullets, ALL CAPS for headings.',
-    '- summary: 2-3 sentence summary.',
-    '- imagePrompt: A detailed prompt for AI image generation.',
-    '',
-    'Return ONLY a valid JSON object (no markdown, no preamble):',
-    '{"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}',
-    '',
-    'ARTICLE TO PROCESS:',
-    articleBlock,
+    '=== ARTICLE TO PROCESS ===',
+    `Title: ${article.title}`,
+    `Source: ${article.source}`,
+    `URL: ${article.url}`,
+    `Description: ${article.description}`,
   ].join('\n');
 }
 
@@ -306,7 +216,12 @@ function parseSingleAiResponse(
       post: {
         article: articleWithSummary,
         emojiTitle: parsed.emojiTitle,
+        emojiTitleVi: parsed.emojiTitleVi,
         facebookText: parsed.facebookText,
+        matchTime: parsed.matchTime,
+        matchTeams: parsed.matchTeams,
+        bestPlayer: parsed.bestPlayer,
+        matchHighlight: parsed.matchHighlight,
         generatedImageUrl: undefined,
         platformDrafts: {},
       },
@@ -367,12 +282,8 @@ function buildPlatformDraftPrompt(
   platformPrompt: string,
   systemPrompt: string,
 ): string {
-  const isVi = isVietnamesePrompt(systemPrompt);
-
   return [
-    isVi
-      ? `Bạn là trợ lý sáng tạo nội dung cho nền tảng ${platform}. TOÀN BỘ nội dung PHẢI VIẾT BẰNG TIẾNG VIỆT.`
-      : `You are a social media content creator for ${platform}. Follow all platform-specific guidelines.`,
+    `Bạn là trợ lý sáng tạo nội dung cho nền tảng ${platform}. TOÀN BỘ nội dung PHẢI VIẾT BẰNG TIẾNG VIỆT.`,
     '',
     '--- ORIGINAL ARTICLE ---',
     `Title: ${article.title}`,
@@ -382,9 +293,7 @@ function buildPlatformDraftPrompt(
     '--- FACEBOOK DRAFT ---',
     facebookText,
     '',
-    isVi
-      ? `Viết lại bài viết trên phù hợp cho nền tảng ${platform}. Trả về CHỈ nội dung bài viết.`
-      : `Rewrite the post above for ${platform}. Adapt length, tone, and format. Return ONLY the post content.`,
+    `Viết lại bài viết trên phù hợp cho nền tảng ${platform}. Trả về CHỈ nội dung bài viết.`,
   ].join('\n');
 }
 
