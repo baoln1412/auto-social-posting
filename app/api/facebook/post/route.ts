@@ -8,6 +8,8 @@ import { getSupabaseServer } from '@/app/lib/supabase';
 
 import { NextRequest } from 'next/server';
 import sharp from 'sharp';
+import { createHash } from 'crypto';
+import { findPostedMarker, recordPostedMarker } from '@/app/lib/db';
 
 async function getChannelToken(channelId: string): Promise<{ token: string; pageId: string } | null> {
   const supabase = getSupabaseServer();
@@ -58,6 +60,19 @@ export async function POST(request: Request) {
     const titleLine = emojiTitle ? `${emojiTitle}\n\n` : '';
     const message = `${titleLine}${facebookText}`;
 
+    // Idempotency: skip if this exact (channel + content) was already posted (retry / double-click).
+    const idempotencyKey = createHash('sha256')
+      .update(JSON.stringify({ channelId, message, imageUrl: imageUrl || '', scheduledTime: scheduledTime || '' }))
+      .digest('hex');
+    try {
+      const existing = findPostedMarker(idempotencyKey);
+      if (existing) {
+        return NextResponse.json({ success: true, postId: existing, deduped: true, scheduled: !!scheduledTimestamp });
+      }
+    } catch (e) {
+      console.warn('[facebook] idempotency check failed, proceeding:', e); // fail-open: never block a real post
+    }
+
     if (imageUrl) {
       const imgRes = await fetch(imageUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AutoSocialBot/1.0)' },
@@ -92,7 +107,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: fbData.error?.message || 'Facebook API error', details: fbData }, { status: fbRes.status });
       }
 
-      return NextResponse.json({ success: true, postId: fbData.id || fbData.post_id, scheduled: !!scheduledTimestamp });
+      const postId = fbData.id || fbData.post_id;
+      try { recordPostedMarker(idempotencyKey, channelId, String(postId)); } catch (e) { console.warn('[facebook] marker record failed:', e); }
+      return NextResponse.json({ success: true, postId, scheduled: !!scheduledTimestamp });
     } else {
       const payload: any = { message, access_token: pageToken };
       if (scheduledTimestamp) {
@@ -111,6 +128,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: fbData.error?.message || 'Facebook API error', details: fbData }, { status: fbRes.status });
       }
 
+      try { recordPostedMarker(idempotencyKey, channelId, String(fbData.id)); } catch (e) { console.warn('[facebook] marker record failed:', e); }
       return NextResponse.json({ success: true, postId: fbData.id, scheduled: !!scheduledTimestamp });
     }
   } catch (error) {
