@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.immigration.pipeline</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>/Users/nguyenbaole/auto-social-posting/deploy/run-pipeline.sh</string>
+  </array>
+  <!-- Every 4 hours (14400s). On a Pro plan use 21600 (6h) to stay under 5 runs/day. -->
+  <key>StartInterval</key>
+  <integer>14400</integer>
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
