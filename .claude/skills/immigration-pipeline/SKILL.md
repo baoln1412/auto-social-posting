@@ -135,7 +135,20 @@ For each market id:
    `relevance_score` (desc) and generate only the **top 15 per market per cycle**
    (the rest stay ungenerated and get reconsidered next cycle). This keeps generation
    inside subscription rate limits.
-2. **Generate and POST ONE item at a time — never draft multiple items' content in
+2. **Pull the real article text for the 15 you picked — and only those 15:**
+   `curl -s "http://localhost:3000/api/pipeline/silver?ids=<id1,id2,...>&withBody=1"`
+   Feed blurbs run a median of 141 characters, which is why posts drifted toward
+   padding; each row now comes back with a `content` field holding the article body,
+   fetched on demand and cached. Ask for it AFTER the top-15 cut — asking for the
+   whole page multiplies the fetch cost for rows you will not write.
+   - `content` is **grounding, not source copy.** Write original Vietnamese analysis
+     for the diaspora reader. Do NOT translate the article, and do not reproduce long
+     passages of it — a translated wire story is both a copyright problem and not the
+     product.
+   - **`content: ""` means no body could be retrieved** (Google News link, paywall, or
+     a failed fetch). Then stay strictly on the headline and description, exactly as
+     before — an empty body is never licence to invent the middle of the story.
+3. **Generate and POST ONE item at a time — never draft multiple items' content in
    the same pass before posting any of them.** Holding several articles' titles/
    summaries/bodies in working context together is exactly what causes cross-item
    mixups (see the pairing warning below — both real incidents happened this way).
@@ -208,8 +221,8 @@ For each market id:
      certainly wrong) and POST them again — but don't rely on this catching
      everything; it's a safety net, not a substitute for generating one item at a
      time.
-3. Each item's POST (fired immediately after that item's generation, per the
-   one-at-a-time loop in step 2 — `items` has exactly ONE element, not an
+4. Each item's POST (fired immediately after that item's generation, per the
+   one-at-a-time loop in step 3 — `items` has exactly ONE element, not an
    accumulated array):
    `curl -s -X POST http://localhost:3000/api/pipeline/gold -H 'Content-Type: application/json' -d '{"items":[{"silver_id":"...","emoji_title":"...","body_text":"...","hashtags":"...","comment_1":"...","comment_2":"...","summary":"...","image_prompt":"...","language":"vi"}]}'`
 

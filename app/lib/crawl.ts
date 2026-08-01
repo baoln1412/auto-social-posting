@@ -58,7 +58,7 @@ async function fetchWithRetry(
 }
 
 // Run async work over items with bounded concurrency (best-effort per item).
-async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+export async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let cursor = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
     while (cursor < items.length) {
@@ -213,7 +213,13 @@ async function fetchRssFeed(feed: FeedEntry, cutoffTime: Date): Promise<{ articl
 // nothing. Fetch the article page and pull a clean main-content excerpt.
 // "URL → clean text" is firecrawl's core idea; done locally with the cheerio
 // dependency already in use, best-effort (returns '' on any failure).
-async function extractArticleBody(url: string): Promise<string> {
+export async function extractArticleBody(url: string): Promise<string> {
+  // A Google News RSS link is a redirect stub, not the article: fetching one answers
+  // 200 but stays on news.google.com and yields 0 paragraphs (measured 2026-08-01).
+  // Decoding those links is its own brittle project — skip rather than burn a fetch.
+  let host: string;
+  try { host = new URL(url).hostname; } catch { return ''; }
+  if (/(^|\.)news\.google\.com$/i.test(host)) return '';
   try {
     const res = await fetchWithRetry(url, { headers: BROWSER_HEADERS }, { retries: 0, timeoutMs: 8000 });
     if (!res.ok) return '';

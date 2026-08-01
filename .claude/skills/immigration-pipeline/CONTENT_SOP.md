@@ -14,6 +14,12 @@
 > MỌI chủ đề (ví dụ §10 là bài di trú, chỉ là một minh hoạ).
 - **Ngôn ngữ đầu ra: 100% tiếng Việt** (dù nguồn là Anh/Đức/Trung/Việt).
 - **Bám sát sự thật** trong bài gốc. KHÔNG bịa số liệu, KHÔNG suy diễn.
+- **Trường `content` (thân bài gốc) là TƯ LIỆU, không phải bản gốc để chép.** Khi
+  `withBody=1` trả về `content`, dùng nó để nắm sự thật rồi **viết phân tích tiếng Việt
+  của riêng mình** cho độc giả kiều bào. TUYỆT ĐỐI không dịch nguyên bài, không chép
+  nguyên đoạn dài (vừa vi phạm bản quyền, vừa không phải sản phẩm của chúng ta).
+- **`content` rỗng (`""`) = không lấy được thân bài** (link Google News, tường phí, lỗi
+  tải). Khi đó chỉ bám tiêu đề + mô tả như trước — KHÔNG được tự bịa phần giữa câu chuyện.
 - Áp dụng **glossary / wordingRules / writingStyle** của thị trường.
 - Từ vựng pháp lý/di trú chuẩn VN ("Cơ quan Quản lý Di trú", "Cục Quản lý Xuất nhập
   cảnh", "Đặc vụ liên bang", "Cư trú bất hợp pháp / Quá hạn visa"…).

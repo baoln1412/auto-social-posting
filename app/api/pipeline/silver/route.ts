@@ -3,6 +3,10 @@
  *
  * GET  /api/pipeline/silver?marketId=&status=ungenerated&limit=
  *        → silver rows awaiting content generation.
+ * GET  /api/pipeline/silver?ids=<id,id,...>&withBody=1
+ *        → those rows with `content`: the real article text, fetched on demand and
+ *          cached in bronze_news.content. Ask for it AFTER picking the top 15, never
+ *          for the whole page — one fetch per row is the entire cost of this endpoint.
  * POST /api/pipeline/silver
  *        body: { items: [{ bronze_id, is_immigration, category?, relevance_score?, duplicate_of? }] }
  *        → marks every bronze_id classified; for immigration (and non-duplicate)
@@ -14,20 +18,46 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getSilver, getBronzeByIds, markBronzeClassified, insertSilver, countPending,
-  type SilverInput,
+  getSilver, getSilverByIds, getBronzeByIds, markBronzeClassified, insertSilver,
+  countPending, getBronzeContent, setBronzeContent, type SilverInput,
 } from '@/app/lib/lake';
+import { extractArticleBody, mapLimit } from '@/app/lib/crawl';
 import { validTopics } from '@/app/lib/topics';
 import { parseJsonBody } from '@/app/lib/jsonBody';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
+/** Attach the real article text to each row, fetching only what isn't cached yet. */
+async function attachBodies(rows: Record<string, any>[]): Promise<Record<string, any>[]> {
+  const cached = await getBronzeContent(rows.map((r) => String(r.bronze_id)));
+  await mapLimit(rows, 4, async (r) => {
+    let body = cached.get(String(r.bronze_id)) ?? '';
+    if (!body && r.article_url) {
+      body = await extractArticleBody(String(r.article_url));
+      if (body) await setBronzeContent(String(r.bronze_id), body);
+    }
+    // '' means no body could be had (Google News stub, paywall, fetch failure). The
+    // generation step must then stay on the headline rather than invent the middle.
+    r.content = body;
+  });
+  return rows;
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
+
+    // By-id form: the generation step's picked rows, optionally with article bodies.
+    const ids = (searchParams.get('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (ids.length > 0) {
+      const picked = await getSilverByIds(ids.slice(0, 50));
+      const items = searchParams.get('withBody') === '1' ? await attachBodies(picked) : picked;
+      return NextResponse.json({ items, count: items.length });
+    }
+
     const marketId = searchParams.get('marketId');
-    if (!marketId) return NextResponse.json({ error: 'marketId is required' }, { status: 400 });
+    if (!marketId) return NextResponse.json({ error: 'marketId or ids is required' }, { status: 400 });
 
     const status = (searchParams.get('status') as 'ungenerated' | 'all') ?? 'ungenerated';
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10), 500);

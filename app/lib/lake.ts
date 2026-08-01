@@ -249,6 +249,23 @@ export async function markBronzeClassified(ids: string[]): Promise<void> {
   }
 }
 
+/**
+ * Cached article bodies keyed by bronze id ('' where never fetched). Feed blurbs run a
+ * median 141 chars, so the generation step needs the real article to stay grounded —
+ * but only for the handful of rows it actually writes up, hence fetch-on-demand + cache
+ * here rather than fetching every crawled article.
+ */
+export async function getBronzeContent(ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = await all(`SELECT id, content FROM bronze_news WHERE id IN (${placeholders})`, ids);
+  return new Map(rows.map((r) => [String(r.id), String(r.content ?? '')]));
+}
+
+export async function setBronzeContent(id: string, content: string): Promise<void> {
+  await run('UPDATE bronze_news SET content = ? WHERE id = ?', [content, id]);
+}
+
 export async function getBronzeByIds(ids: string[]): Promise<Record<string, any>[]> {
   if (ids.length === 0) return [];
   const placeholders = ids.map(() => '?').join(',');
