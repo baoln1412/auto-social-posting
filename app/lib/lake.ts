@@ -630,7 +630,7 @@ export interface AuditInput {
   bronze_kept: number;
   silver_count?: number;
   gold_count?: number;
-  errors?: string;
+  errors?: string | null;
 }
 
 export async function insertAudit(rows: AuditInput[]): Promise<void> {
@@ -672,6 +672,21 @@ export async function getAuditSummary(marketId: string): Promise<any> {
     `SELECT source_name, COUNT(*) AS gold_count
        FROM gold_content WHERE market_id = ?
        GROUP BY source_name ORDER BY gold_count DESC`,
+    [marketId],
+  );
+  // Feed health. A feed that dies is otherwise invisible: it just stops contributing,
+  // and nothing distinguishes that from a quiet week. Two separate signals, because
+  // conflating them is how UK (one live feed, 0.25 articles/cycle) reads as broken:
+  //   failing → the crawl recorded a hard fetch/parse failure on its last run
+  //   quiet   → fetches fine, but has produced no article in `staleDays`
+  const feedHealth = await all(
+    `SELECT source_name,
+            MAX(run_at) AS last_run,
+            MAX(CASE WHEN bronze_in > 0 THEN run_at END) AS last_article,
+            SUM(CASE WHEN errors IS NOT NULL THEN 1 ELSE 0 END) AS error_runs
+       FROM audit_runs
+      WHERE market_id = ? AND source_name <> '(market total)'
+      GROUP BY source_name`,
     [marketId],
   );
   // audit_runs.silver_count / gold_count are always 0: the crawl step is the only
@@ -731,5 +746,23 @@ export async function getAuditSummary(marketId: string): Promise<any> {
       bronzeIn: num(r.bronze_in), bronzeKept: num(r.bronze_kept),
       silver: num(r.silver_count), gold: num(r.gold_count), errors: r.errors,
     })),
+    feedHealth: feedHealth
+      .map((r) => {
+        const lastArticle: string | null = r.last_article ?? null;
+        const quietDays = lastArticle
+          ? Math.floor((Date.now() - new Date(lastArticle).getTime()) / 86_400_000)
+          : null; // null = never produced an article at all
+        return {
+          source: r.source_name as string,
+          lastArticle,
+          quietDays,
+          errorRuns: num(r.error_runs),
+          // Threshold is generous on purpose: a market can legitimately run a
+          // low-volume feed (UK's Guardian publishes ~1.5 articles/day, so a bad
+          // week is normal). Silence for a fortnight is not.
+          stale: quietDays === null || quietDays >= 14,
+        };
+      })
+      .sort((a, b) => (b.quietDays ?? 1e6) - (a.quietDays ?? 1e6)),
   };
 }

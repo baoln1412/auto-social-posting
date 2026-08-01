@@ -124,11 +124,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       // One audit row per feed (fetched count) + a market summary row.
       await insertAudit([
+        // Record WHY a feed returned nothing. Without this a hard fetch failure and a
+        // healthy-but-quiet feed both persist as bronze_in 0 / errors null, and a feed
+        // that dies stays invisible — the UK market looks identical to a broken one at
+        // 0.25 articles per cycle.
         ...perFeed.map((pf) => ({
           market_id: market.id,
           source_name: pf.name,
           bronze_in: pf.count,
           bronze_kept: 0,
+          errors: pf.status === 'failed' ? 'fetch/parse failed' : null,
         })),
         {
           market_id: market.id,

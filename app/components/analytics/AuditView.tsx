@@ -8,6 +8,7 @@ interface AuditData {
   perSource: { source: string; bronze: number }[];
   silverPerSource: { source: string; silver: number }[];
   recentRuns: { runAt: string; source: string; bronzeIn: number; bronzeKept: number; silver: number; gold: number; errors: string | null }[];
+  feedHealth?: { source: string; lastArticle: string | null; quietDays: number | null; errorRuns: number; stale: boolean }[];
 }
 
 export default function AuditView({ pageId }: { pageId: string }) {
@@ -95,6 +96,41 @@ export default function AuditView({ pageId }: { pageId: string }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Feed health — only the ones needing attention. The Per-source table above
+          reads from bronze, which keeps 7 days, so a feed that stopped contributing
+          vanishes from it entirely; these come from audit_runs, which is permanent. */}
+      {(data.feedHealth ?? []).some((f) => f.stale) && (
+        <Card className="card-warm">
+          <CardHeader><CardTitle className="text-base">⚠️ Feeds needing attention</CardTitle></CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                  <th className="py-2">Source</th>
+                  <th className="py-2 text-right">Last article</th>
+                  <th className="py-2 text-right">Failed runs</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data.feedHealth ?? []).filter((f) => f.stale).map((f) => (
+                  <tr key={f.source} className="border-b border-border/50">
+                    <td className="py-2 font-medium text-foreground">{f.source}</td>
+                    <td className="py-2 text-right">
+                      {f.quietDays === null ? 'never' : `${f.quietDays}d ago`}
+                    </td>
+                    <td className="py-2 text-right text-muted-foreground">{f.errorRuns || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Quiet for 14+ days, or never produced an article. A low-volume feed can be
+              healthy — check the URL before removing it.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent runs */}
       <Card className="card-warm">

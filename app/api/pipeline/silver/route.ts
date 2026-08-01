@@ -34,6 +34,11 @@ async function attachBodies(rows: Record<string, any>[]): Promise<Record<string,
   await mapLimit(rows, 4, async (r) => {
     let body = cached.get(String(r.bronze_id)) ?? '';
     if (!body && r.article_url) {
+      // article_url lives on the silver row, so extraction still works after bronze's
+      // 7-day retention has dropped the source row — only the cache write is lost
+      // (UPDATE matches nothing). A >7-day-old row therefore refetches each time,
+      // which is correct, just not cached. Rare: rows are normally written the same
+      // cycle they are crawled.
       body = await extractArticleBody(String(r.article_url));
       if (body) await setBronzeContent(String(r.bronze_id), body);
     }
