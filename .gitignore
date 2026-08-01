@@ -36,3 +36,25 @@ Thumbs.db
 .claude/
 .vercel
 .env*.local
+
+# Local project memory (not committed)
+.mem/
+
+# user-uploaded card images (runtime)
+public/uploads/
+data/uploads/
+
+# Runtime lake + generated media (~700MB). The DuckDB lake, rendered reels and
+# focal-point cache are all reproducible from the pipeline — never commit them.
+data/
+
+# Vendored clone of coreyhaines31/marketingskills — it carries its own .git,
+# so committing it would embed a broken gitlink. Re-clone it instead.
+vendor/
+
+# Throwaway card-render QA screenshots (16MB of PNGs)
+card-review/
+
+# Python bytecode from deploy/
+__pycache__/
+*.pyc
