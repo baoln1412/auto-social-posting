@@ -102,16 +102,28 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
-    const { id, enabled } = body;
+    const { id, enabled, url, feedType, name } = body;
 
-    if (!id || typeof enabled !== 'boolean') {
-      return NextResponse.json({ error: 'id and enabled (boolean) are required' }, { status: 400 });
+    // `url` is patchable so a feed can be repointed without delete-and-recreate, which
+    // would orphan its audit history under the old name. The crawl's self-heal already
+    // rewrites URLs this way internally; this just exposes it.
+    const patch: Record<string, unknown> = {};
+    if (typeof enabled === 'boolean') patch.enabled = enabled;
+    if (typeof url === 'string' && url.trim()) patch.url = url.trim();
+    if (typeof feedType === 'string') patch.feed_type = feedType;
+    // Renaming leaves already-crawled rows under the old source_name, so the audit
+    // shows both for bronze's 7-day retention window and then settles. Worth it: a
+    // repointed feed carrying its old name misreports where the content came from.
+    if (typeof name === 'string' && name.trim()) patch.name = name.trim();
+
+    if (!id || Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: 'id plus one of enabled / url / feedType / name is required' }, { status: 400 });
     }
 
     const supabase = getSupabaseServer();
     const { data, error } = await supabase
       .from('rss_feeds')
-      .update({ enabled })
+      .update(patch)
       .eq('id', id)
       .select()
       .single();
