@@ -2,16 +2,25 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ContentPage, PostDraft, Article, PostStatus, KeywordConfig } from './types';
+import { TOPICS } from './lib/topics';
 import AppLayout from './components/layout/AppLayout';
 import PostCard from './components/PostCard';
 import Pagination from './components/Pagination';
 import ContentCalendar from './components/calendar/ContentCalendar';
 import AnalyticsDashboard from './components/analytics/AnalyticsDashboard';
+import AuditView from './components/analytics/AuditView';
+import UsageView from './components/analytics/UsageView';
 import SettingsView from './components/settings/SettingsView';
+import PageTabs from './components/PageTabs';
+import PipelineStatusBar from './components/PipelineStatusBar';
+import { MarketContext } from './components/MarketContextConfig';
 import { Button } from '@/components/ui/button';
-import AIChatWindow, { DashboardFilters } from './components/chat/AIChatWindow';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import AIChatWindow, { DashboardFilters, AIChatHandle } from './components/chat/AIChatWindow';
 
 export default function Home() {
+  const chatRef = useRef<AIChatHandle>(null);
   const [pages, setPages] = useState<ContentPage[]>([]);
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('content');
@@ -29,9 +38,12 @@ export default function Home() {
   const [filterTo, setFilterTo] = useState('');
   const [filterDone, setFilterDone] = useState('all');
   const [filterKeyword, setFilterKeyword] = useState('');
+  const [filterTopic, setFilterTopic] = useState('All');
 
   const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [fullRunning, setFullRunning] = useState(false);
   const [progress, setProgress] = useState('');
+  const [statusRefreshKey, setStatusRefreshKey] = useState(0);
 
   // ── Load pages ──
   const loadPages = useCallback(async () => {
@@ -61,6 +73,7 @@ export default function Home() {
       if (filterTo) params.set('to', filterTo);
       if (filterDone !== 'all') params.set('done', filterDone);
       if (filterKeyword.trim()) params.set('keyword', filterKeyword.trim());
+      if (filterTopic !== 'All') params.set('topic', filterTopic);
 
       const res = await fetch(`/api/posts?${params}`);
       const data = await res.json();
@@ -72,33 +85,88 @@ export default function Home() {
     } finally {
       setPostsLoading(false);
     }
-  }, [activePageId, offset, filterSource, filterFrom, filterTo, filterDone, filterKeyword]);
+  }, [activePageId, offset, filterSource, filterFrom, filterTo, filterDone, filterKeyword, filterTopic]);
 
   useEffect(() => { loadPosts(); }, [loadPosts]);
-  useEffect(() => { setOffset(0); }, [filterSource, filterFrom, filterTo, filterDone, filterKeyword, activePageId]);
+  useEffect(() => { setOffset(0); }, [filterSource, filterFrom, filterTo, filterDone, filterKeyword, filterTopic, activePageId]);
+  // Reset topic filter when switching markets (a topic may not be enabled in the new market).
+  useEffect(() => { setFilterTopic('All'); }, [activePageId]);
 
   const activePage = pages.find((p) => p.id === activePageId);
 
-  // ── Page actions ──
-  const handleAddPage = async () => {
-    const name = prompt('Enter a name for the new content page:');
-    if (!name?.trim()) return;
+  // ── Market actions ──
+  // New-page modal (replaces window.prompt, which is blocked in embedded browsers).
+  const [newPageOpen, setNewPageOpen] = useState(false);
+  const [npName, setNpName] = useState('');
+  const [npCode, setNpCode] = useState('');
+  const [npCountry, setNpCountry] = useState('');
+  const [npSaving, setNpSaving] = useState(false);
 
+  const handleAddPage = () => {
+    setNpName(''); setNpCode(''); setNpCountry('');
+    setNewPageOpen(true);
+  };
+
+  const submitNewPage = async () => {
+    if (!npName.trim()) return;
+    setNpSaving(true);
     try {
       const res = await fetch('/api/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({
+          name: npName.trim(),
+          countryCode: npCode.trim().toUpperCase(),
+          countryName: npCountry.trim(),
+        }),
       });
       const data = await res.json();
       if (data.page) {
         setPages((prev) => [...prev, data.page]);
         setActivePageId(data.page.id);
         setActiveView('settings');
+        setNewPageOpen(false);
+      } else {
+        alert(data.error ?? 'Failed to create page');
       }
     } catch (err) {
-      console.error('Failed to create page:', err);
+      console.error('Failed to create market:', err);
+      alert('Failed to create page');
+    } finally {
+      setNpSaving(false);
     }
+  };
+
+  const handleSaveContext = async (ctx: MarketContext) => {
+    if (!activePageId) return;
+    await fetch('/api/pages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: activePageId,
+        language: ctx.language,
+        glossary: ctx.glossary,
+        wordingRules: ctx.wordingRules,
+        writingStyle: ctx.writingStyle,
+      }),
+    });
+    setPages((prev) =>
+      prev.map((p) =>
+        p.id === activePageId
+          ? { ...p, language: ctx.language, glossary: ctx.glossary, wordingRules: ctx.wordingRules, writingStyle: ctx.writingStyle }
+          : p,
+      ),
+    );
+  };
+
+  const handleSaveTopics = async (topics: string[]) => {
+    if (!activePageId) return;
+    await fetch('/api/pages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: activePageId, enabledTopics: topics }),
+    });
+    setPages((prev) => prev.map((p) => (p.id === activePageId ? { ...p, enabledTopics: topics } : p)));
   };
 
   const handleSavePrompt = async (newPrompt: string, newUserPrompt: string, platformPrompts: Record<string, string>) => {
@@ -157,59 +225,61 @@ export default function Home() {
     handleStatusChange(articleUrl, newStatus);
   };
 
-  // ── Pipeline ──
+  // ── Crawl (bronze) ──
+  // Manual trigger pulls fresh news into the bronze layer. Immigration
+  // classification (silver) and Vietnamese content generation (gold) run via the
+  // scheduled Claude Code task / the `/immigration-pipeline` skill — not in-app.
   const handleRunPipeline = async () => {
-    if (!activePageId || !activePage) return;
     setPipelineRunning(true);
-    setProgress('Fetching articles...');
+    setProgress('Crawling latest news into bronze…');
     try {
-      const fetchRes = await fetch(`/api/fetch-news?pageId=${activePageId}`);
-      const fetchData = await fetchRes.json();
-      const articles: Article[] = fetchData.articles ?? [];
-      if (articles.length === 0) { setProgress('No new articles found.'); setPipelineRunning(false); return; }
-      setProgress(`${articles.length} articles fetched. Filtering & processing with AI...`);
-
-      const pipelineRes = await fetch('/api/pipeline', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          articles,
-          pageId: activePageId,
-          systemPrompt: activePage.systemPrompt,
-          userPrompt: activePage.userPrompt ?? '',
-          platformPrompts: activePage.platformPrompts ?? {},
-          keywordConfig: activePage.keywordConfig ?? { tier1: [], tier2: [], minScore: 1 },
-        }),
-      });
-      const reader = pipelineRes.body?.getReader();
-      if (!reader) throw new Error('No stream');
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const event = JSON.parse(line.slice(6));
-            if (event.type === 'progress') setProgress(`${event.current}/${event.total}: ${event.title}`);
-            else if (event.type === 'post') {
-              setPosts((prev) => {
-                if (prev.some((p) => p.article.url === event.post.article.url)) return prev;
-                return [event.post, ...prev];
-              });
-            } else if (event.type === 'done') setProgress(`Done! ${event.total} posts generated.`);
-          } catch {}
-        }
-      }
-      await loadPosts();
+      const res = await fetch('/api/pipeline/crawl', { method: 'POST' });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? 'Crawl failed');
+      const mine = (data.markets ?? []).find((m: { marketId: string }) => m.marketId === activePageId);
+      const inserted = mine?.inserted ?? 0;
+      setProgress(
+        `Crawled ${mine?.crawled ?? 0}, added ${inserted} new to bronze. ` +
+        `Run the immigration-pipeline skill (or wait for the schedule) to filter & generate.`,
+      );
     } catch (err) {
       setProgress(`Error: ${err instanceof Error ? err.message : 'Unknown'}`);
-    } finally { setPipelineRunning(false); }
+    } finally { setPipelineRunning(false); setStatusRefreshKey((k) => k + 1); }
+  };
+
+  // ── Run FULL pipeline (crawl → silver → gold) on demand, to test config ──
+  // Triggers the same Claude Code skill the 4h schedule uses, then polls until
+  // the run finishes and reloads the generated posts.
+  const handleRunFullPipeline = async () => {
+    if (!confirm('Run the full pipeline now (crawl → filter → generate)?\nThis uses Claude Code and can take a few minutes.')) return;
+    setFullRunning(true);
+    setProgress('Starting full pipeline (crawl → silver → gold)…');
+    try {
+      const res = await fetch('/api/pipeline/run', { method: 'POST' });
+      const data = await res.json();
+      if (!data.ok) {
+        setProgress(data.running ? 'A pipeline run is already in progress.' : `Error: ${data.error ?? 'Failed to start'}`);
+        setFullRunning(false);
+        return;
+      }
+      setProgress('Pipeline running… generating Vietnamese content (this can take a few minutes).');
+      const poll = setInterval(async () => {
+        try {
+          const r = await fetch('/api/pipeline/run');
+          const d = await r.json();
+          if (!d.running) {
+            clearInterval(poll);
+            setFullRunning(false);
+            setProgress('Full pipeline finished — refreshing posts.');
+            loadPosts();
+            setStatusRefreshKey((k) => k + 1);
+          }
+        } catch { /* transient — keep polling */ }
+      }, 5000);
+    } catch (err) {
+      setProgress(`Error: ${err instanceof Error ? err.message : 'Unknown'}`);
+      setFullRunning(false);
+    }
   };
 
   if (pagesLoading) {
@@ -224,72 +294,32 @@ export default function Home() {
   const renderContentView = () => {
     if (!activePage) return null;
     return (
-      <div className="flex flex-col gap-5 max-w-3xl">
+      <div className="flex flex-col gap-5 max-w-[1600px]">
+        {/* Market sub-tabs */}
+        <PageTabs
+          pages={pages}
+          activePageId={activePageId}
+          onSelect={setActivePageId}
+          onAddPage={handleAddPage}
+        />
+
+        <PipelineStatusBar pageId={activePage.id} refreshKey={statusRefreshKey} />
+
         {/* Pipeline controls */}
         <div className="flex items-center gap-3">
-          <Button onClick={handleRunPipeline} disabled={pipelineRunning} size="default"
+          <Button onClick={handleRunPipeline} disabled={pipelineRunning || fullRunning} size="default"
             className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
-            {pipelineRunning ? '⏳ Running...' : '🚀 Fetch & Generate Posts'}
+            {pipelineRunning ? '⏳ Crawling...' : '🚀 Crawl News (bronze)'}
+          </Button>
+          <Button onClick={handleRunFullPipeline} disabled={fullRunning || pipelineRunning} size="default"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+            {fullRunning ? '⏳ Running full pipeline…' : '⚡ Run Full Pipeline'}
           </Button>
           <Button onClick={loadPosts} disabled={postsLoading} variant="outline" size="default">
             🔄 Refresh
           </Button>
           {progress && <span className="text-xs text-primary font-medium">{progress}</span>}
         </div>
-
-        {/* Applied keyword summary */}
-        {activePage?.keywordConfig && (() => {
-          const kc = activePage.keywordConfig;
-          const t1 = (kc.tier1 ?? []).length;
-          const t2 = (kc.tier2 ?? []).length;
-          const crime = (kc.crimeKeywords ?? []).length;
-          const excl = (kc.excludeKeywords ?? []).length;
-          const pol = (kc.politicalKeywords ?? []).length;
-          return (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">🔑 Keywords:</span>
-              {t1 > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono">
-                  {t1} tier-1 (+3pts)
-                </span>
-              )}
-              {t2 > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
-                  {t2} tier-2 (+1pt)
-                </span>
-              )}
-              {kc.useCrimeFilter ? (
-                <>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-mono">
-                    🚨 {crime} crime
-                  </span>
-                  {excl > 0 && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-mono">
-                      🚫 {excl} exclude
-                    </span>
-                  )}
-                  {pol > 0 && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-mono">
-                      🏛 {pol} political ban
-                    </span>
-                  )}
-                </>
-              ) : (
-                t1 === 0 && t2 === 0 && (
-                  <span className="text-xs text-muted-foreground italic">No keyword filter configured</span>
-                )
-              )}
-              <span className="text-xs text-muted-foreground">· min score: {kc.minScore ?? 1}</span>
-              <button
-                onClick={() => setActiveView('settings')}
-                className="text-xs text-primary underline hover:no-underline ml-1"
-              >
-                Configure →
-              </button>
-            </div>
-          );
-        })()}
-
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 items-center">
@@ -304,6 +334,12 @@ export default function Home() {
             className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground">
             <option value="All">All Sources</option>
             {sources.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={filterTopic} onChange={(e) => setFilterTopic(e.target.value)}
+            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground">
+            <option value="All">All Topics</option>
+            {TOPICS.filter((t) => (activePage?.enabledTopics ?? TOPICS.map((x) => x.id)).includes(t.id))
+              .map((t) => <option key={t.id} value={t.id}>{t.vi}</option>)}
           </select>
           <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)}
             className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground" />
@@ -327,18 +363,20 @@ export default function Home() {
           <div className="text-center py-16 text-muted-foreground">Loading posts...</div>
         ) : posts.length === 0 ? (
           <div className="text-center py-16 rounded-xl border border-dashed border-border bg-card text-muted-foreground">
-            <p className="text-lg mb-2 font-medium">No posts yet</p>
-            <p className="text-sm">Click &quot;Fetch &amp; Generate Posts&quot; to get started.</p>
+            <p className="text-lg mb-2 font-medium">No content yet</p>
+            <p className="text-sm">Crawl news into bronze, then run the immigration-pipeline skill (or wait for the schedule) to filter &amp; generate.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
             {posts.map((post) => (
               <PostCard
                 key={post.article.url}
                 post={post}
                 pageId={activePage.id}
+                pageName={activePage.name}
                 onToggleDone={() => handleToggleDone(post.article.url, post.isDone ?? false)}
                 onStatusChange={handleStatusChange}
+                onShowChecklistInChat={(text) => chatRef.current?.openWithMessage(text)}
               />
             ))}
           </div>
@@ -360,17 +398,32 @@ export default function Home() {
 
     switch (activeView) {
       case 'calendar': return <ContentCalendar pageId={activePage.id} />;
-      case 'analytics': return <AnalyticsDashboard pageId={activePage.id} />;
+      case 'usage': return <UsageView pageId={activePage.id} />;
+      case 'analytics': return (
+        <div className="flex flex-col gap-8">
+          <AnalyticsDashboard pageId={activePage.id} />
+          <AuditView pageId={activePage.id} />
+        </div>
+      );
       case 'settings': return (
         <SettingsView
           pageId={activePage.id}
           pageName={activePage.name}
+          countryCode={activePage.countryCode ?? ''}
+          countryName={activePage.countryName ?? ''}
           systemPrompt={activePage.systemPrompt}
           userPrompt={activePage.userPrompt ?? ''}
           platformPrompts={activePage.platformPrompts ?? {}}
-          keywordConfig={activePage.keywordConfig ?? { tier1: [], tier2: [], minScore: 1 }}
+          marketContext={{
+            language: activePage.language ?? 'vi',
+            glossary: activePage.glossary ?? {},
+            wordingRules: activePage.wordingRules ?? '',
+            writingStyle: activePage.writingStyle ?? '',
+          }}
+          enabledTopics={activePage.enabledTopics ?? TOPICS.map((t) => t.id)}
           onSavePrompt={handleSavePrompt}
-          onSaveKeywordConfig={handleSaveKeywordConfig}
+          onSaveContext={handleSaveContext}
+          onSaveTopics={handleSaveTopics}
           onDeletePage={handleDeletePage}
           onRenamePage={handleRenamePage}
         />
@@ -394,6 +447,7 @@ export default function Home() {
       {/* AI Chat Copilot — always visible on content view */}
       {activePageId && (
         <AIChatWindow
+          ref={chatRef}
           pageId={activePageId}
           currentFilters={{ source: filterSource, from: filterFrom, to: filterTo, done: filterDone as DashboardFilters['done'], keyword: filterKeyword }}
           onFiltersChange={(filters) => {
@@ -406,6 +460,40 @@ export default function Home() {
           onPostsRefresh={loadPosts}
         />
       )}
+
+      <Dialog open={newPageOpen} onOpenChange={setNewPageOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New page / market</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-2">
+            <label className="text-sm font-medium">
+              Name<span className="text-red-500">*</span>
+              <Input className="mt-1" autoFocus placeholder='e.g. "Czech Republic / Người Việt"'
+                value={npName} onChange={(e) => setNpName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitNewPage(); }} />
+            </label>
+            <div className="flex gap-3">
+              <label className="text-sm font-medium flex-1">
+                Country code
+                <Input className="mt-1" placeholder="CZ" maxLength={2}
+                  value={npCode} onChange={(e) => setNpCode(e.target.value)} />
+              </label>
+              <label className="text-sm font-medium flex-[2]">
+                Country name
+                <Input className="mt-1" placeholder="Czech Republic"
+                  value={npCountry} onChange={(e) => setNpCountry(e.target.value)} />
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewPageOpen(false)}>Cancel</Button>
+            <Button onClick={submitNewPage} disabled={!npName.trim() || npSaving}>
+              {npSaving ? 'Creating…' : 'Create page'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

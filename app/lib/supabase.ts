@@ -1,48 +1,26 @@
 /**
- * Server-side Supabase client.
+ * Local data client.
  *
- * Uses the service-role key for server-side writes (pipeline),
- * and the anon key for client-side reads (via NEXT_PUBLIC_ env vars).
+ * Previously backed by hosted Supabase; now backed by an embedded SQLite
+ * database (see ./db.ts) so all data stays on this machine. The function
+ * names and the returned `.from(...)` query-builder surface are kept
+ * identical to the old supabase-js client, so every API route that calls
+ * `getSupabaseServer()` continues to work without changes.
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-let serverClient: SupabaseClient | null = null;
+import { getLocalClient, type LocalClient } from './db';
 
 /**
- * Server-side Supabase client with service-role privileges.
- * Used in API routes for reading and writing sports_posts.
+ * Server-side data client (formerly service-role Supabase).
+ * Used in API routes for reading and writing posts, pages, feeds, channels.
  */
-export function getSupabaseServer(): SupabaseClient {
-  if (!serverClient) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) {
-      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-    }
-    serverClient = createClient(url, key, {
-      global: {
-        fetch: (input, init) =>
-          fetch(input, { ...init, cache: 'no-store' }),
-      },
-    });
-  }
-  return serverClient;
+export function getSupabaseServer(): LocalClient {
+  return getLocalClient();
 }
 
 /**
- * Anon Supabase client for client-side reads.
+ * Anon data client (kept for API compatibility — same local backend).
  */
-let anonClient: SupabaseClient | null = null;
-
-export function getSupabaseAnon(): SupabaseClient {
-  if (!anonClient) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) {
-      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
-    }
-    anonClient = createClient(url, key);
-  }
-  return anonClient;
+export function getSupabaseAnon(): LocalClient {
+  return getLocalClient();
 }

@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { id: 'content', label: 'Content', icon: '📝' },
   { id: 'calendar', label: 'Calendar', icon: '📅' },
   { id: 'analytics', label: 'Analytics', icon: '📊' },
+  { id: 'usage', label: 'Usage', icon: '📈' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
 

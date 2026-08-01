@@ -19,6 +19,7 @@ const VIEW_LABELS: Record<string, string> = {
   content: '📝 Content',
   calendar: '📅 Calendar',
   analytics: '📊 Analytics',
+  usage: '📈 Usage',
   settings: '⚙️ Settings',
 };
 

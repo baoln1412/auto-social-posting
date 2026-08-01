@@ -25,7 +25,7 @@ export default function PageTabs({ pages, activePageId, onSelect, onAddPage }: P
               borderBottom: isActive ? '2px solid #f0e523' : '2px solid transparent',
             }}
           >
-            {page.name}
+            {page.countryCode ? `${page.countryCode} · ${page.name}` : page.name}
           </button>
         );
       })}

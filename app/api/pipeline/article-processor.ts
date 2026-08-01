@@ -195,7 +195,8 @@ function buildSingleArticlePrompt(article: Article, systemPrompt: string): strin
       '7. [HASHTAGS]: 5-8 hashtags (#Australia101 #ChuyenUcChutChut #TinTucUc + keyword).',
       '',
       '📝 OUTPUT FORMAT: Trả về CHỈ 1 JSON object hợp lệ, KHÔNG markdown, KHÔNG preamble:',
-      '{"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}',
+      '{"relevant":true,"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}',
+      'Nếu bài viết KHÔNG liên quan đến chủ đề trang (không phải tin Úc / không ảnh hưởng người Việt ở Úc), trả về CHÍNH XÁC: {"relevant":false} — không viết gì thêm.',
       '',
       '⚠️ QUY TẮC:',
       '- emojiTitle: BẰNG TIẾNG VIỆT, hấp dẫn, có emoji.',
@@ -226,7 +227,8 @@ function buildSingleArticlePrompt(article: Article, systemPrompt: string): strin
     '- imagePrompt: A detailed prompt for AI image generation.',
     '',
     'Return ONLY a valid JSON object (no markdown, no preamble):',
-    '{"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}',
+    '{"relevant":true,"emojiTitle":"...","facebookText":"...","summary":"...","imagePrompt":"..."}',
+    "If the article is NOT relevant to this page's niche, return EXACTLY: {\"relevant\":false} — nothing else.",
     '',
     'ARTICLE TO PROCESS:',
     articleBlock,
@@ -269,6 +271,16 @@ function parseSingleAiResponse(
     // Handle case where AI returns an array with one item
     if (Array.isArray(parsed)) {
       parsed = parsed[0];
+    }
+
+    // Structured self-eval ("decision at boundaries" — see docs/APPLIED_SOURCES.md,
+    // browser-use/video-use): the model declares irrelevance via an explicit
+    // {"relevant":false} field instead of us sniffing rejection phrases out of a
+    // generated title. The title-signal check below stays as a backstop for
+    // models that ignore the field.
+    if (parsed && parsed.relevant === false) {
+      console.log(`[pipeline] 🚫 AI declared article irrelevant (structured field) for: ${article.title.slice(0, 60)}`);
+      return { post: null, imagePrompt: null };
     }
 
     if (!parsed || !parsed.emojiTitle || !parsed.facebookText) {

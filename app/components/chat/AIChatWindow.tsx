@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 
@@ -25,7 +25,15 @@ interface AIChatWindowProps {
   onPostsRefresh: () => void;
 }
 
-export default function AIChatWindow({ pageId, currentFilters, onFiltersChange, onPostsRefresh }: AIChatWindowProps) {
+export interface AIChatHandle {
+  /** Opens the chat panel and appends `text` as an assistant message (no API round-trip). */
+  openWithMessage: (text: string) => void;
+}
+
+const AIChatWindow = forwardRef<AIChatHandle, AIChatWindowProps>(function AIChatWindow(
+  { pageId, currentFilters, onFiltersChange, onPostsRefresh },
+  ref,
+) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -36,6 +44,13 @@ export default function AIChatWindow({ pageId, currentFilters, onFiltersChange, 
   const [isLoading, setIsLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    openWithMessage: (text: string) => {
+      setMessages((prev) => [...prev, { role: 'assistant', content: text }]);
+      setIsOpen(true);
+    },
+  }));
 
   useEffect(() => {
     if (isOpen) {
@@ -206,7 +221,9 @@ export default function AIChatWindow({ pageId, currentFilters, onFiltersChange, 
       )}
     </>
   );
-}
+});
+
+export default AIChatWindow;
 
 function getToolStatusText(tool: string, result: Record<string, unknown>): string {
   switch (tool) {

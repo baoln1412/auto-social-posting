@@ -18,6 +18,8 @@ interface DiscoveredFeed {
   url: string;
   title?: string;
   type: string;
+  method?: string;
+  feedType?: string;
 }
 
 interface SourceManagerProps {
@@ -88,10 +90,11 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
         setNewFeedUrl(url);
         setNewFeedType('web_scrape');
       } else if (foundFeeds.length === 1) {
-        setNewFeedUrl(foundFeeds[0].url);
-        setNewName(foundFeeds[0].title || guessName(url));
-        setDetectStatus(`✅ Found: ${foundFeeds[0].url}`);
-        setNewFeedType('rss');
+        const f = foundFeeds[0];
+        setNewFeedUrl(f.url);
+        setNewName(f.title || guessName(url));
+        setDetectStatus(`✅ ${f.method || 'Found'}: ${f.url}`);
+        setNewFeedType(f.feedType || 'rss');
       } else {
         setDiscovered(foundFeeds);
         setDetectStatus(`Found ${foundFeeds.length} feeds — pick one:`);
@@ -109,7 +112,7 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
     setNewName(df.title || guessName(inputUrl));
     setDiscovered([]);
     setDetectStatus(`✅ Selected: ${df.url}`);
-    setNewFeedType('rss');
+    setNewFeedType(df.feedType || 'rss');
   };
 
   const handleAdd = async () => {
@@ -257,10 +260,17 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handleSelectDiscovered(df)}
-                    className="justify-start text-xs truncate"
+                    className="flex-col items-start h-auto py-1 text-xs"
                   >
-                    <span className="text-primary mr-1">⟶</span>
-                    {df.title ? `${df.title} — ` : ''}{df.url}
+                    <span className="truncate max-w-full">
+                      <span className="text-primary mr-1">⟶</span>
+                      {df.title ? `${df.title} — ` : ''}{df.url}
+                    </span>
+                    {df.method && (
+                      <span className="text-[10px] text-muted-foreground pl-4">
+                        {df.method}{df.feedType === 'web_scrape' ? ' · scrape' : ''}
+                      </span>
+                    )}
                   </Button>
                 ))}
               </div>
