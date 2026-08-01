@@ -32,8 +32,13 @@ Thumbs.db
 *.swp
 *.swo
 
-# Claude Code
-.claude/
+# Claude Code — local settings stay out, but the pipeline SOP is source: it defines
+# every generated post and the FB-compliance gate. Git will not descend into an
+# excluded directory, so each level is excluded by /* and re-included by name.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/immigration-pipeline/
 .vercel
 .env*.local
 
