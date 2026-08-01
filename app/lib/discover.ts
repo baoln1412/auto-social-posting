@@ -1,0 +1,187 @@
+/**
+ * Feed discovery cascade (shared by /api/feeds/discover and the crawl's
+ * self-heal). Resolves the best available ingestion method for a URL:
+ *   1. The URL itself is already a feed                → direct
+ *   2. <link rel="alternate" rss|atom> in the page     → html-link
+ *   3. Probe standard + non-standard feed paths        → probe
+ *        (Arc /arc/outboundfeeds/rss, Ippen /rssfeed.rdf, etc.)
+ *   4. No native feed → Google News RSS scoped to site → google-news
+ *        (bypasses sites whose own feed is bot-walled, e.g. Akamai)
+ *   5. Page renders article links server-side          → scrape (web_scrape)
+ */
+
+import { BROWSER_HEADERS } from '@/app/lib/crawl';
+
+export type DiscoverMethod = 'direct' | 'html-link' | 'probe' | 'google-news' | 'scrape';
+
+export interface DiscoveredFeed {
+  url: string;
+  title?: string;
+  type: DiscoverMethod;
+  method: string;
+  feedType: 'rss' | 'web_scrape';
+}
+
+// Standard + real-world non-standard feed paths, probed concurrently.
+const COMMON_FEED_PATHS = [
+  '/feed/', '/feed', '/rss/', '/rss', '/feed.xml', '/rss.xml', '/atom.xml',
+  '/index.xml', '/feeds/posts/default', '/?feed=rss2', '/?feed=atom',
+  '/rssfeed.rdf',                             // Ippen Digital (24hamburg, merkur, fr.de)
+  '/rss.rdf', '/feed.rss', '/feeds/rss', '/news/rss',
+  '/arc/outboundfeeds/rss/?outputType=xml',  // Arc Publishing (rnd.de, WaPo-platform papers)
+  '/arc/outboundfeeds/rss/',
+];
+
+// Locale hints for the Google News fallback, keyed by the host's TLD.
+const TLD_LOCALE: Record<string, { hl: string; gl: string; ceid: string }> = {
+  de: { hl: 'de', gl: 'DE', ceid: 'DE:de' },
+  au: { hl: 'en-AU', gl: 'AU', ceid: 'AU:en' },
+  vn: { hl: 'vi', gl: 'VN', ceid: 'VN:vi' },
+  in: { hl: 'en-IN', gl: 'IN', ceid: 'IN:en' },
+  uk: { hl: 'en-GB', gl: 'GB', ceid: 'GB:en' },
+  fr: { hl: 'fr', gl: 'FR', ceid: 'FR:fr' },
+  cz: { hl: 'cs', gl: 'CZ', ceid: 'CZ:cs' },
+};
+
+async function fetchDoc(url: string, timeoutMs: number): Promise<{ ok: boolean; text: string }> {
+  try {
+    const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) return { ok: false, text: '' };
+    return { ok: true, text: await res.text() };
+  } catch {
+    return { ok: false, text: '' };
+  }
+}
+
+// A real feed root marker — guards against HTML error pages served with an
+// xml-ish content-type by a bot wall.
+function looksLikeFeed(text: string): boolean {
+  return (
+    /<rss[\s>]/i.test(text) ||
+    /<feed[\s>]/i.test(text) ||
+    /<rdf:RDF[\s>]/i.test(text) ||
+    (/<channel[\s>]/i.test(text) && /<item[\s>]/i.test(text))
+  );
+}
+
+function feedItemCount(text: string): number {
+  return (text.match(/<item[\s>]/gi)?.length ?? 0) + (text.match(/<entry[\s>]/gi)?.length ?? 0);
+}
+
+function extractFeedLinks(html: string, baseUrl: string): DiscoveredFeed[] {
+  const feeds: DiscoveredFeed[] = [];
+  const linkRegex = /<link[^>]*type=["'](application\/(?:rss|atom)\+xml)["'][^>]*>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = linkRegex.exec(html)) !== null) {
+    const tag = match[0];
+    const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
+    if (!hrefMatch) continue;
+    let href = hrefMatch[1];
+    if (href.startsWith('/')) {
+      const u = new URL(baseUrl);
+      href = `${u.protocol}//${u.host}${href}`;
+    } else if (!href.startsWith('http')) {
+      href = `${baseUrl.replace(/\/$/, '')}/${href}`;
+    }
+    const titleMatch = tag.match(/title=["']([^"']+)["']/i);
+    feeds.push({ url: href, title: titleMatch?.[1], type: 'html-link', method: '<link> tag in page', feedType: 'rss' });
+  }
+  return feeds;
+}
+
+function countArticleLinks(html: string): number {
+  const re = /href=["'](?:https?:\/\/[^"'/]+)?\/[a-z0-9-]+\/[^"']*?(?:-\d{6,}|\/\d{4}\/\d{2}\/)[^"']*["']/gi;
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) seen.add(m[0]);
+  return seen.size;
+}
+
+function googleNewsFeed(host: string): string {
+  const tld = host.split('.').pop() ?? '';
+  const loc = TLD_LOCALE[tld] ?? { hl: 'en', gl: 'US', ceid: 'US:en' };
+  const q = encodeURIComponent(`site:${host} when:7d`);
+  return `https://news.google.com/rss/search?q=${q}&hl=${loc.hl}&gl=${loc.gl}&ceid=${loc.ceid}`;
+}
+
+/**
+ * Run the 5-tier cascade. Returns the best feed(s), best method first (empty if
+ * none). `opts.exclude` lists URLs that must NOT be returned — used by the crawl's
+ * self-heal to skip the very feed URL that just failed, so a site that advertises
+ * a bot-walled feed (Newsweek) cascades past it to the Tier-4 Google News fallback
+ * instead of re-suggesting the same broken URL.
+ */
+export async function discoverFeeds(
+  rawUrl: string,
+  opts: { exclude?: string[] } = {},
+): Promise<DiscoveredFeed[]> {
+  const excluded = new Set(opts.exclude ?? []);
+  let url = rawUrl.trim();
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  let origin: string, host: string;
+  try {
+    const parsed = new URL(url);
+    origin = `${parsed.protocol}//${parsed.host}`;
+    host = parsed.host;
+  } catch {
+    return [];
+  }
+
+  const found: DiscoveredFeed[] = [];
+  const add = (f: DiscoveredFeed) => {
+    if (excluded.has(f.url)) return;
+    if (!found.some((x) => x.url === f.url)) found.push(f);
+  };
+
+  // Tier 1 — the given URL is itself a feed (unless it's the excluded/failing one)
+  const page = await fetchDoc(url, 8000);
+  if (page.ok && looksLikeFeed(page.text) && !excluded.has(url)) {
+    return [{ url, title: 'Direct feed', type: 'direct', method: 'URL is already a feed', feedType: 'rss' }];
+  }
+
+  // Tier 2 — <link rel="alternate"> advertised in the page HTML
+  if (page.ok) for (const f of extractFeedLinks(page.text, url)) add(f);
+
+  // Tier 3 — probe standard + non-standard feed paths
+  const probes = await Promise.allSettled(
+    COMMON_FEED_PATHS.map(async (path) => {
+      const feedUrl = `${origin}${path}`;
+      if (found.some((d) => d.url === feedUrl)) return null;
+      const doc = await fetchDoc(feedUrl, 6000);
+      return doc.ok && looksLikeFeed(doc.text) ? feedUrl : null;
+    }),
+  );
+  for (const p of probes) {
+    if (p.status === 'fulfilled' && p.value) {
+      add({ url: p.value, type: 'probe', method: 'Probed feed path', feedType: 'rss' });
+    }
+  }
+
+  // Tier 4 — no native feed → Google News scoped to the site (bot-wall bypass)
+  if (found.length === 0) {
+    const gn = googleNewsFeed(host);
+    const doc = await fetchDoc(gn, 8000);
+    if (doc.ok && feedItemCount(doc.text) > 0) {
+      add({
+        url: gn,
+        title: `Google News · ${host}`,
+        type: 'google-news',
+        method: "Google News fallback (site's own feed is unavailable/bot-walled)",
+        feedType: 'rss',
+      });
+    }
+  }
+
+  // Tier 5 — last resort → scrape the page HTML for article links
+  if (found.length === 0 && page.ok && countArticleLinks(page.text) >= 3) {
+    add({
+      url,
+      title: `Scrape · ${host}`,
+      type: 'scrape',
+      method: 'No feed found — scrape the page HTML for articles',
+      feedType: 'web_scrape',
+    });
+  }
+
+  return found;
+}
