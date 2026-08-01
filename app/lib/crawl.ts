@@ -184,8 +184,14 @@ async function fetchRssFeed(feed: FeedEntry, cutoffTime: Date): Promise<{ articl
     for (const item of feedData.items ?? []) {
       const title = (item.title ?? '').trim();
       if (!title) continue;
-      const pubDateStr = item.pubDate ?? item.isoDate ?? new Date(0).toISOString();
-      if (new Date(pubDateStr).getTime() < cutoffTime.getTime()) continue;
+      // An item carrying no date at all is UNKNOWN, not ancient. The old epoch-0
+      // fallback made every dateless item older than any cutoff, so feeds that omit
+      // per-item dates were silently dropped whole: tagesschau's Atom feed parses 77
+      // migration-heavy entries and had contributed zero articles. Undated → treat as
+      // current and let exact-URL dedup stop it re-entering on later runs.
+      const rawDate = item.pubDate ?? item.isoDate;
+      if (rawDate && new Date(rawDate).getTime() < cutoffTime.getTime()) continue;
+      const pubDateStr = rawDate ?? new Date().toISOString();
       const url = item.link ?? item.guid ?? '';
       if (!url) continue;
       const { imageUrl, imageUrls } = extractImages(item);
