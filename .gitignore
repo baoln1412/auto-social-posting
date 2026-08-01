@@ -63,3 +63,6 @@ card-review/
 # Python bytecode from deploy/
 __pycache__/
 *.pyc
+
+# code-review-graph index — regenerable with `code-review-graph build`.
+.code-review-graph/
