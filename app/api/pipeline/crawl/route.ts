@@ -11,13 +11,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/app/lib/supabase';
 import { crawlFeeds, type FeedEntry } from '@/app/lib/crawl';
-import { insertBronze, deleteOldBronze, insertAudit, type BronzeInput } from '@/app/lib/lake';
+import {
+  insertBronze, deleteOldBronze, insertAudit, countConsecutiveFailures, type BronzeInput,
+} from '@/app/lib/lake';
 import { passesKeywordFilter } from '@/app/lib/keywordFilter';
 import { discoverFeeds } from '@/app/lib/discover';
 import type { KeywordConfig } from '@/app/types';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
+
+/** Consecutive failed runs a feed must log before self-heal rewrites its URL.
+ *  3 runs at the 4-hourly cadence ≈ half a day of genuine breakage. */
+const MIN_FAILURES_BEFORE_SELF_HEAL = 3;
+
+/** Same feed, written differently. Discovery re-probes the origin and hands back the
+ *  canonical form, which for a trailing slash is the SAME endpoint — so a plain `!==`
+ *  read it as a fix and rewrote the row. Euronews oscillated /rss → /rss/ → /rss across
+ *  three consecutive runs, burning a discovery call each time and never healing. */
+function sameFeedTarget(a: string, b: string): boolean {
+  const norm = (u: string) => u.trim().replace(/\/+$/, '').replace(/^http:/, 'https:');
+  return norm(a) === norm(b);
+}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -71,16 +86,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // on its origin and, if it resolves to a different working feed (e.g. the
       // Tier-4 Google News fallback), update the stored URL so the NEXT crawl uses
       // it. perFeed is index-aligned with feeds/feedRows (crawlFeeds preserves order).
+      //
+      // Only after MIN_FAILURES CONSECUTIVE failed runs. Repointing on a single bad
+      // run is a one-way door: the fallback is a Google News wrapper, wrappers never
+      // fail, so the original is never retried — and wrappers are the worst inputs
+      // this pipeline has (thinnest blurbs, redirect stubs no body can be read from).
+      // Publishers rate-limit intermittently: Euronews logged four 406s while serving
+      // 50 items perfectly to a direct fetch. A blip must not cost a good feed.
       for (let i = 0; i < perFeed.length; i++) {
         if (perFeed[i].status !== 'failed') continue;
         const row = (feedRows ?? [])[i];
         if (!row) continue;
+        // +1 for this run, whose audit row is written further below.
+        const failures = (await countConsecutiveFailures(market.id, perFeed[i].name)) + 1;
+        if (failures < MIN_FAILURES_BEFORE_SELF_HEAL) {
+          console.warn(
+            `[crawl] "${row.name}" failed (${failures}/${MIN_FAILURES_BEFORE_SELF_HEAL} consecutive) — ` +
+            'leaving the URL alone; could be a transient block.',
+          );
+          continue;
+        }
         try {
           const origin = new URL(row.url).origin;
           // Exclude the failing URL so an advertised-but-bot-walled feed cascades
           // past itself to the Google News fallback instead of being re-suggested.
           const [best] = await discoverFeeds(origin, { exclude: [row.url] });
-          if (best && best.url !== row.url) {
+          if (best && !sameFeedTarget(best.url, row.url)) {
             await supabase
               .from('rss_feeds')
               .update({ url: best.url, feed_type: best.feedType })

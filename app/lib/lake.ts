@@ -644,6 +644,34 @@ export async function insertAudit(rows: AuditInput[]): Promise<void> {
   }
 }
 
+/**
+ * How many of a feed's most recent runs failed, counting back from the latest until
+ * the first success. Lets the crawl tell a blip apart from a genuinely dead feed
+ * before it rewrites the feed's URL — Euronews logged 4 intermittent 406s while
+ * serving 50 items perfectly well to a direct fetch.
+ *
+ * Counts PRIOR runs only: the caller's own failure isn't written to audit_runs until
+ * after the self-heal step, so add it in at the call site.
+ */
+export async function countConsecutiveFailures(
+  marketId: string,
+  sourceName: string,
+  lookback = 10,
+): Promise<number> {
+  const rows = await all(
+    `SELECT errors FROM audit_runs
+      WHERE market_id = ? AND source_name = ?
+      ORDER BY run_at DESC LIMIT ?`,
+    [marketId, sourceName, lookback],
+  );
+  let n = 0;
+  for (const r of rows) {
+    if (r.errors == null) break;
+    n++;
+  }
+  return n;
+}
+
 /** Audit summary for a market: live layer counts + recent run rows. */
 export async function getAuditSummary(marketId: string): Promise<any> {
   const counts = await all(
