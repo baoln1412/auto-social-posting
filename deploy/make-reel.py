@@ -2,8 +2,11 @@
 """
 MVP+: one gold post -> one 9:16 branded reel. Fully local, $0.
   voice    = Edge-TTS (free, vi-VN, no key) -> mp3 + sentence timings
-  captions = punctuation-aware cues (comma/period pause points, capped at a max
-             word count) over the image (PIL PNG overlays; this ffmpeg lacks drawtext/libass)
+  captions = punctuation-aware cues (comma/period pause points, capped at a max word count),
+             drawn white with the word being spoken flipped to yellow. The whole band is
+             pre-composited into ONE alpha clip (PIL frames -> qtrle .mov) rather than an
+             ffmpeg overlay per word: measured on a 15s clip, 30 overlays render in 2.9s but
+             150 take 39.7s. (PIL because this ffmpeg lacks drawtext/libass.)
   frame    = deploy/assets/frame.png (101 CHUYỆN ÚC blue block + logo + vertical bar)
   title    = white, left of nothing / right of the bar, inside the blue block
   intro    = deploy/assets/intro.mp4 spliced in AFTER the hook (first sentence)
@@ -33,6 +36,7 @@ W, H = 1080, 1920
 CAP_Y, CAP_H = 780, 150               # captions over the image
 TITLE_X, TITLE_Y, TITLE_W = 185, 1420, 840   # title inside the blue block, right of the bar
 WHITE, YELLOW = (255, 255, 255, 255), (255, 221, 0, 255)
+CAP_BASE, CAP_ACTIVE = WHITE, YELLOW   # captions read white, the word being spoken flips to brand yellow
 EMOJI = re.compile("[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF\U0000FE0F]")
 
 def clean(s):
@@ -48,31 +52,6 @@ def narration(post):
     lead = (post.get("facebookText", "") or "").split("🔹")[0]
     lead = clean(lead.split("\n\n")[0] if "\n\n" in lead else lead)
     return (title + ". " + lead).strip()[:600]
-
-def wrap(text, width):
-    out, line = [], ""
-    for w in text.split():
-        if len(line) + len(w) + 1 > width and line:
-            out.append(line); line = w
-        else:
-            line = (line + " " + w).strip()
-    if line: out.append(line)
-    return out
-
-def render_text(path, lines, fontsize, fill, stroke_w, box_w, canvas_h=None, center=True):
-    font = ImageFont.truetype(FONT, fontsize)
-    lh = fontsize + 14
-    h = canvas_h or (lh * len(lines) + 30)
-    img = Image.new("RGBA", (box_w, h), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    y = (h - lh * len(lines)) // 2 if canvas_h else 15
-    for ln in lines:
-        bb = d.textbbox((0, 0), ln, font=font, stroke_width=stroke_w)
-        x = ((box_w - (bb[2] - bb[0])) // 2 - bb[0]) if center else (stroke_w - bb[0])
-        d.text((x, y), ln, font=font, fill=fill, stroke_width=stroke_w, stroke_fill=(0, 0, 0, 255))
-        y += lh
-    img.save(path)
-    return h
 
 async def tts(text, mp3):
     import edge_tts
@@ -142,8 +121,83 @@ def align_cues(text, ww, dur, size=5):
             times[i] = (ls + (rs - ls) * (i - li) / span, ls + (rs - ls) * (i + 1 - li) / span)
     cues = []
     for g in chunk_words(mw, size):
-        cues.append((times[g[0]][0], times[g[-1]][1], " ".join(mw[k] for k in g)))
+        cues.append((times[g[0]][0], times[g[-1]][1],
+                     [(mw[k], times[k][0], times[k][1]) for k in g]))
     return cues
+
+def layout_words(d, words, font, box_w):
+    """Wrap `words` into centred lines -> ([(line_words, line_width)], space_width). Word-level
+    layout, because the caption has to know where each individual word sits to colour one of them."""
+    sp = d.textlength(" ", font=font)
+    lines, cur, cw = [], [], 0.0
+    for w in words:
+        wl = d.textlength(w, font=font)
+        if cur and cw + sp + wl > box_w:
+            lines.append((cur, cw)); cur, cw = [], 0.0
+        cur.append((w, wl)); cw += (sp if len(cur) > 1 else 0) + wl
+    if cur:
+        lines.append((cur, cw))
+    return lines, sp
+
+
+def render_cue(words, active, fontsize=64, stroke=7):
+    """One caption frame: the whole cue in white, the word currently being spoken in yellow."""
+    img = Image.new("RGBA", (W, CAP_H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    font = ImageFont.truetype(FONT, fontsize)
+    lines, sp = layout_words(d, [w for w, _, _ in words], font, W - 60)
+    lh = fontsize + 14
+    y = (CAP_H - lh * len(lines)) // 2
+    i = 0
+    for line, lw in lines:
+        x = (W - lw) / 2
+        for w, wl in line:
+            d.text((x, y), w, font=font, fill=CAP_ACTIVE if i == active else CAP_BASE,
+                   stroke_width=stroke, stroke_fill=(0, 0, 0, 255))
+            x += wl + sp
+            i += 1
+        y += lh
+    return img
+
+
+def active_word(cues, t):
+    """(cue index, word index) being spoken at `t`, or None between cues."""
+    for ci, (a, b, words) in enumerate(cues):
+        if a <= t < b:
+            wi = 0
+            for k, (_, ws, _we) in enumerate(words):
+                if ws <= t:
+                    wi = k
+            return ci, wi
+    return None
+
+
+def render_caption_track(path, cues, dur, fps=30):
+    """Pre-composite the whole caption band into ONE alpha clip, so the filter graph carries a
+    single overlay instead of one per word. Measured on a 15s clip: 30 overlays 2.9s vs 150
+    overlays 39.7s — overlay count scales superlinearly, so per-word highlighting cannot live in
+    the filter graph. Frames are cached per (cue, word), so PIL draws once per word, not per frame."""
+    n = max(1, int(round(dur * fps)))
+    blank = Image.new("RGBA", (W, CAP_H), (0, 0, 0, 0)).tobytes()
+    cache = {}
+    p = subprocess.Popen(
+        ["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgba",
+         "-s", f"{W}x{CAP_H}", "-r", str(fps), "-i", "-", "-c:v", "qtrle", path],
+        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    for f in range(n):
+        key = active_word(cues, f / fps)
+        if key is None:
+            p.stdin.write(blank)
+            continue
+        if key not in cache:
+            cache[key] = render_cue(cues[key[0]][2], key[1]).tobytes()
+        p.stdin.write(cache[key])
+    p.stdin.close()
+    if p.wait() != 0:
+        print(p.stderr.read().decode()[-800:])
+        return False
+    return True
+
 
 def title_segments(title):
     """(word, colour) list. `**kw**` -> yellow; else country/prefix white, headline yellow."""
@@ -201,6 +255,27 @@ def fetch_video(url, dst):
     except Exception as e:
         print("  video fetch failed:", e); return False
 
+def video_duration(path):
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                            "-of", "csv=p=0", path], capture_output=True, text=True, timeout=10)
+        return float(r.stdout.strip())
+    except Exception:
+        return 0.0
+
+def slideshow_risk(bg_items, dur, per=10.0):
+    """Warn when the reel is really a slideshow. A Ken Burns pan over one or two stills stretched
+    across a minute is the exact failure mode OpenMontage flags, and it is what this pipeline
+    produces by default when a post ships a single picture."""
+    if any(b["kind"] == "video" for b in bg_items):
+        return None
+    want = max(1, int(dur / per))
+    if len(bg_items) < want:
+        return (f"slideshow risk: {len(bg_items)} still(s) across {dur:.0f}s — "
+                f"want ~{want} images or some video b-roll (stock.py)")
+    return None
+
+
 def get_media(post):
     """Ordered [{"url","kind"}] for the slideshow. New (--json) callers send
     `media`; the old marketId/index path only ever had a single article.imageUrl."""
@@ -230,17 +305,27 @@ def build_content(tmp, post, content):
         if ok:
             bg_items.append({"path": p, "kind": m["kind"]})
     n_bg = max(1, len(bg_items))  # background segments: one per media item, or 1 solid-color fallback
-    seg_dur = dur / n_bg
-    seg_frames = max(1, int(round(seg_dur * 30)))
+    target = dur / n_bg
+    # A video clip shorter than its equal time-share can't fill it — trim can't pad,
+    # and the leftover would otherwise show up as a frozen last frame at the very end
+    # while narration keeps playing. Cap short clips to their own length and hand the
+    # leftover time to the other segments instead.
+    vdur = {i: video_duration(it["path"]) for i, it in enumerate(bg_items) if it["kind"] == "video"}
+    short = {i: d for i, d in vdur.items() if 0 < d < target}
+    leftover = sum(target - d for d in short.values())
+    others = [i for i in range(len(bg_items)) if i not in short]
+    bonus = leftover / len(others) if others else 0
+    seg_durs = [short[i] if i in short else target + bonus for i in range(len(bg_items))] or [target]
     print(f"  background: {len(bg_items)} item(s) -> {n_bg} segment(s)" if bg_items else "  background: solid color (no media)")
+    risk = slideshow_risk(bg_items, dur)
+    if risk:
+        print("  ⚠ " + risk)
 
     title_png = os.path.join(tmp, "title.png")
     th = render_title(title_png, title_segments(post.get("emojiTitle", "")), 50, TITLE_W, 4)
-    cap_pngs = []
-    for i, (_, _, t) in enumerate(cues):
-        p = os.path.join(tmp, f"c{i}.png")
-        render_text(p, wrap(t, 16), 64, (255, 221, 0, 255), 7, W, canvas_h=CAP_H, center=True)
-        cap_pngs.append(p)
+    caps_mov = os.path.join(tmp, "caps.mov")
+    if not render_caption_track(caps_mov, cues, dur):
+        return None
 
     inputs = []
     if bg_items:
@@ -256,16 +341,13 @@ def build_content(tmp, post, content):
                 inputs += ["-loop", "1", "-framerate", "1", "-t", "1", "-i", it["path"]]
     else:
         inputs += ["-f", "lavfi", "-i", f"color=c=0x0a2a6b:s={W}x{H}:r=30"]
-    inputs += ["-loop", "1", "-i", title_png]
-    for p in cap_pngs:
-        inputs += ["-loop", "1", "-i", p]
+    inputs += ["-loop", "1", "-i", title_png, "-i", caps_mov]
     inputs += ["-loop", "1", "-i", FRAME, "-i", mp3]
 
-    n = len(cues)
     title_idx = n_bg
-    cap_start = n_bg + 1
-    frame_idx = n_bg + 1 + n
-    audio_idx = n_bg + 2 + n
+    cap_idx = n_bg + 1
+    frame_idx = n_bg + 2
+    audio_idx = n_bg + 3
 
     # one Ken Burns zoom per image segment (or a trimmed clip per video segment),
     # concatenated if there's more than one. Video segments' own audio is never
@@ -274,29 +356,27 @@ def build_content(tmp, post, content):
     parts = []
     if bg_items:
         for i, (it, lbl) in enumerate(zip(bg_items, seg_labels)):
+            sd = seg_durs[i]
             if it["kind"] == "video":
                 parts.append(
-                    f"[{i}:v]trim=0:{seg_dur:.3f},setpts=PTS-STARTPTS,"
+                    f"[{i}:v]trim=0:{sd:.3f},setpts=PTS-STARTPTS,"
                     f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1,fps=30[{lbl}]"
                 )
             else:
+                frames = max(1, int(round(sd * 30)))
                 parts.append(
                     f"[{i}:v]scale=1350:2400:force_original_aspect_ratio=increase,crop=1350:2400,"
-                    f"zoompan=z='min(zoom+0.0004,1.2)':d={seg_frames}:s={W}x{H}:fps=30,setsar=1[{lbl}]"
+                    f"zoompan=z='min(zoom+0.0004,1.2)':d={frames}:s={W}x{H}:fps=30,setsar=1[{lbl}]"
                 )
     else:
         parts.append(f"[0:v]setsar=1[{seg_labels[0]}]")
     if n_bg > 1:
         parts.append("".join(f"[{lbl}]" for lbl in seg_labels) + f"concat=n={n_bg}:v=1:a=0[bg]")
 
-    cur = "bg"
-    # captions over the image
-    for i, (a, b, _) in enumerate(cues):
-        nxt = f"c{i}"
-        parts.append(f"[{cur}][{i+cap_start}:v]overlay=0:{CAP_Y}:enable=between(t\\,{a:.2f}\\,{b:.2f})[{nxt}]")
-        cur = nxt
-    # brand frame on top, then the title inside the blue block
-    parts.append(f"[{cur}][{frame_idx}:v]overlay=0:0[fr]")
+    # one pre-composited caption strip (see render_caption_track), then the brand frame on top,
+    # then the title inside the blue block
+    parts.append(f"[bg][{cap_idx}:v]overlay=0:{CAP_Y}[cap]")
+    parts.append(f"[cap][{frame_idx}:v]overlay=0:0[fr]")
     parts.append(f"[fr][{title_idx}:v]overlay={TITLE_X}:{TITLE_Y}[v]")
     fc = ";".join(parts)
 
@@ -330,7 +410,33 @@ def splice_intro(content, dur, hook_end, out):
         print(r.stderr[-1800:]); return False
     return True
 
+def demo():
+    cues = [(0.0, 1.0, [("a", 0.0, 0.5), ("b", 0.5, 1.0)]),
+            (2.0, 3.0, [("c", 2.0, 3.0)])]
+    assert active_word(cues, 0.1) == (0, 0)
+    assert active_word(cues, 0.7) == (0, 1)          # second word once its start has passed
+    assert active_word(cues, 1.5) is None            # gap between cues -> blank strip
+    assert active_word(cues, 2.5) == (1, 0)
+    assert active_word(cues, 99) is None
+    img = render_cue(cues[0][2], 1)
+    assert img.size == (W, CAP_H) and img.mode == "RGBA"
+    d = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
+    font = ImageFont.truetype(FONT, 64)
+    lines, _ = layout_words(d, ["word"] * 12, font, W - 60)
+    assert len(lines) > 1, "a long cue must wrap instead of running off the frame"
+    assert sum(len(l) for l, _ in lines) == 12, "wrapping must not drop or duplicate a word"
+
+    img = [{"kind": "image"}]
+    assert slideshow_risk(img, 60) and "slideshow risk" in slideshow_risk(img, 60)
+    assert slideshow_risk(img * 6, 60) is None                  # enough stills -> fine
+    assert slideshow_risk([{"kind": "video"}], 60) is None      # motion footage -> never a slideshow
+    assert slideshow_risk(img, 8) is None                       # short reel, one still is fine
+    print("make-reel.py self-check ok")
+
+
 def main():
+    if sys.argv[1] == "--demo":
+        demo(); return
     if sys.argv[1] == "--json":
         post = json.load(open(sys.argv[2]))
         out = sys.argv[3] if len(sys.argv) > 3 else os.path.expanduser("~/Downloads/reel-demo.mp4")

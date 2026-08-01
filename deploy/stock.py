@@ -8,7 +8,8 @@ Emits exactly make-reel.py's media shape: [{"url","kind"}], so the output pastes
 --json payload's "media" field.
 
 Usage: PEXELS_API_KEY=... stock.py "ai investing" [count] [--photos]
-       stock.py --demo          # offline self-check, no key needed
+       stock.py "1950s wall street" 3 --archive   # Internet Archive, no key at all
+       stock.py --demo                            # offline self-check, no key needed
 """
 import json, os, sys, urllib.parse, urllib.request
 
@@ -33,8 +34,35 @@ def pick_file(files, target_w=TARGET_W):
     return min(big, key=lambda f: (f["width"] < f["height"] and 0 or 1, abs(f["width"] - target_w)))
 
 
-def search(query, count=3, kind="video", key=None):
-    """[{"url","kind"}] for `query`. kind='video' (b-roll, preferred) or 'photo' (Ken Burns)."""
+def search_archive(query, count=3):
+    """Public-domain motion footage from the Internet Archive — no key at all (unlike Pexels), and
+    real footage rather than stock b-roll, which is the difference between a video that looks
+    researched and one that looks generic. The free-archive path from OpenMontage."""
+    q = urllib.parse.urlencode({"q": f"{query} AND mediatype:(movies)", "rows": max(1, count) * 2,
+                                "page": 1, "output": "json"}) + "&fl%5B%5D=identifier"
+    docs = json.load(urllib.request.urlopen(
+        f"https://archive.org/advancedsearch.php?{q}", timeout=25)).get("response", {}).get("docs", [])
+    out = []
+    for doc in docs:
+        if len(out) >= count:
+            break
+        ident = doc.get("identifier")
+        try:
+            meta = json.load(urllib.request.urlopen(f"https://archive.org/metadata/{ident}", timeout=25))
+        except Exception:
+            continue
+        mp4 = next((f["name"] for f in meta.get("files", []) if f.get("name", "").lower().endswith(".mp4")), None)
+        if mp4:
+            out.append({"url": f"https://archive.org/download/{ident}/{urllib.parse.quote(mp4)}",
+                        "kind": "video"})
+    return out
+
+
+def search(query, count=3, kind="video", key=None, source="pexels"):
+    """[{"url","kind"}] for `query`. kind='video' (b-roll, preferred) or 'photo' (Ken Burns).
+    source='archive' uses the Internet Archive instead and needs no key."""
+    if source == "archive":
+        return search_archive(query, count)
     key = key or os.environ.get("PEXELS_API_KEY")
     if not key:
         raise SystemExit("set PEXELS_API_KEY (free: https://www.pexels.com/api/)")
@@ -68,4 +96,5 @@ if __name__ == "__main__":
         demo(); sys.exit(0)
     q = sys.argv[1]
     n = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 3
-    print(json.dumps(search(q, n, "photo" if "--photos" in sys.argv else "video"), indent=2))
+    print(json.dumps(search(q, n, "photo" if "--photos" in sys.argv else "video",
+                            source="archive" if "--archive" in sys.argv else "pexels"), indent=2))

@@ -12,7 +12,7 @@ Run with the python that owns faster-whisper: /opt/homebrew/bin/python3
 Usage: make-shorts.py <video.mp4> [count] [outdir]
        make-shorts.py --demo          # offline self-check
 """
-import json, os, subprocess, sys
+import array, json, os, subprocess, sys
 
 MODEL = os.environ.get("SHORTS_MODEL", "sonnet")
 MIN_S, MAX_S = 20, 60
@@ -41,7 +41,13 @@ mid-sentence), and must make sense with no surrounding context. Prefer a clean s
 point over a longer rambling one. `title` is the on-screen hook, not a description.
 
 TRANSCRIPT (each line is `start-end text`, seconds):
-{transcript}"""
+{transcript}
+{peaks}"""
+
+PEAKS_NOTE = """
+AUDIO PEAKS (seconds): {peaks}
+These are the loudest moments — laughter, emphasis, a raised voice. The transcript cannot show
+them. Treat a peak as evidence of an emotional beat, but only if the words there also stand up."""
 
 
 def transcribe(video, lang=None):
@@ -51,9 +57,36 @@ def transcribe(video, lang=None):
     return [(s.start, s.end, s.text.strip()) for s in segs if s.text.strip()]
 
 
-def rank(segments, count=3, model=MODEL):
+def rms_windows(video, rate=1000, window=1.0):
+    """(time, loudness) per window. Decoded mono at 1 kHz — that is plenty to trace a loudness
+    envelope, and it keeps the pure-Python sum-of-squares small enough to stay instant on a
+    long video."""
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", video, "-ac", "1", "-ar", str(rate),
+                          "-f", "s16le", "-"], capture_output=True).stdout
+    a = array.array("h")
+    a.frombytes(raw[:len(raw) // 2 * 2])
+    n = max(1, int(rate * window))
+    return [(i / rate, (sum(s * s for s in a[i:i + n]) / n) ** 0.5)
+            for i in range(0, max(0, len(a) - n), n)]
+
+
+def pick_peaks(levels, top=10, min_gap=8.0):
+    """Loudest windows, spread out — without a gap one loud stretch swallows every slot and the
+    model gets ten timestamps that are all the same moment."""
+    out = []
+    for t, v in sorted(levels, key=lambda x: -x[1]):
+        if all(abs(t - u) >= min_gap for u in out):
+            out.append(t)
+        if len(out) >= top:
+            break
+    return sorted(out)
+
+
+def rank(segments, count=3, model=MODEL, peaks=()):
     lines = "\n".join(f"{a:.1f}-{b:.1f} {t}" for a, b, t in segments)
-    prompt = RUBRIC.format(count=count, min_s=MIN_S, max_s=MAX_S, transcript=lines[:120000])
+    note = PEAKS_NOTE.format(peaks=", ".join(f"{p:.0f}" for p in peaks)) if peaks else ""
+    prompt = RUBRIC.format(count=count, min_s=MIN_S, max_s=MAX_S,
+                           transcript=lines[:120000], peaks=note)
     proc = subprocess.run(["claude", "-p", prompt, "--output-format", "json",
                            "--model", model, "--json-schema", json.dumps(SCHEMA)],
                           capture_output=True, text=True, timeout=600)
@@ -92,6 +125,12 @@ def demo():
     a, b = snap({"start": 0.0, "end": 999}, segs)          # runaway end -> capped
     assert b - a <= MAX_S, f"clip should cap at {MAX_S}s, got {b - a}"
     assert snap({"start": 1, "end": 2}, []) == (1, 2)      # no transcript -> pass through
+
+    levels = [(0.0, 9), (1.0, 100), (2.0, 98), (30.0, 90), (60.0, 10)]
+    p = pick_peaks(levels, top=3, min_gap=8.0)
+    assert p == [1.0, 30.0, 60.0], f"loud neighbours must collapse to one peak, got {p}"
+    assert pick_peaks(levels, top=1) == [1.0]
+    assert pick_peaks([]) == []
     print("make-shorts.py self-check ok")
 
 
@@ -104,8 +143,9 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     print("transcribing…")
     segs = transcribe(video)
-    print(f"  {len(segs)} segments; ranking…")
-    for i, c in enumerate(sorted(rank(segs, count), key=lambda c: -c["score"])[:count], 1):
+    peaks = pick_peaks(rms_windows(video))
+    print(f"  {len(segs)} segments, {len(peaks)} audio peaks; ranking…")
+    for i, c in enumerate(sorted(rank(segs, count, peaks=peaks), key=lambda c: -c["score"])[:count], 1):
         a, b = snap(c, segs)
         out = os.path.join(outdir, f"short{i}.mp4")
         ok = cut(video, a, b, out)
