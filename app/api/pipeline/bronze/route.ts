@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getBronze } from '@/app/lib/lake';
+import { getBronze, countPending } from '@/app/lib/lake';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10), 500);
 
     const rows = await getBronze(marketId, status, limit);
-    return NextResponse.json({ articles: rows, count: rows.length });
+    // `count` is this page; `pending` is the real unclassified backlog.
+    const pending = await countPending('bronze', marketId);
+    return NextResponse.json({ articles: rows, count: rows.length, pending });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[bronze]', msg);

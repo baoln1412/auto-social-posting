@@ -14,7 +14,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getSilver, getBronzeByIds, markBronzeClassified, insertSilver, type SilverInput,
+  getSilver, getBronzeByIds, markBronzeClassified, insertSilver, countPending,
+  type SilverInput,
 } from '@/app/lib/lake';
 import { validTopics } from '@/app/lib/topics';
 import { parseJsonBody } from '@/app/lib/jsonBody';
@@ -32,7 +33,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10), 500);
 
     const rows = await getSilver(marketId, status, limit);
-    return NextResponse.json({ items: rows, count: rows.length });
+    // `count` is this page; `pending` is the real ungenerated backlog.
+    const pending = await countPending('silver', marketId);
+    return NextResponse.json({ items: rows, count: rows.length, pending });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[silver][GET]', msg);

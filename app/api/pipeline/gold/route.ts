@@ -70,6 +70,31 @@ function bodyMismatched(item: GoldItem, df: Map<string, number>, n: number): boo
   return true;
 }
 
+/**
+ * DuckDB binds primitives only: an `undefined` or an array value fails the INSERT with
+ * "Cannot create values of type ANY", which throws mid-batch and takes every good item
+ * with it. Catch the shape here so one malformed item is rejected on its own, with a
+ * reason the agent can act on, instead of a 500 that reads as "server broken, resend".
+ */
+const TEXT_FIELDS = [
+  'emoji_title', 'body_text', 'summary', 'hook', 'hashtags',
+  'comment_1', 'comment_2', 'image_prompt', 'language',
+] as const;
+
+function badShape(i: GoldItem): string | null {
+  for (const f of TEXT_FIELDS) {
+    const v = (i as any)[f];
+    if (v === undefined || v === null) continue; // optional — defaulted at insert
+    if (typeof v !== 'string') {
+      return `${f} must be a string, got ${Array.isArray(v) ? 'an array' : typeof v}` +
+        (f === 'hashtags' ? ' — send the tags as one space-separated string.' : '.');
+    }
+  }
+  if (!i.emoji_title?.trim()) return 'emoji_title is required and must be a non-empty string.';
+  if (!i.body_text?.trim()) return 'body_text is required and must be a non-empty string.';
+  return null;
+}
+
 interface GoldItem {
   silver_id: string;
   emoji_title: string;
@@ -104,6 +129,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     for (const i of items) {
       const s = byId.get(i.silver_id);
       if (!s) continue;
+
+      const shape = badShape(i);
+      if (shape) {
+        rejected.push({ silver_id: i.silver_id, reason: shape });
+        continue;
+      }
 
       if (!dfCache.has(s.market_id)) dfCache.set(s.market_id, await buildDf(s.market_id));
       const { df, n } = dfCache.get(s.market_id)!;

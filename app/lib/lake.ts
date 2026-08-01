@@ -224,6 +224,25 @@ export async function getBronze(
   );
 }
 
+/**
+ * True backlog for a pipeline queue. The GET routes return a *capped page*, so
+ * `items.length` hitting the limit reads as "the queue is that big" when it is
+ * only "the page is full" — that misread cost a pipeline run a false alarm.
+ */
+export async function countPending(
+  layer: 'bronze' | 'silver',
+  marketId: string,
+): Promise<number> {
+  const [table, col] = layer === 'bronze'
+    ? ['bronze_news', 'classified']
+    : ['silver_immigration', 'generated'];
+  const rows = await all(
+    `SELECT COUNT(*) AS c FROM ${table} WHERE market_id = ? AND ${col} = false`,
+    [marketId],
+  );
+  return num(rows[0]?.c);
+}
+
 export async function markBronzeClassified(ids: string[]): Promise<void> {
   for (const id of ids) {
     await run('UPDATE bronze_news SET classified = true WHERE id = ?', [id]);
