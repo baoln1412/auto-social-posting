@@ -12,16 +12,20 @@ interact with it over HTTP, never by opening the DB file. Run the steps in order
 ## Hard rules
 - **Output language: Vietnamese.** All generated content (titles, body, summary,
   hashtags) MUST be written in natural Vietnamese for a Vietnamese audience.
-- **Trusted sources only.** Only use/cite the approved sources (already enforced by
-  the configured feeds): The Guardian, Newsweek, The New York Times, Fox News
-  Digital, Times of India, SWR Aktuell, Yahoo News/Scout, Yahoo奇摩, China Times,
-  Dân trí, and official provincial/municipal Police announcements. Do not invent
-  facts or cite anything outside the article you are given.
+- **Sources are the per-market configured feeds** — established outlets with an
+  editorial masthead, chosen per market in Settings. That feed list is the single
+  source of truth; no list is duplicated here, because a copy in this file drifts
+  from the config and then lies about what is enforced. **Cite the source on every
+  post. Never invent facts, and never cite anything outside the article you are
+  given.** (Historical note: this rule used to name a fixed nine-outlet whitelist and
+  claim the feeds enforced it. They never did — measured 2026-08-02, 43 of 55 enabled
+  feeds sat outside that list and 81% of published posts came from them. The list
+  described the original US/UK tool, not the seven-market one.)
 - **LLM does filtering + dedup** (no keyword lists). You decide immigration
   relevance and same-event duplicates with judgement.
-- **Sources are multilingual.** Article titles/descriptions may be in the source
-  country's language — English (Guardian/Newsweek/NYT/Fox/Times of India),
-  German (SWR Aktuell), Chinese (Yahoo奇摩, China Times), or Vietnamese (Dân trí).
+- **Sources are multilingual.** Article titles/descriptions arrive in the market's
+  own language — English (US/UK/India/Australia), German (Germany), Vietnamese
+  (Vietnam), and Italian/French/Finnish among others in the Others catch-all.
   Read and classify each article **in its original language** — do NOT skip or
   down-rank an article just because it isn't English. Regardless of source
   language, the generated `body_text` output is always Vietnamese (§ Step 4).
