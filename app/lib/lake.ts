@@ -516,6 +516,34 @@ export async function setGoldImages(id: string, imageUrl: string, insetUrl: stri
   return true;
 }
 
+/** Text fields of a published post that may be corrected in place. */
+const EDITABLE_GOLD_FIELDS = [
+  'emoji_title', 'body_text', 'summary', 'hook', 'hashtags',
+  'comment_1', 'comment_2', 'image_prompt',
+] as const;
+export type EditableGoldField = (typeof EDITABLE_GOLD_FIELDS)[number];
+
+/**
+ * Correct a published post's text. There was no way to fix a post short of deleting
+ * it — and deleting the gold row alone loses it for good, because its silver row
+ * stays `generated = true` and never comes back round. Column names come from the
+ * whitelist above, never from the caller.
+ */
+export async function updateGoldText(
+  id: string,
+  fields: Partial<Record<EditableGoldField, string>>,
+): Promise<number> {
+  const cols = (Object.keys(fields) as EditableGoldField[])
+    .filter((f) => EDITABLE_GOLD_FIELDS.includes(f) && typeof fields[f] === 'string');
+  if (cols.length === 0) return 0;
+  await run(
+    `UPDATE gold_content SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
+    [...cols.map((c) => fields[c] as string), id],
+  );
+  const check = await all('SELECT COUNT(*) AS c FROM gold_content WHERE id = ?', [id]);
+  return num(check[0]?.c);
+}
+
 export interface GoldFilter {
   marketId: string;
   source?: string;

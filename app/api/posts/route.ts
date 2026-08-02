@@ -8,7 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getGold, deleteGold, moveGold, setGoldImages } from '@/app/lib/lake';
+import {
+  getGold, deleteGold, moveGold, setGoldImages, updateGoldText, type EditableGoldField,
+} from '@/app/lib/lake';
 import { PostDraft } from '@/app/types';
 
 export const dynamic = 'force-dynamic';
@@ -86,11 +88,31 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 /**
  * PATCH /api/posts —
  *   • Save card images:  { id, imageUrl, insetUrl }  (persist hand-picked images)
+ *   • Correct post text: { id, fields: { hashtags?, body_text?, … } }
  *   • Move to a market:  { ids: string[], marketId }
  */
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json().catch(() => ({}));
+
+    // Text correction. The gold endpoint rejects corrupted items on the way in, but
+    // posts already published with mojibake (a lost Vietnamese Đ) had no repair path
+    // at all short of deleting them — and a deleted gold row never regenerates,
+    // because its silver row stays marked generated.
+    if (body.id && body.fields && typeof body.fields === 'object') {
+      const fields = body.fields as Partial<Record<EditableGoldField, string>>;
+      for (const [k, v] of Object.entries(fields)) {
+        if (typeof v === 'string' && v.includes('�')) {
+          return NextResponse.json(
+            { error: `${k} still contains U+FFFD (�) — send the corrected character, not the broken one.` },
+            { status: 400 },
+          );
+        }
+      }
+      const updated = await updateGoldText(body.id, fields);
+      if (updated === 0) return NextResponse.json({ error: 'No post with that id' }, { status: 404 });
+      return NextResponse.json({ ok: true, updated: Object.keys(fields) });
+    }
 
     if (body.id && (body.imageUrl !== undefined || body.insetUrl !== undefined)) {
       await setGoldImages(body.id, body.imageUrl ?? '', body.insetUrl ?? '');
