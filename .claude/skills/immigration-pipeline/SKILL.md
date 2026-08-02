@@ -135,10 +135,16 @@ For each market id:
    residue of ungenerated rows is **expected** — it is the top-15 cap below doing
    its job, not a stuck queue.
    **PER-MARKET RELEVANCE CAP (cost control):** with 12 topics far more articles
-   qualify, so do NOT generate every ungenerated silver row. Sort the returned rows by
-   `relevance_score` (desc) and generate only the **top 15 per market per cycle**
-   (the rest stay ungenerated and get reconsidered next cycle). This keeps generation
-   inside subscription rate limits.
+   qualify, so do NOT generate every ungenerated silver row. Generate only the
+   **top 15 per market per cycle** (the rest stay ungenerated and get reconsidered
+   next cycle). This keeps generation inside subscription rate limits.
+   **Rank `groundable` rows first, then by `relevance_score` (desc).** Each row carries
+   a `groundable` flag: `false` means its link is a Google News redirect stub whose
+   article body can never be fetched, so the post could only be written from a
+   headline. Ranking on relevance alone spends cap slots on rows you will then have to
+   refuse — Australia generated 9 of 15 because 6 of the picked rows were stubs.
+   A market that is mostly stubs will still run short of 15; that is correct and
+   expected, and **never a reason to pad a thin story into 400 words.**
 2. **Pull the real article text for the 15 you picked — and only those 15:**
    `curl -s "http://localhost:3000/api/pipeline/silver?ids=<id1,id2,...>&withBody=1"`
    Feed blurbs run a median of 141 characters, which is why posts drifted toward

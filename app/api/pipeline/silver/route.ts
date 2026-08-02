@@ -28,6 +28,18 @@ import { parseJsonBody } from '@/app/lib/jsonBody';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
+/**
+ * Can this row's article body ever be fetched? Known before any network call, because
+ * a Google News link is a redirect stub that yields nothing. Matters at SELECTION
+ * time: the top-15 cap was spent on relevance alone, so ungroundable rows took slots
+ * and were then correctly refused as unwritable — Australia generated 9 of 15 with 6
+ * stubs sitting in the picked set. `true` is "worth trying", not a guarantee: a
+ * paywall or a failed fetch still lands on an empty body.
+ */
+function groundable(row: Record<string, any>): boolean {
+  return !String(row.article_url ?? '').includes('news.google.com');
+}
+
 /** Attach the real article text to each row, fetching only what isn't cached yet. */
 async function attachBodies(rows: Record<string, any>[]): Promise<Record<string, any>[]> {
   const cached = await getBronzeContent(rows.map((r) => String(r.bronze_id)));
@@ -58,6 +70,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (ids.length > 0) {
       const picked = await getSilverByIds(ids.slice(0, 50));
       const items = searchParams.get('withBody') === '1' ? await attachBodies(picked) : picked;
+      items.forEach((r) => { r.groundable = groundable(r); });
       return NextResponse.json({ items, count: items.length });
     }
 
@@ -68,6 +81,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10), 500);
 
     const rows = await getSilver(marketId, status, limit);
+    rows.forEach((r) => { r.groundable = groundable(r); });
     // `count` is this page; `pending` is the real ungenerated backlog.
     const pending = await countPending('silver', marketId);
     return NextResponse.json({ items: rows, count: rows.length, pending });
