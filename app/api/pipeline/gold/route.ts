@@ -92,6 +92,18 @@ function badShape(i: GoldItem): string | null {
   }
   if (!i.emoji_title?.trim()) return 'emoji_title is required and must be a non-empty string.';
   if (!i.body_text?.trim()) return 'body_text is required and must be a non-empty string.';
+
+  // U+FFFD means a character was already lost before this payload arrived — it cannot
+  // be recovered here, only detected. Two published posts carry `#Cộng<FFFD>đồng…`
+  // where the Đ died, so the mojibake ships to the reader. Reject rather than repair:
+  // guessing the intended character would silently rewrite published Vietnamese.
+  for (const f of TEXT_FIELDS) {
+    const v = (i as any)[f];
+    if (typeof v === 'string' && v.includes('�')) {
+      return `${f} contains U+FFFD (�) — a character was corrupted before sending, ` +
+        'most often a Vietnamese capital Đ. Re-encode the payload and resend this item.';
+    }
+  }
   return null;
 }
 
