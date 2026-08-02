@@ -19,6 +19,11 @@ fi
 echo $$ > "$LOCK"
 trap 'rm -f "$LOCK"' EXIT INT TERM
 
+# Tells the skill the lock is already held on its behalf. Without this the skill's
+# own lock check (Step 0) would see this wrapper's fresh lock and abort every
+# scheduled run as if it were a collision.
+export IMM_PIPELINE_LOCK_HELD=1
+
 # Headless run of the project skill. `--permission-mode bypassPermissions` lets it
 # run curl/bash unattended; remove it if you prefer to pre-approve a tool allowlist.
 claude -p "Run the /immigration-pipeline skill to completion. Do every step." \

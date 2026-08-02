@@ -30,6 +30,27 @@ interact with it over HTTP, never by opening the DB file. Run the steps in order
   down-rank an article just because it isn't English. Regardless of source
   language, the generated `body_text` output is always Vietnamese (§ Step 4).
 
+## Step 0 — Take the run lock (do this FIRST, before any crawl)
+Two cycles running at once corrupt each other: they share scratch files and re-read
+each other's half-written state, which is the exact condition behind the cross-item
+mixups warned about in Step 4. `deploy/run-pipeline.sh` already locks the scheduled
+and Settings-button runs against each other, but a cycle started by hand in a session
+bypasses that wrapper and is invisible to it — that collision has happened.
+
+```bash
+if [ -n "$IMM_PIPELINE_LOCK_HELD" ]; then
+  echo "lock held by run-pipeline.sh — proceed"        # scheduled run: already locked
+elif [ -f data/pipeline.lock ] && [ $(( $(date +%s) - $(stat -f %m data/pipeline.lock) )) -lt 1800 ]; then
+  echo "ABORT: another pipeline cycle is in progress"; exit 1
+else
+  echo $$ > data/pipeline.lock                          # took it; release in Step 5
+fi
+```
+**If it says ABORT, stop — do not run the cycle.** A lock older than 30 minutes is a
+crashed run and may be taken over. Use a **per-run scratch path** (e.g.
+`/tmp/imm_pipeline_$$`), never a fixed one, so even a bypassed lock cannot make two
+runs read each other's files.
+
 ## Step 1 — Crawl (bronze)
 Run: `curl -s -X POST http://localhost:3000/api/pipeline/crawl`
 This pulls the last 24h from every market's feeds into bronze and deletes bronze >7d.
@@ -236,8 +257,16 @@ For each market id:
    accumulated array):
    `curl -s -X POST http://localhost:3000/api/pipeline/gold -H 'Content-Type: application/json' -d '{"items":[{"silver_id":"...","emoji_title":"...","body_text":"...","hashtags":"...","comment_1":"...","comment_2":"...","summary":"...","image_prompt":"...","language":"vi"}]}'`
 
-## Step 5 — Report
+## Step 5 — Report and release the lock
 Summarize per market: bronze crawled, silver kept (with a topic breakdown), gold generated.
+
+Then release the lock **only if Step 0 is the one that took it** — if
+`IMM_PIPELINE_LOCK_HELD` was set, the wrapper owns it and removes it itself:
+```bash
+[ -n "$IMM_PIPELINE_LOCK_HELD" ] || rm -f data/pipeline.lock
+```
+Release it even when the cycle ends early or errors; otherwise the next scheduled run
+skips itself for 30 minutes until the lock goes stale.
 
 > NOTE: If the user has a fuller content SOP (required structure, tone, demo
 > examples), it lives in `.claude/skills/immigration-pipeline/CONTENT_SOP.md` —
