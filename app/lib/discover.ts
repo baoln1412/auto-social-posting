@@ -171,7 +171,12 @@ export async function discoverFeeds(
       COMMON_FEED_PATHS.map(async (path) => {
         const feedUrl = `${base}${path}`;
         if (found.some((d) => d.url === feedUrl)) return null;
-        const doc = await fetchDoc(feedUrl, 6000);
+        // 12s, not 6s: probes run concurrently so a longer budget costs no extra
+        // wall-clock, and at 6s a slow-but-working feed is indistinguishable from no
+        // feed at all. CIC News answers /feed in 5.9s — it tripped the old limit about
+        // half the time, and the penalty is permanent (Tier 4 ratchets the site to a
+        // Google News wrapper and the real URL is never retried).
+        const doc = await fetchDoc(feedUrl, 12000);
         return doc.ok && looksLikeFeed(doc.text) ? feedUrl : null;
       }),
     ),
