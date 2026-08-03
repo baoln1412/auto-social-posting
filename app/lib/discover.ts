@@ -5,21 +5,22 @@
  *   2. <link rel="alternate" rss|atom> in the page     → html-link
  *   3. Probe standard + non-standard feed paths        → probe
  *        (Arc /arc/outboundfeeds/rss, Ippen /rssfeed.rdf, etc.)
- *   4. No native feed → Google News RSS scoped to site → google-news
+ *   4. Google News sitemap (direct URLs, real titles)  → news-sitemap
+ *   5. No native feed → Google News RSS scoped to site → google-news
  *        (bypasses sites whose own feed is bot-walled, e.g. Akamai)
- *   5. Page renders article links server-side          → scrape (web_scrape)
+ *   6. Page renders article links server-side          → scrape (web_scrape)
  */
 
 import { BROWSER_HEADERS, fetchViaPublicDns } from '@/app/lib/crawl';
 
-export type DiscoverMethod = 'direct' | 'html-link' | 'probe' | 'google-news' | 'scrape';
+export type DiscoverMethod = 'direct' | 'html-link' | 'probe' | 'news-sitemap' | 'google-news' | 'scrape';
 
 export interface DiscoveredFeed {
   url: string;
   title?: string;
   type: DiscoverMethod;
   method: string;
-  feedType: 'rss' | 'web_scrape';
+  feedType: 'rss' | 'web_scrape' | 'news_sitemap';
 }
 
 // Standard + real-world non-standard feed paths, probed concurrently.
@@ -109,6 +110,45 @@ function countArticleLinks(html: string): number {
   return seen.size;
 }
 
+/**
+ * Find a sitemap that actually carries news entries. robots.txt is the reliable
+ * index — guessing /news-sitemap.xml misses the ones served off an assets host.
+ * Verified by requiring a real <news:title>, so a plain URL-only sitemap (no titles,
+ * so nothing to generate from) is rejected rather than configured and left empty.
+ */
+async function discoverNewsSitemap(origin: string): Promise<string | null> {
+  const robots = await fetchDoc(`${origin}/robots.txt`, 8000);
+  if (!robots.ok) return null;
+  const listed = [...robots.text.matchAll(/^\s*Sitemap:\s*(\S+)/gim)].map((m) => m[1]);
+  // News-looking sitemaps first: a publisher's main sitemap is usually a huge archive
+  // index, while the news one is the recent window Google polls.
+  const ranked = [
+    ...listed.filter((u) => /news/i.test(u)),
+    ...listed.filter((u) => !/news/i.test(u)),
+  ].slice(0, 3);
+
+  for (const url of ranked) {
+    const doc = await fetchDoc(url, 12000);
+    if (!doc.ok) continue;
+    if (/<news:title>/i.test(doc.text)) return url;
+    // An index lists child sitemaps — check the most recent child before rejecting.
+    if (/<sitemapindex[\s>]/i.test(doc.text)) {
+      const child = [...doc.text.matchAll(/<sitemap>([\s\S]*?)<\/sitemap>/g)]
+        .map((m) => ({
+          loc: m[1].match(/<loc>([\s\S]*?)<\/loc>/)?.[1]?.trim() ?? '',
+          mod: new Date(m[1].match(/<lastmod>([\s\S]*?)<\/lastmod>/)?.[1] ?? 0).getTime() || 0,
+        }))
+        .filter((c) => c.loc)
+        .sort((a, b) => b.mod - a.mod)[0];
+      if (child) {
+        const inner = await fetchDoc(child.loc, 12000);
+        if (inner.ok && /<news:title>/i.test(inner.text)) return url;
+      }
+    }
+  }
+  return null;
+}
+
 function googleNewsFeed(host: string): string {
   const tld = host.split('.').pop() ?? '';
   const loc = TLD_LOCALE[tld] ?? { hl: 'en', gl: 'US', ceid: 'US:en' };
@@ -117,11 +157,11 @@ function googleNewsFeed(host: string): string {
 }
 
 /**
- * Run the 5-tier cascade. Returns the best feed(s), best method first (empty if
+ * Run the 6-tier cascade. Returns the best feed(s), best method first (empty if
  * none). `opts.exclude` lists URLs that must NOT be returned — used by the crawl's
  * self-heal to skip the very feed URL that just failed, so a site that advertises
- * a bot-walled feed (Newsweek) cascades past it to the Tier-4 Google News fallback
- * instead of re-suggesting the same broken URL.
+ * a bot-walled feed (Newsweek) cascades past it to a later tier instead of
+ * re-suggesting the same broken URL.
  */
 export async function discoverFeeds(
   rawUrl: string,
@@ -187,7 +227,24 @@ export async function discoverFeeds(
     }
   }
 
-  // Tier 4 — no native feed → Google News scoped to the site (bot-wall bypass)
+  // Tier 4 — a Google News sitemap, which most newsrooms publish for indexing even
+  // when they retired their RSS. It carries the same three fields an item needs —
+  // direct URL, title, publication date — so it beats the Google News wrapper below
+  // on the thing that matters: the URL is the publisher's, so the body is fetchable.
+  if (found.length === 0) {
+    const sm = await discoverNewsSitemap(origin);
+    if (sm) {
+      add({
+        url: sm,
+        title: 'News sitemap',
+        type: 'news-sitemap',
+        method: 'Google News sitemap (no RSS, but direct article URLs)',
+        feedType: 'news_sitemap',
+      });
+    }
+  }
+
+  // Tier 5 — no native feed → Google News scoped to the site (bot-wall bypass)
   if (found.length === 0) {
     const gn = googleNewsFeed(host);
     const doc = await fetchDoc(gn, 8000);
@@ -202,7 +259,7 @@ export async function discoverFeeds(
     }
   }
 
-  // Tier 5 — last resort → scrape the page HTML for article links
+  // Tier 6 — last resort → scrape the page HTML for article links
   if (found.length === 0 && page.ok && countArticleLinks(page.text) >= 3) {
     add({
       url,

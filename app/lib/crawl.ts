@@ -318,6 +318,91 @@ async function fetchRssFeed(feed: FeedEntry, cutoffTime: Date): Promise<{ articl
   }
 }
 
+// ── Google News sitemap ingestion ────────────────────────────────────────────
+// A third ingestion method, for publishers with no usable RSS. A news sitemap
+// carries everything an RSS item does — direct article URL, real title, precise
+// publication date — so those rows are groundable, unlike the Google News wrapper
+// they replace. Measured 2026-08-03: nine.com.au publishes 153 entries, 70 of them
+// inside 24h, against ~79/day of unfetchable redirect stubs from its wrapper.
+// No description though: a sitemap has no summary field, so these entries lean
+// entirely on extractArticleBody at generation time.
+const SITEMAP_NS = /<news:title>([\s\S]*?)<\/news:title>/;
+
+function decodeXmlText(raw: string): string {
+  return raw
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&amp;/g, '&')
+    .trim();
+}
+
+/** One `<url>` block → an Article, or null when it is too old / not an article. */
+function sitemapEntry(block: string, feedName: string, cutoffTime: Date): Article | null {
+  const url = decodeXmlText(block.match(/<loc>([\s\S]*?)<\/loc>/)?.[1] ?? '');
+  if (!url) return null;
+  const rawDate =
+    block.match(/<news:publication_date>([\s\S]*?)<\/news:publication_date>/)?.[1] ??
+    block.match(/<lastmod>([\s\S]*?)<\/lastmod>/)?.[1] ?? '';
+  const parsed = rawDate ? new Date(rawDate.trim()) : null;
+  // An entry with no parseable date is unknown, not ancient — keep it and let
+  // exact-URL dedup stop it re-entering, matching the RSS path's rule.
+  if (parsed && !Number.isNaN(parsed.getTime()) && parsed.getTime() < cutoffTime.getTime()) return null;
+  const title = decodeXmlText(block.match(SITEMAP_NS)?.[1] ?? '');
+  // No <news:title> means a plain sitemap entry, not a news one. The URL slug is a
+  // poor title and the LLM would be generating from a guess, so skip it.
+  if (!title) return null;
+  return {
+    title,
+    url,
+    pubDate: parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : new Date().toISOString(),
+    source: feedName,
+    description: '',
+  };
+}
+
+async function fetchNewsSitemap(
+  feed: FeedEntry,
+  cutoffTime: Date,
+): Promise<{ articles: Article[]; ok: boolean }> {
+  try {
+    const res = await fetchWithRetry(feed.url, { headers: BROWSER_HEADERS }, { timeoutMs: 15000 });
+    if (!res.ok) throw new Error(`Status code ${res.status}`);
+    let xml = await res.text();
+
+    // A <sitemapindex> lists child sitemaps rather than articles (indailyqld ships
+    // 246 of them). Follow only the few most recently modified — the rest are
+    // archive shards, and fetching all of them would be hundreds of requests.
+    if (/<sitemapindex[\s>]/i.test(xml)) {
+      const children = [...xml.matchAll(/<sitemap>([\s\S]*?)<\/sitemap>/g)]
+        .map((m) => ({
+          url: decodeXmlText(m[1].match(/<loc>([\s\S]*?)<\/loc>/)?.[1] ?? ''),
+          mod: new Date(m[1].match(/<lastmod>([\s\S]*?)<\/lastmod>/)?.[1] ?? 0).getTime() || 0,
+        }))
+        .filter((c) => c.url)
+        .sort((a, b) => b.mod - a.mod)
+        .slice(0, 3);
+      const parts = await Promise.allSettled(
+        children.map(async (c) =>
+          (await fetchWithRetry(c.url, { headers: BROWSER_HEADERS }, { retries: 0, timeoutMs: 15000 })).text(),
+        ),
+      );
+      xml = parts.map((p) => (p.status === 'fulfilled' ? p.value : '')).join('');
+    }
+
+    const articles: Article[] = [];
+    for (const m of xml.matchAll(/<url>([\s\S]*?)<\/url>/g)) {
+      const entry = sitemapEntry(m[1], feed.name, cutoffTime);
+      if (entry) articles.push(entry);
+    }
+    return { articles, ok: true };
+  } catch (err) {
+    console.error(`[crawl] sitemap "${feed.name}" failed:`, err);
+    return { articles: [], ok: false };
+  }
+}
+
 // ── Article body extraction (firecrawl pattern, built with cheerio) ──────────
 // Web-scraped listing entries reach the LLM with an empty description — a bare
 // headline — so the silver/gold stages generate Vietnamese content from almost
@@ -417,7 +502,11 @@ export async function crawlFeeds(
   cutoff: Date,
 ): Promise<{ articles: Article[]; perFeed: { name: string; status: 'ok' | 'failed'; count: number }[] }> {
   const results = await Promise.allSettled(
-    feeds.map((f) => (f.feedType === 'web_scrape' ? fetchWebScrape(f) : fetchRssFeed(f, cutoff))),
+    feeds.map((f) =>
+      f.feedType === 'web_scrape' ? fetchWebScrape(f)
+      : f.feedType === 'news_sitemap' ? fetchNewsSitemap(f, cutoff)
+      : fetchRssFeed(f, cutoff),
+    ),
   );
   const perFeed: { name: string; status: 'ok' | 'failed'; count: number }[] = [];
   const all: Article[] = [];
