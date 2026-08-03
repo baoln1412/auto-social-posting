@@ -49,7 +49,7 @@ function publicLookup(hostname: string, options: any, callback: (...a: any[]) =>
  * ponytail: bodies are decoded as UTF-8 — every feed in the config is UTF-8, and a
  * mis-decode surfaces loudly as U+FFFD, which the gold stage already rejects.
  */
-function fetchViaPublicDns(
+export function fetchViaPublicDns(
   url: string,
   headers: Record<string, string>,
   timeoutMs: number,

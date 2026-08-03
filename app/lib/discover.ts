@@ -10,7 +10,7 @@
  *   5. Page renders article links server-side          → scrape (web_scrape)
  */
 
-import { BROWSER_HEADERS } from '@/app/lib/crawl';
+import { BROWSER_HEADERS, fetchViaPublicDns } from '@/app/lib/crawl';
 
 export type DiscoverMethod = 'direct' | 'html-link' | 'probe' | 'google-news' | 'scrape';
 
@@ -49,7 +49,19 @@ async function fetchDoc(url: string, timeoutMs: number): Promise<{ ok: boolean; 
     if (!res.ok) return { ok: false, text: '' };
     return { ok: true, text: await res.text() };
   } catch {
-    return { ok: false, text: '' };
+    // Discovery has to survive a sinkholed host for the same reason the crawl does —
+    // and here it matters more. A host the local resolver lies about looks to this
+    // cascade like a site with no feed at all, so step 4 repoints it at a Google News
+    // wrapper: thin blurbs, unfetchable redirect stubs, and the original never retried.
+    // That ratchet is where this market's Google News feeds came from. Retry over
+    // public DNS so a site's own feed is found before we give up on it.
+    try {
+      const res = await fetchViaPublicDns(url, BROWSER_HEADERS, timeoutMs);
+      if (!res.ok) return { ok: false, text: '' };
+      return { ok: true, text: await res.text() };
+    } catch {
+      return { ok: false, text: '' };
+    }
   }
 }
 
@@ -142,14 +154,27 @@ export async function discoverFeeds(
   // Tier 2 — <link rel="alternate"> advertised in the page HTML
   if (page.ok) for (const f of extractFeedLinks(page.text, url)) add(f);
 
-  // Tier 3 — probe standard + non-standard feed paths
+  // Tier 3 — probe standard + non-standard feed paths.
+  // Probed under the given URL's own section as well as the origin: a newsroom's feed
+  // routinely sits beside its section rather than at the root (SBS publishes at
+  // /news/feed, nothing at /feed), so an origin-only probe declares "no native feed"
+  // and hands the site to the Google News fallback while its real feed sits one
+  // directory down. Section first — it is the more specific answer when both exist.
+  // Probe under the URL's *directory*: /news/ → /news, but /rss.xml → the root, so a
+  // feed URL handed in by hand doesn't spend 19 requests on /rss.xml/feed and friends.
+  const segments = new URL(url).pathname.split('/').filter(Boolean);
+  if (segments.length && segments[segments.length - 1].includes('.')) segments.pop();
+  const section = segments.length ? `${origin}/${segments.join('/')}` : origin;
+  const bases = section !== origin ? [section, origin] : [origin];
   const probes = await Promise.allSettled(
-    COMMON_FEED_PATHS.map(async (path) => {
-      const feedUrl = `${origin}${path}`;
-      if (found.some((d) => d.url === feedUrl)) return null;
-      const doc = await fetchDoc(feedUrl, 6000);
-      return doc.ok && looksLikeFeed(doc.text) ? feedUrl : null;
-    }),
+    bases.flatMap((base) =>
+      COMMON_FEED_PATHS.map(async (path) => {
+        const feedUrl = `${base}${path}`;
+        if (found.some((d) => d.url === feedUrl)) return null;
+        const doc = await fetchDoc(feedUrl, 6000);
+        return doc.ok && looksLikeFeed(doc.text) ? feedUrl : null;
+      }),
+    ),
   );
   for (const p of probes) {
     if (p.status === 'fulfilled' && p.value) {
