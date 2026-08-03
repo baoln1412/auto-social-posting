@@ -14,6 +14,7 @@ import dns from 'node:dns';
 import https from 'node:https';
 import http from 'node:http';
 import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import type { Article } from '@/app/types';
 
 // ── Fallback transport for hosts the local resolver lies about ───────────────
@@ -43,6 +44,22 @@ function publicLookup(hostname: string, options: any, callback: (...a: any[]) =>
 }
 
 /**
+ * Servers stuck on pre-RFC-5746 TLS renegotiation — baotintuc.vn is one — are refused
+ * outright by Node 20/OpenSSL 3 with ERR_SSL_UNSAFE_LEGACY_RENEGOTIATION_DISABLED, so
+ * they read as "bot-walled" when nothing is blocking us at all.
+ *
+ * This flag only permits connecting to a server that lacks *secure renegotiation*; it
+ * does not lower the protocol version or weaken cipher selection, and against a modern
+ * server the connection is byte-identical. The protection it relaxes is against a 2009
+ * MITM renegotiation splice (CVE-2009-3555) — and this path fetches public news pages
+ * with no credentials, cookies, or request body to splice into. Scoped to this fallback
+ * transport, which only runs after a normal fetch has already failed.
+ */
+const legacyTlsAgent = new https.Agent({
+  secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
+});
+
+/**
  * GET a URL over stdlib http(s) with `publicLookup`, returned as a real `Response`
  * so callers keep using `.ok` / `.status` / `.text()` unchanged.
  * Follows redirects and decompresses, because `fetch` does both and feeds rely on it.
@@ -61,7 +78,12 @@ export function fetchViaPublicDns(
     const mod = target.protocol === 'http:' ? http : https;
     const req = mod.request(
       target,
-      { headers, lookup: publicLookup as never, timeout: timeoutMs },
+      {
+        headers,
+        lookup: publicLookup as never,
+        timeout: timeoutMs,
+        ...(target.protocol === 'https:' && { agent: legacyTlsAgent }),
+      },
       (res) => {
         const status = res.statusCode ?? 0;
         const location = res.headers.location;
