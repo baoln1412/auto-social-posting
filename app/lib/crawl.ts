@@ -10,7 +10,89 @@
 
 import Parser from 'rss-parser';
 import * as cheerio from 'cheerio';
+import dns from 'node:dns';
+import https from 'node:https';
+import http from 'node:http';
+import zlib from 'node:zlib';
 import type { Article } from '@/app/types';
+
+// ── Fallback transport for hosts the local resolver lies about ───────────────
+// Measured 2026-08-03: `sbs.com.au` resolves to 127.0.0.1 on this machine — the
+// local resolver sinkholes it — so every request died on a TLS alert raised by a
+// *local* listener and never reached SBS at all. That reads exactly like an Akamai
+// bot wall and was misdiagnosed as one twice, costing SBS (a third of Australia's
+// crawl) to the ungroundable Google News fallback.
+//
+// stdlib `https.request` takes a `lookup` directly, so the resolver is swapped with
+// no dependency and no global state. Deliberately NOT done via undici's global
+// dispatcher: Next patches `globalThis.fetch`, so a dispatcher installs cleanly and
+// then never applies — it logged success while every fetch still hit the sinkhole.
+const resolver = new dns.Resolver();
+resolver.setServers(['8.8.8.8', '1.1.1.1']);
+
+/** dns.lookup shape, but answered by public DNS and refusing loopback answers. */
+function publicLookup(hostname: string, options: any, callback: (...a: any[]) => void): void {
+  resolver.resolve4(hostname, (err, addresses) => {
+    // A resolver outage must not take the crawl down — fall back to the OS.
+    if (err || !addresses?.length) return dns.lookup(hostname, options, callback);
+    const usable = addresses.filter((a) => !a.startsWith('127.') && a !== '0.0.0.0');
+    if (!usable.length) return callback(new Error(`${hostname} is DNS-sinkholed`));
+    if (options?.all) return callback(null, usable.map((address) => ({ address, family: 4 })));
+    callback(null, usable[0], 4);
+  });
+}
+
+/**
+ * GET a URL over stdlib http(s) with `publicLookup`, returned as a real `Response`
+ * so callers keep using `.ok` / `.status` / `.text()` unchanged.
+ * Follows redirects and decompresses, because `fetch` does both and feeds rely on it.
+ * ponytail: bodies are decoded as UTF-8 — every feed in the config is UTF-8, and a
+ * mis-decode surfaces loudly as U+FFFD, which the gold stage already rejects.
+ */
+function fetchViaPublicDns(
+  url: string,
+  headers: Record<string, string>,
+  timeoutMs: number,
+  redirectsLeft = 5,
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    let target: URL;
+    try { target = new URL(url); } catch (e) { return reject(e); }
+    const mod = target.protocol === 'http:' ? http : https;
+    const req = mod.request(
+      target,
+      { headers, lookup: publicLookup as never, timeout: timeoutMs },
+      (res) => {
+        const status = res.statusCode ?? 0;
+        const location = res.headers.location;
+        if ([301, 302, 303, 307, 308].includes(status) && location && redirectsLeft > 0) {
+          res.resume();
+          return resolve(
+            fetchViaPublicDns(new URL(location, target).href, headers, timeoutMs, redirectsLeft - 1),
+          );
+        }
+        const encoding = String(res.headers['content-encoding'] ?? '').toLowerCase();
+        const stream =
+          encoding === 'gzip' ? res.pipe(zlib.createGunzip())
+          : encoding === 'deflate' ? res.pipe(zlib.createInflate())
+          : encoding === 'br' ? res.pipe(zlib.createBrotliDecompress())
+          : res;
+        const chunks: Buffer[] = [];
+        stream.on('data', (c: Buffer) => chunks.push(c));
+        stream.on('error', reject);
+        stream.on('end', () => {
+          // `new Response` rejects a status outside 200–599, and a body on 204/304.
+          if (status < 200 || status > 599) return reject(new Error(`Bad status ${status}`));
+          const body = status === 204 || status === 304 ? null : Buffer.concat(chunks).toString('utf8');
+          resolve(new Response(body, { status }));
+        });
+      },
+    );
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('Feed timeout')));
+    req.end();
+  });
+}
 
 export interface FeedEntry {
   name: string;
@@ -51,6 +133,21 @@ async function fetchWithRetry(
       return res;
     } catch (err) {
       lastErr = err;
+      // fetch() can't reach a host the OS resolver sinkholes, and fails the same way
+      // a bot wall does. Retry once over stdlib with public DNS before giving up —
+      // only on connection-level failures, so a genuine 4xx/5xx still short-circuits.
+      if (!/^HTTP \d/.test(String((err as Error)?.message))) {
+        try {
+          const viaDns = await fetchViaPublicDns(
+            url,
+            (init.headers as Record<string, string>) ?? BROWSER_HEADERS,
+            timeoutMs,
+          );
+          if (viaDns.status < 500 && viaDns.status !== 429) return viaDns;
+        } catch (dnsErr) {
+          lastErr = dnsErr;
+        }
+      }
       if (attempt < retries) await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
     }
   }
@@ -162,8 +259,16 @@ async function parseFeedWithRetry(url: string, retries = 2): Promise<Awaited<Ret
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
+      // Fetch the body ourselves, then parse the string — rss-parser's parseURL
+      // uses Node's http/https modules directly, which resolve through the OS
+      // (getaddrinfo) and so bypass the public-DNS dispatcher installed above.
+      // A sinkholed host stayed unreachable here long after fetch() could reach it.
       return await Promise.race([
-        parser.parseURL(url),
+        fetchWithRetry(url, { headers: BROWSER_HEADERS }, { retries: 0, timeoutMs: 15000 })
+          .then(async (res) => {
+            if (!res.ok) throw new Error(`Status code ${res.status}`);
+            return parser.parseString(await res.text());
+          }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 15000)),
       ]);
     } catch (err) {
