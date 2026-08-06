@@ -15,6 +15,8 @@ MVP+: one gold post -> one 9:16 branded reel. Fully local, $0.
 
 Usage: make-reel.py <marketId> <index> [out.mp4]
    or: make-reel.py --json <payload.json> [out.mp4]   (web UI one-click render;
+   add --validate anywhere to stop after the voice: writes <out>.mp3 and prints the narration,
+       so you hear the direction before paying for media fetch + the full ffmpeg render.
        payload = {"emojiTitle", "narration" (approved script, overrides auto-lead),
                   "media": [{"url", "kind": "image"|"video"}, ...] (ordered, split
                   evenly across the reel; video clips are trimmed to their slot;
@@ -22,7 +24,7 @@ Usage: make-reel.py <marketId> <index> [out.mp4]
 Skipped (add later): top big-number zone, yellow keyword highlight in the title,
 background music, SFX. Core proven, $0 local.
 """
-import sys, os, re, json, asyncio, subprocess, tempfile, urllib.request, difflib, unicodedata
+import sys, os, re, json, asyncio, subprocess, tempfile, urllib.request, difflib, unicodedata, shutil
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -285,7 +287,13 @@ def get_media(post):
     single = post.get("article", {}).get("imageUrl")
     return [{"url": single, "kind": "image"}] if single else []
 
-def build_content(tmp, post, content):
+def take_flag(argv, name):
+    """Pull a bare flag out of argv wherever it sits, so the positional args keep their places."""
+    rest = [a for a in argv if a != name]
+    return rest, len(rest) != len(argv)
+
+
+def build_content(tmp, post, content, validate_to=None):
     mp3 = os.path.join(tmp, "v.mp3")
     if post.get("narration"):  # approved script from the web UI overrides the auto-lead
         nar = clean(" ".join(ln.strip() for ln in post["narration"].splitlines() if ln.strip()))[:4000]
@@ -296,6 +304,15 @@ def build_content(tmp, post, content):
         return None
     cues = align_cues(nar, whisper_words(mp3), dur)   # voice-accurate word timing
     print(f"  voice: {dur:.1f}s, {len(cues)} cues, hook_end {hook_end:.1f}s")
+
+    # ponytail: direction gate. Voice + wording decide whether the reel is right, and both exist
+    # by this line — everything after it (media fetch over the network, Ken Burns per image, the
+    # caption track, three concats) is the expensive part. Hear it first, re-run without the flag.
+    if validate_to:
+        shutil.copy(mp3, validate_to)
+        print(f"\n  VALIDATE — narration ({len(nar)} chars):\n{nar}\n\n  audio: {validate_to}"
+              f"\n  Looks right? Re-run the same command without --validate to render.")
+        return None
 
     bg_items = []
     for i, m in enumerate(get_media(post)):
@@ -431,10 +448,16 @@ def demo():
     assert slideshow_risk(img * 6, 60) is None                  # enough stills -> fine
     assert slideshow_risk([{"kind": "video"}], 60) is None      # motion footage -> never a slideshow
     assert slideshow_risk(img, 8) is None                       # short reel, one still is fine
+
+    # --validate must come out of argv wherever it sits, or the positional market/index shift
+    assert take_flag(["x", "m", "3"], "--validate") == (["x", "m", "3"], False)
+    assert take_flag(["x", "--validate", "m", "3"], "--validate") == (["x", "m", "3"], True)
+    assert take_flag(["x", "m", "3", "--validate"], "--validate") == (["x", "m", "3"], True)
     print("make-reel.py self-check ok")
 
 
 def main():
+    sys.argv[:], validate = take_flag(sys.argv, "--validate")
     if sys.argv[1] == "--demo":
         demo(); return
     if sys.argv[1] == "--json":
@@ -449,7 +472,9 @@ def main():
 
     tmp = tempfile.mkdtemp()
     content = os.path.join(tmp, "content.mp4")
-    res = build_content(tmp, post, content)
+    res = build_content(tmp, post, content, validate_to=(out + ".mp3") if validate else None)
+    if validate:
+        return
     if not res:
         print("content build failed"); sys.exit(1)
     dur, hook_end = res
