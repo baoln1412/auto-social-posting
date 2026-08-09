@@ -9,6 +9,11 @@ module.exports = {
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
+      fontSize: {
+        // The measured scale topped out at 24px, so no size said "top of the
+        // page". This is that rung — view titles only, one per screen.
+        display: ['2rem', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '700' }],
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -26,6 +31,22 @@ module.exports = {
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
+        },
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+        },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
+        brand: {
+          facebook: 'hsl(var(--brand-facebook))',
+          instagram: 'hsl(var(--brand-instagram))',
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',
