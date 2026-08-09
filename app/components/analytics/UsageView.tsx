@@ -33,7 +33,7 @@ interface Row {
   keptPct: number | null; // silver / bronze
   yieldPct: number | null; // gold / bronze
   tokens: number;
-  verdict: { icon: string; label: string; tone: string };
+  verdict: { dot: string; label: string; tone: string };
 }
 
 function fmt(n: number): string {
@@ -44,10 +44,10 @@ function fmt(n: number): string {
 
 function judge(bronze: number, gold: number, yieldPct: number | null): Row['verdict'] {
   if (bronze >= 10 && gold === 0)
-    return { icon: '🔴', label: 'Drop', tone: 'text-red-600' };
+    return { dot: 'bg-destructive', label: 'Drop', tone: 'text-destructive' };
   if (bronze >= 20 && (yieldPct ?? 100) < 5)
-    return { icon: '🟡', label: 'Low yield', tone: 'text-amber-600' };
-  return { icon: '🟢', label: 'Keep', tone: 'text-emerald-600' };
+    return { dot: 'bg-warning', label: 'Low yield', tone: 'text-warning' };
+  return { dot: 'bg-success', label: 'Keep', tone: 'text-success' };
 }
 
 export default function UsageView({ pageId }: { pageId: string }) {
@@ -93,7 +93,7 @@ export default function UsageView({ pageId }: { pageId: string }) {
   return (
     <div className="flex flex-col gap-5 max-w-4xl">
       <div>
-        <h2 className="text-xl font-bold text-foreground">📈 Source Usage</h2>
+        <h2 className="text-display text-foreground">Source Usage</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Estimated token spend vs. content yield per source. Sources that crawl a lot
           but produce no posts are burning screening effort — candidates to drop.
@@ -110,8 +110,8 @@ export default function UsageView({ pageId }: { pageId: string }) {
         ].map((c) => (
           <Card key={c.label} className="card-warm">
             <CardContent className="p-4">
-              <p className="text-2xl font-bold text-foreground">{c.value}</p>
-              <p className="text-xs font-medium text-foreground mt-1">{c.label}</p>
+              <p className="text-2xl font-bold text-foreground tabular-nums">{c.value}</p>
+              <p className="text-xs font-normal text-foreground mt-1">{c.label}</p>
               <p className="text-[11px] text-muted-foreground">{c.sub}</p>
             </CardContent>
           </Card>
@@ -126,7 +126,7 @@ export default function UsageView({ pageId }: { pageId: string }) {
             <p className="text-sm text-muted-foreground">No articles yet. Run the pipeline.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm tabular-nums">
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="py-2">Source</th>
@@ -150,7 +150,7 @@ export default function UsageView({ pageId }: { pageId: string }) {
                       </td>
                       <td className="py-2 text-right tabular-nums">{fmt(r.tokens)}</td>
                       <td className={`py-2 text-right font-medium ${r.verdict.tone}`}>
-                        {r.verdict.icon} {r.verdict.label}
+                        <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${r.verdict.dot}`} />{r.verdict.label}
                       </td>
                     </tr>
                   ))}
@@ -178,8 +178,8 @@ export default function UsageView({ pageId }: { pageId: string }) {
         <strong>Bronze is a rolling 7-day count</strong> (raw articles are pruned after 7 days),
         while <strong>Silver / Gold are cumulative</strong> (never pruned) — so Yield % is
         indicative, not exact, and can exceed 100% for long-lived good sources. The reliable
-        drop signal is <span className="text-red-600">🔴 Drop</span>: a source still crawling
-        ≥10 articles/week but with 0 posts ever. <span className="text-amber-600">🟡 Low yield</span>
+        drop signal is <span className="text-destructive">Drop</span>: a source still crawling
+        ≥10 articles/week but with 0 posts ever. <span className="text-warning">Low yield</span>
         = &lt;5% of its recent crawl became posts.
         <br />
         Token figures are <strong>estimates</strong> for relative comparison, not billing (the

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Loader2, MapPin } from 'lucide-react';
 
 type Task = 'location';
 
@@ -64,11 +65,7 @@ export default function BackfillButton({ pageId }: Props) {
           onClick={() => runBackfill(['location'])}
           className="gap-2"
         >
-          {isRunning ? (
-            <span className="animate-spin">⚙️</span>
-          ) : (
-            '📍'
-          )}
+          {isRunning ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
           {isRunning ? 'Running…' : 'Backfill Location'}
         </Button>
 
@@ -89,14 +86,14 @@ export default function BackfillButton({ pageId }: Props) {
         <div className="flex flex-wrap gap-2">
           {results.map((r) => (
             <div key={r.task} className="flex items-center gap-1.5 text-xs">
-              <Badge variant="secondary" className="text-green-700 bg-green-100">
-                ✅ {r.task}
+              <Badge variant="secondary" className="text-success bg-success/15">
+                {r.task}
               </Badge>
               <span className="text-muted-foreground">
                 Scanned <strong>{r.scanned}</strong> · Updated{' '}
-                <strong className="text-green-700">{r.updated}</strong>
+                <strong className="text-success">{r.updated}</strong>
                 {r.errors > 0 && (
-                  <span className="text-red-500"> · {r.errors} errors</span>
+                  <span className="text-destructive"> · {r.errors} errors</span>
                 )}
               </span>
             </div>
@@ -105,7 +102,7 @@ export default function BackfillButton({ pageId }: Props) {
       )}
 
       {status === 'error' && (
-        <p className="text-xs text-red-500">⚠️ {errorMsg}</p>
+        <p className="text-xs text-destructive">{errorMsg}</p>
       )}
     </div>
   );

@@ -65,7 +65,7 @@ const AIChatWindow = forwardRef<AIChatHandle, AIChatWindowProps>(function AIChat
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setIsLoading(true);
-    setStatusText('Đang suy nghĩ...');
+    setStatusText('Đang suy nghĩ…');
 
     // Placeholder for streaming response
     const assistantMsg: Message = { role: 'assistant', content: '' };
@@ -130,7 +130,7 @@ const AIChatWindow = forwardRef<AIChatHandle, AIChatWindowProps>(function AIChat
                 onPostsRefresh();
               }
             } else if (event.type === 'model_fallback') {
-              setStatusText('⚠️ Chuyển sang model dự phòng...');
+              setStatusText('⚠️ Chuyển sang model dự phòng…');
             } else if (event.type === 'error') {
               finalContent = `❌ Lỗi: ${event.message}`;
               setMessages((prev) => {
@@ -227,11 +227,11 @@ export default AIChatWindow;
 
 function getToolStatusText(tool: string, result: Record<string, unknown>): string {
   switch (tool) {
-    case 'update_dashboard_filters': return 'Đang cập nhật bộ lọc...';
+    case 'update_dashboard_filters': return 'Đang cập nhật bộ lọc…';
     case 'regenerate_draft': return `Đang viết lại ${result.field ?? ''}...`;
-    case 'schedule_post': return 'Đang lên lịch bài đăng...';
+    case 'schedule_post': return 'Đang lên lịch bài đăng…';
     case 'scrape_custom_url': return `Đang lấy dữ liệu từ ${result.url ?? 'website'}...`;
-    case 'push_to_pipeline': return 'Đang đưa vào pipeline...';
-    default: return 'Đang xử lý...';
+    case 'push_to_pipeline': return 'Đang đưa vào pipeline…';
+    default: return 'Đang xử lý…';
   }
 }

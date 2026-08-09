@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toast, confirmDialog } from './feedback';
 
 interface PageInfo {
   pageId: string;
@@ -61,13 +62,18 @@ export default function FacebookConnect() {
   };
 
   const handleDisconnect = async () => {
-    if (!confirm('Disconnect your Facebook page? You can reconnect anytime.')) return;
+    const ok = await confirmDialog({
+      title: 'Disconnect this Facebook page?',
+      body: 'You can reconnect it at any time.',
+      confirmLabel: 'Disconnect',
+    });
+    if (!ok) return;
     setDisconnecting(true);
     try {
       await fetch('/api/facebook/status', { method: 'DELETE' });
       setStatus({ connected: false });
     } catch {
-      alert('Failed to disconnect');
+      toast('Failed to disconnect');
     } finally {
       setDisconnecting(false);
     }
@@ -83,7 +89,7 @@ export default function FacebookConnect() {
           className="h-2 w-2 rounded-full animate-pulse"
           style={{ backgroundColor: '#666' }}
         />
-        <span style={{ color: '#666' }}>Checking Facebook connection...</span>
+        <span style={{ color: '#666' }}>Checking Facebook connection…</span>
       </div>
     );
   }
@@ -102,7 +108,7 @@ export default function FacebookConnect() {
             style={{ backgroundColor: '#22c55e', boxShadow: '0 0 6px #22c55e' }}
           />
           <span style={{ color: '#86efac' }}>
-            <strong>📘 {primaryPage.pageName}</strong>
+            <strong>{primaryPage.pageName}</strong>
             {status.pages.length > 1 && (
               <span style={{ color: '#4ade80' }}>
                 {' '}+{status.pages.length - 1} more
@@ -124,7 +130,7 @@ export default function FacebookConnect() {
               border: '1px solid rgba(96,165,250,0.2)',
             }}
           >
-            🔄 Reconnect
+            Reconnect
           </button>
           <button
             onClick={handleDisconnect}
@@ -137,7 +143,7 @@ export default function FacebookConnect() {
               opacity: disconnecting ? 0.5 : 1,
             }}
           >
-            {disconnecting ? '...' : '✕ Disconnect'}
+            {disconnecting ? '...' : 'Disconnect'}
           </button>
         </div>
       </div>
@@ -173,7 +179,7 @@ export default function FacebookConnect() {
             border: '1px solid #166FE5',
           }}
         >
-          📘 Connect via OAuth
+          Connect via OAuth
         </button>
       </div>
     );
@@ -204,7 +210,7 @@ export default function FacebookConnect() {
           cursor: 'pointer',
         }}
       >
-        📘 Connect Facebook Page
+        Connect Facebook Page
       </button>
     </div>
   );

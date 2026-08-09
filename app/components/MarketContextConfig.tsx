@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { ChevronDown, ChevronUp, X } from 'lucide-react';
 
 export interface MarketContext {
   language: string;
@@ -69,8 +70,8 @@ export default function MarketContextConfig({ context, onSave }: MarketContextCo
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-foreground hover:bg-accent/50 transition-colors rounded-t-xl"
       >
-        <span>🌐 Market Content Context</span>
-        <span className="text-muted-foreground text-xs">{isOpen ? '▲ Collapse' : '▼ Expand'}</span>
+        <span>Market Content Context</span>
+        <span className="text-muted-foreground text-xs inline-flex items-center gap-1">{isOpen ? <><ChevronUp size={13} />Collapse</> : <><ChevronDown size={13} />Expand</>}</span>
       </button>
 
       {isOpen && (
@@ -111,9 +112,9 @@ export default function MarketContextConfig({ context, onSave }: MarketContextCo
                   />
                   <button
                     onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}
-                    className="text-muted-foreground hover:text-red-600 px-1"
+                    className="text-muted-foreground hover:text-destructive px-1"
                     title="Remove"
-                  >✕</button>
+                  ><X size={13} /></button>
                 </div>
               ))}
             </div>
@@ -146,8 +147,8 @@ export default function MarketContextConfig({ context, onSave }: MarketContextCo
           </div>
 
           <Button onClick={handleSave} disabled={saving} size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white">
-            {saving ? 'Saving...' : saved ? '✓ Saved' : 'Save Market Context'}
+            className="bg-success hover:bg-success/90 text-white">
+            {saving ? 'Saving…' : saved ? 'Saved' : 'Save Market Context'}
           </Button>
         </CardContent>
       )}

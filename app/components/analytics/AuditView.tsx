@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertTriangle } from 'lucide-react';
 
 interface AuditData {
   counts: { bronze: number; bronzeUnclassified: number; silver: number; silverUngenerated: number; gold: number };
@@ -43,7 +44,7 @@ export default function AuditView({ pageId }: { pageId: string }) {
 
   return (
     <div className="flex flex-col gap-5 max-w-3xl">
-      <h2 className="text-xl font-bold text-foreground">🔎 Pipeline Audit</h2>
+      <h2 className="text-display text-foreground">Pipeline Audit</h2>
 
       {/* Layer counts */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -56,8 +57,8 @@ export default function AuditView({ pageId }: { pageId: string }) {
         ].map((c) => (
           <Card key={c.label} className="card-warm">
             <CardContent className="p-4">
-              <p className="text-2xl font-bold text-foreground">{c.value}</p>
-              <p className="text-xs font-medium text-foreground mt-1">{c.label}</p>
+              <p className="text-2xl font-bold text-foreground tabular-nums">{c.value}</p>
+              <p className="text-xs font-normal text-foreground mt-1">{c.label}</p>
               <p className="text-[11px] text-muted-foreground">{c.sub}</p>
             </CardContent>
           </Card>
@@ -71,7 +72,7 @@ export default function AuditView({ pageId }: { pageId: string }) {
           {sources.length === 0 ? (
             <p className="text-sm text-muted-foreground">No articles yet. Run the pipeline.</p>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm tabular-nums">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground border-b border-border">
                   <th className="py-2">Source</th>
@@ -102,9 +103,9 @@ export default function AuditView({ pageId }: { pageId: string }) {
           vanishes from it entirely; these come from audit_runs, which is permanent. */}
       {(data.feedHealth ?? []).some((f) => f.stale) && (
         <Card className="card-warm">
-          <CardHeader><CardTitle className="text-base">⚠️ Feeds needing attention</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Feeds needing attention</CardTitle></CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
+            <table className="w-full text-sm tabular-nums">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground border-b border-border">
                   <th className="py-2">Source</th>
@@ -145,7 +146,7 @@ export default function AuditView({ pageId }: { pageId: string }) {
                   <span className="shrink-0">{new Date(r.runAt).toLocaleString('en-GB')}</span>
                   <span className="truncate flex-1">{r.source}</span>
                   <span className="shrink-0">in {r.bronzeIn} · kept {r.bronzeKept}</span>
-                  {r.errors && <span className="text-red-600 shrink-0">⚠</span>}
+                  {r.errors && <AlertTriangle size={13} className="text-destructive shrink-0" />}
                 </div>
               ))}
             </div>

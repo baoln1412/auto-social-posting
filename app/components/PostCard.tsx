@@ -9,6 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import VideoGenModal from './VideoGenModal';
 import { useVideoGen } from './useVideoGen';
+import { toast, confirmDialog } from './feedback';
+import {
+  Check, ChevronDown, ChevronRight, ChevronUp, Circle, Loader2, Video,
+} from 'lucide-react';
 
 interface PostCardProps {
   post: PostDraft;
@@ -29,17 +33,20 @@ interface PostCardProps {
 const ENABLE_PUBLISHING = false;
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft: { label: 'Draft', className: 'bg-stone-100 text-stone-600' },
-  scheduled: { label: 'Scheduled', className: 'bg-amber-50 text-amber-700' },
-  published: { label: 'Published', className: 'bg-emerald-50 text-emerald-700' },
-  failed: { label: 'Failed', className: 'bg-red-50 text-red-700' },
+  draft: { label: 'Draft', className: 'bg-muted text-muted-foreground' },
+  scheduled: { label: 'Scheduled', className: 'bg-warning/10 text-warning' },
+  published: { label: 'Published', className: 'bg-success/10 text-success' },
+  failed: { label: 'Failed', className: 'bg-destructive/10 text-destructive' },
 };
 
-const PLATFORM_CONFIG: Record<string, { label: string; icon: string; color: string; btnClass: string }> = {
-  facebook: { label: 'Facebook', icon: '📘', color: 'text-blue-600', btnClass: 'bg-blue-600 hover:bg-blue-700 text-white' },
-  instagram: { label: 'Instagram', icon: '📸', color: 'text-pink-600', btnClass: 'bg-pink-600 hover:bg-pink-700 text-white' },
-  threads: { label: 'Threads', icon: '🧵', color: 'text-stone-700', btnClass: 'bg-stone-700 hover:bg-stone-800 text-white' },
-  tiktok: { label: 'TikTok', icon: '🎵', color: 'text-stone-700', btnClass: 'bg-stone-700 hover:bg-stone-800 text-white' },
+// No `icon` field: the label already says "Facebook". Lucide dropped brand
+// glyphs, and hand-rolling four brand SVGs for a publisher that ships behind
+// ENABLE_PUBLISHING=false is work with no reader.
+const PLATFORM_CONFIG: Record<string, { label: string; color: string; btnClass: string }> = {
+  facebook: { label: 'Facebook', color: 'text-brand-facebook', btnClass: 'bg-brand-facebook hover:bg-brand-facebook/90 text-white' },
+  instagram: { label: 'Instagram', color: 'text-brand-instagram', btnClass: 'bg-brand-instagram hover:bg-brand-instagram/90 text-white' },
+  threads: { label: 'Threads', color: 'text-foreground', btnClass: 'bg-foreground hover:bg-foreground/90 text-background' },
+  tiktok: { label: 'TikTok', color: 'text-foreground', btnClass: 'bg-foreground hover:bg-foreground/90 text-background' },
 };
 
 function CopyButton({ text }: { text: string }) {
@@ -51,7 +58,7 @@ function CopyButton({ text }: { text: string }) {
   };
   return (
     <Button variant="outline" size="sm" onClick={handleCopy} className="text-xs h-7">
-      {copied ? '✓ Copied' : '📋 Copy'}
+      {copied ? 'Copied' : 'Copy'}
     </Button>
   );
 }
@@ -81,9 +88,14 @@ function PlatformDraftSection({
 
   const postToChannels = async (scheduledTime?: string) => {
     const selected = platformChannels.filter((c) => selectedChannels.has(c.id));
-    if (selected.length === 0) { alert(`No ${cfg.label} channels selected.`); return; }
+    if (selected.length === 0) { toast(`No ${cfg.label} channels selected.`); return; }
     const channelNames = selected.map((c) => c.platformPageName).join(', ');
-    if (!confirm(`${scheduledTime ? '📅 Schedule' : `${cfg.icon} Post`} to ${cfg.label}: ${channelNames}?`)) return;
+    const ok = await confirmDialog({
+      title: scheduledTime ? `Schedule to ${cfg.label}?` : `Post to ${cfg.label} now?`,
+      body: channelNames,
+      confirmLabel: scheduledTime ? 'Schedule' : 'Post now',
+    });
+    if (!ok) return;
 
     const results: string[] = [];
     for (const ch of selected) {
@@ -100,10 +112,10 @@ function PlatformDraftSection({
           }),
         });
         const data = await res.json();
-        results.push(data.success ? `✅ ${ch.platformPageName}: ${data.scheduled ? 'Scheduled' : 'Posted'}` : `❌ ${ch.platformPageName}: ${data.error}`);
-      } catch (err) { results.push(`❌ Error: ${err}`); }
+        results.push(data.success ? `${ch.platformPageName}: ${data.scheduled ? 'Scheduled' : 'Posted'}` : `${ch.platformPageName}: ${data.error}`);
+      } catch (err) { results.push(`Error: ${err}`); }
     }
-    alert(results.join('\n'));
+    toast(results.join('\n'));
   };
 
   return (
@@ -111,7 +123,7 @@ function PlatformDraftSection({
       <div className="rounded-lg border border-border overflow-hidden bg-muted/20">
         <div className="flex items-center justify-between px-4 py-2 border-b border-border">
           <span className={`text-xs font-semibold uppercase tracking-wider ${cfg.color}`}>
-            {cfg.icon} {cfg.label} Draft {isEditing && <span className="text-emerald-600 normal-case tracking-normal">(edited)</span>}
+            {cfg.label} Draft {isEditing && <span className="text-success normal-case tracking-normal">(edited)</span>}
           </span>
           <CopyButton text={editedDraft} />
         </div>
@@ -129,10 +141,10 @@ function PlatformDraftSection({
             const isSelected = selectedChannels.has(ch.id);
             return (
               <button key={ch.id} onClick={() => onToggleChannel(ch.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border
-                  ${isSelected ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-muted/50 text-muted-foreground border-border'}`}>
-                <span>{isSelected ? '✓' : '○'}</span>
-                <span>{cfg.icon} {ch.platformPageName}</span>
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-normal transition-colors border
+                  ${isSelected ? 'bg-info/10 text-info border-info/25' : 'bg-muted/50 text-muted-foreground border-border'}`}>
+                {isSelected ? <Check size={13} /> : <Circle size={13} />}
+                <span>{ch.platformPageName}</span>
               </button>
             );
           })}
@@ -143,7 +155,7 @@ function PlatformDraftSection({
       {platformChannels.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground whitespace-nowrap">📅 Schedule:</label>
+            <label className="text-xs text-muted-foreground whitespace-nowrap">Schedule:</label>
             <input type="datetime-local" id={`schedule-${platform}-${encodeURIComponent(emojiTitle)}`}
               className="flex-1 text-sm px-3 py-1.5 rounded-lg border border-border bg-background text-foreground" />
           </div>
@@ -151,15 +163,15 @@ function PlatformDraftSection({
             <Button onClick={() => postToChannels()}
               disabled={platformChannels.filter(c => selectedChannels.has(c.id)).length === 0}
               size="sm" className={`flex-1 ${cfg.btnClass}`}>
-              {cfg.icon} Post Now
+              Post Now
             </Button>
             <Button onClick={() => {
               const input = document.getElementById(`schedule-${platform}-${encodeURIComponent(emojiTitle)}`) as HTMLInputElement;
-              if (!input?.value) { alert('Pick a date and time first.'); return; }
+              if (!input?.value) { toast('Pick a date and time first.'); return; }
               postToChannels(new Date(input.value).toISOString());
             }} disabled={platformChannels.filter(c => selectedChannels.has(c.id)).length === 0}
-              variant="outline" size="sm" className="flex-1 text-amber-700 border-amber-200 hover:bg-amber-50">
-              📅 Schedule
+              variant="outline" size="sm" className="flex-1 text-warning border-warning/25 hover:bg-warning/10">
+              Schedule
             </Button>
           </div>
         </div>
@@ -216,10 +228,10 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
         }),
       });
       setSaveState(res.ok ? 'saved' : '');
-      if (!res.ok) alert('Save failed');
+      if (!res.ok) toast('Save failed');
     } catch {
       setSaveState('');
-      alert('Save failed');
+      toast('Save failed');
     }
   }, [post.id, ovBg, ovInset, imageUrl, imageUrls]);
 
@@ -230,7 +242,7 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
       fd.set('file', file);
       const res = await fetch('/api/image/upload', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok || !data.url) { alert(data.error ?? 'Upload failed'); return; }
+      if (!res.ok || !data.url) { toast(data.error ?? 'Upload failed'); return; }
       const abs = window.location.origin + data.url; // card route fetches bg/inset server-side → needs absolute
       if (which === 'bg') setOvBg(abs); else setOvInset(abs);
       setSaveState('');
@@ -303,8 +315,8 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
       const res = await fetch('/api/ai/refine', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draft: editedFbDraft, instruction: aiPrompt }) });
       const data = await res.json();
       if (data.success) setAiSuggestion(data.refined);
-      else alert(`AI Error: ${data.error}`);
-    } catch (err) { alert(`Network error: ${err}`); }
+      else toast(`AI Error: ${data.error}`);
+    } catch (err) { toast(`Network error: ${err}`); }
     finally { setAiLoading(false); }
   };
 
@@ -320,19 +332,24 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
 
   const postToFbChannels = async (scheduledTime?: string) => {
     const selected = facebookChannels.filter(c => selectedChannels.has(c.id));
-    if (selected.length === 0) { alert('Select at least one Facebook channel.'); return; }
+    if (selected.length === 0) { toast('Select at least one Facebook channel.'); return; }
     const channelNames = selected.map((c) => c.platformPageName).join(', ');
-    if (!confirm(`${scheduledTime ? '📅 Schedule' : '📘 Post'} to: ${channelNames}?`)) return;
+    const ok = await confirmDialog({
+      title: scheduledTime ? 'Schedule to Facebook?' : 'Post to Facebook now?',
+      body: channelNames,
+      confirmLabel: scheduledTime ? 'Schedule' : 'Post now',
+    });
+    if (!ok) return;
 
     const results: string[] = [];
     for (const ch of selected) {
       try {
         const res = await fetch('/api/facebook/post', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelId: ch.id, emojiTitle: '', facebookText: editedFbDraft, imageUrl: generatedImageUrl || imageUrl, ...(scheduledTime && { scheduledTime }) }) });
         const data = await res.json();
-        results.push(data.success ? `✅ ${ch.platformPageName}: ${data.scheduled ? 'Scheduled' : 'Posted'}` : `❌ ${ch.platformPageName}: ${data.error}`);
-      } catch (err) { results.push(`❌ Error: ${err}`); }
+        results.push(data.success ? `${ch.platformPageName}: ${data.scheduled ? 'Scheduled' : 'Posted'}` : `${ch.platformPageName}: ${data.error}`);
+      } catch (err) { results.push(`Error: ${err}`); }
     }
-    alert(results.join('\n'));
+    toast(results.join('\n'));
   };
 
   const statusCfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
@@ -346,8 +363,8 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
         {article.location && (
           <>
             <span className="opacity-50">·</span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-600/90 text-yellow-300 font-bold text-[11px] shrink-0 backdrop-blur-sm">
-              📍 {article.location}
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/90 text-destructive-foreground font-bold text-[11px] shrink-0 backdrop-blur-sm">
+              {article.location}
             </span>
           </>
         )}
@@ -369,7 +386,7 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
         {isNew && <Badge className="bg-primary text-primary-foreground text-[10px] animate-pulse">🆕 NEW</Badge>}
       </div>
       <a href={url} target="_blank" rel="noopener noreferrer"
-        className="shrink-0 px-2.5 py-1 rounded-md bg-amber-500/90 hover:bg-amber-400 transition-colors backdrop-blur-sm text-xs font-semibold text-black">
+        className="shrink-0 px-2.5 py-1 rounded-md bg-warning/90 hover:bg-warning transition-colors backdrop-blur-sm text-xs font-semibold text-foreground">
         Source ↗
       </a>
     </div>
@@ -392,7 +409,7 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
           {generatedImageUrl && (
             <div className="absolute top-3 left-4">
               <Badge className="bg-primary text-primary-foreground text-[10px]">
-                ✨ AI Generated
+                AI Generated
               </Badge>
             </div>
           )}
@@ -424,14 +441,14 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
             className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground/70 hover:text-primary transition-colors"
           >
             <span className="px-1.5 py-0.5 rounded bg-muted border border-border">#{post.id.slice(0, 8)}</span>
-            <span className="opacity-60">📋 copy for AI</span>
+            <span className="opacity-60">copy for AI</span>
           </button>
         )}
 
         {/* Video Generation */}
         <Button onClick={() => setVideoOpen(true)}
-          className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-semibold">
-          🎬 Tạo Video
+          className="w-full bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary text-white font-semibold">
+          Tạo Video
         </Button>
         <VideoGenModal
           open={videoOpen}
@@ -443,18 +460,18 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
 
         {/* Render result — surfaces here even if the drawer was already closed */}
         {vg.jobStatus === 'done' && vg.jobFile && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 space-y-2">
-            <div className="flex items-center gap-2 text-sm text-emerald-700 font-medium">
-              <span>🎥</span><span>Video đã sẵn sàng</span>
+          <div className="rounded-lg border border-success/25 bg-success/10 px-3 py-2 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-success font-normal">
+              <Video size={14} /><span>Video đã sẵn sàng</span>
             </div>
             <div className="flex gap-2">
               <a href={`/api/video/file?f=${vg.jobFile}`} download="reel.mp4"
-                className="flex-1 text-center py-1.5 rounded-md text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
-                📥 Tải về
+                className="flex-1 text-center py-1.5 rounded-md text-xs font-semibold bg-success text-white hover:bg-success/90 transition-colors">
+                Tải về
               </a>
               <button onClick={() => setVideoPreviewOpen((v) => !v)}
-                className="flex-1 py-1.5 rounded-md text-xs font-semibold bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-100/50 transition-colors">
-                {videoPreviewOpen ? '▲ Ẩn' : '▶ Xem trước'}
+                className="flex-1 py-1.5 rounded-md text-xs font-semibold bg-white text-success border border-success/25 hover:bg-success/50 transition-colors">
+                {videoPreviewOpen ? <><ChevronUp size={13} />Ẩn</> : <><ChevronRight size={13} />Xem trước</>}
               </button>
             </div>
             {videoPreviewOpen && (
@@ -466,8 +483,8 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
         {/* Download */}
         {(generatedImageUrl || imageUrl) && (
           <a href={`/api/image/resize?url=${encodeURIComponent(generatedImageUrl || imageUrl || '')}`} download="fb-post-image.jpg"
-            className="flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-colors bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100">
-            📥 Download FB Image (1200×630)
+            className="flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-colors bg-info/10 text-info border border-info/25 hover:bg-info/15">
+            Download FB Image (1200×630)
           </a>
         )}
 
@@ -475,10 +492,10 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
         <div className="rounded-lg border border-border overflow-hidden bg-muted/10">
           <button
             onClick={() => { if (!showCard) setCardLoading(true); setShowCard((v) => !v); }}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-rose-600 uppercase tracking-wider hover:bg-rose-50/50 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-primary uppercase tracking-wider hover:bg-primary/50 transition-colors"
           >
-            <span>🖼️ News Card {cardRatio === '4:5' ? '(4:5)' : '(1:1)'}</span>
-            <span className="text-muted-foreground normal-case tracking-normal">{showCard ? '▲ Hide' : '▼ Generate & view'}</span>
+            <span>News Card {cardRatio === '4:5' ? '(4:5)' : '(1:1)'}</span>
+            <span className="text-muted-foreground normal-case tracking-normal">{showCard ? <><ChevronUp size={13} />Hide</> : <><ChevronDown size={13} />Generate & view</>}</span>
           </button>
 
           {showCard && (
@@ -490,7 +507,7 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
                     key={r}
                     onClick={() => { if (r !== cardRatio) { setCardLoading(true); setCardRatio(r); } }}
                     className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors ${
-                      cardRatio === r ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-foreground border-border hover:bg-accent'
+                      cardRatio === r ? 'bg-primary text-white border-primary' : 'bg-white text-foreground border-border hover:bg-accent'
                     }`}
                   >
                     {r === '4:5' ? '4:5 Portrait' : '1:1 Square'}
@@ -500,13 +517,13 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
 
               {/* Import local images — main bg + circle inset (for articles with no photo) */}
               <div className="flex flex-wrap items-center gap-3 text-xs">
-                <label className="inline-flex items-center gap-1.5 cursor-pointer text-rose-600 font-semibold">
-                  <span>🖼️ Main image{ovBg ? ' ✓' : ''}</span>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-primary font-semibold">
+                  <span className="inline-flex items-center gap-1">Main image{ovBg && <Check size={12} />}</span>
                   <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLocal(f, 'bg'); e.target.value = ''; }} />
                 </label>
-                <label className="inline-flex items-center gap-1.5 cursor-pointer text-rose-600 font-semibold">
-                  <span>⭕ Circle image{ovInset ? ' ✓' : ''}</span>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-primary font-semibold">
+                  <span className="inline-flex items-center gap-1">Circle image{ovInset && <Check size={12} />}</span>
                   <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLocal(f, 'inset'); e.target.value = ''; }} />
                 </label>
@@ -514,8 +531,8 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
                 {(ovBg || ovInset) && (
                   <>
                     <button type="button" disabled={saveState === 'saving'} onClick={saveCardImages}
-                      className="px-2.5 py-1 rounded-md bg-rose-600 text-white font-semibold hover:bg-rose-700 disabled:opacity-50">
-                      {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved ✓' : '💾 Save to post'}
+                      className="px-2.5 py-1 rounded-md bg-primary text-white font-semibold hover:bg-primary/90 disabled:opacity-50">
+                      {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save to post'}
                     </button>
                     <button type="button" className="text-muted-foreground underline"
                       onClick={() => { setOvBg(null); setOvInset(null); setSaveState(''); setCardLoading(true); }}>
@@ -546,12 +563,12 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
               {/* Actions */}
               <div className="flex gap-2">
                 <a href={cardUrl} target="_blank" rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold bg-white text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors">
-                  ↗ Open full
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold bg-white text-primary border border-primary/25 hover:bg-primary/10 transition-colors">
+                  Open full
                 </a>
                 <a href={cardUrl} download={`news-card-${cardRatio.replace(':', 'x')}.png`}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold bg-rose-600 text-white hover:bg-rose-700 transition-colors">
-                  📥 Download PNG
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors">
+                  Download PNG
                 </a>
               </div>
             </div>
@@ -561,13 +578,13 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
         {/* ═══════ FACEBOOK DRAFT (Default, always shown) ═══════ */}
         <div className="rounded-lg border border-border overflow-hidden bg-muted/20">
           <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-            <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
-              📘 Facebook Draft {isFbEditing && <span className="text-emerald-600 normal-case tracking-normal">(edited)</span>}
+            <span className="text-xs font-semibold text-info uppercase tracking-wider">
+              Facebook Draft {isFbEditing && <span className="text-success normal-case tracking-normal">(edited)</span>}
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowAiPanel(!showAiPanel)}
-                className={`text-xs h-7 ${showAiPanel ? 'bg-purple-50 text-purple-700 border-purple-200' : ''}`}>
-                🤖 AI Fix
+                className={`text-xs h-7 ${showAiPanel ? 'bg-primary/10 text-primary border-primary/25' : ''}`}>
+                AI Fix
               </Button>
               <CopyButton text={editedFbDraft} />
             </div>
@@ -583,7 +600,7 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
         {(comment1?.trim() || comment2?.trim()) && (
           <div className="rounded-lg border border-border overflow-hidden bg-muted/10">
             <div className="px-4 py-2 border-b border-border">
-              <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">💬 Seed Comments</span>
+              <span className="text-xs font-semibold text-warning uppercase tracking-wider">Seed Comments</span>
             </div>
             {[comment1, comment2].map((c, i) =>
               c?.trim() ? (
@@ -599,26 +616,26 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
 
         {/* AI Panel */}
         {showAiPanel && (
-          <div className="rounded-lg p-4 space-y-3 bg-purple-50/50 border border-purple-200">
-            <span className="text-xs font-semibold text-purple-700 uppercase tracking-wider">🤖 AI Draft Editor</span>
+          <div className="rounded-lg p-4 space-y-3 bg-primary/50 border border-primary/25">
+            <span className="text-xs font-semibold text-primary uppercase tracking-wider">AI Draft Editor</span>
             <div className="flex gap-2">
               <input type="text" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !aiLoading) handleAiRefine(); }}
-                placeholder="e.g. Rewrite intro, add more detail..."
+                placeholder="e.g. Rewrite intro, add more detail…"
                 className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-white outline-none text-foreground" disabled={aiLoading} />
-              <Button onClick={handleAiRefine} disabled={aiLoading || !aiPrompt.trim()} size="sm" className="bg-purple-600 hover:bg-purple-700 text-white">
-                {aiLoading ? '⏳...' : '✨ Refine'}
+              <Button onClick={handleAiRefine} disabled={aiLoading || !aiPrompt.trim()} size="sm" className="bg-primary hover:bg-primary/90 text-white">
+                {aiLoading ? <><Loader2 size={13} className="animate-spin" />Refining…</> : 'Refine'}
               </Button>
             </div>
             {aiSuggestion && (
               <div className="space-y-2">
-                <p className="text-xs text-emerald-600 font-semibold">AI Suggestion:</p>
-                <div className="text-sm text-foreground whitespace-pre-wrap rounded-lg p-3 bg-white border border-purple-100 max-h-[200px] overflow-y-auto" style={{ lineHeight: 1.6 }}>
+                <p className="text-xs text-success font-semibold">AI Suggestion:</p>
+                <div className="text-sm text-foreground whitespace-pre-wrap rounded-lg p-3 bg-white border border-primary/25 max-h-[200px] overflow-y-auto" style={{ lineHeight: 1.6 }}>
                   {aiSuggestion}
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={applyAiSuggestion} size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">✅ Apply</Button>
-                  <Button onClick={() => setAiSuggestion('')} variant="outline" size="sm" className="text-destructive border-red-200">✕ Discard</Button>
+                  <Button onClick={applyAiSuggestion} size="sm" className="flex-1 bg-success hover:bg-success/90 text-white">Apply</Button>
+                  <Button onClick={() => setAiSuggestion('')} variant="outline" size="sm" className="text-destructive border-destructive/25">Discard</Button>
                 </div>
               </div>
             )}
@@ -633,39 +650,39 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
                 const isSelected = selectedChannels.has(ch.id);
                 return (
                   <button key={ch.id} onClick={() => toggleChannel(ch.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border
-                      ${isSelected ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-muted/50 text-muted-foreground border-border'}`}>
-                    <span>{isSelected ? '✓' : '○'}</span>
-                    <span>📘 {ch.platformPageName}</span>
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-normal transition-colors border
+                      ${isSelected ? 'bg-info/10 text-info border-info/25' : 'bg-muted/50 text-muted-foreground border-border'}`}>
+                    {isSelected ? <Check size={13} /> : <Circle size={13} />}
+                    <span>{ch.platformPageName}</span>
                   </button>
                 );
               })}
             </div>
             <div className="flex flex-col gap-2 pt-2 border-t border-border">
               <div className="flex items-center gap-2">
-                <label className="text-xs text-muted-foreground whitespace-nowrap">📅 Schedule:</label>
+                <label className="text-xs text-muted-foreground whitespace-nowrap">Schedule:</label>
                 <input type="datetime-local" id={`schedule-fb-${encodeURIComponent(url)}`}
                   className="flex-1 text-sm px-3 py-1.5 rounded-lg border border-border bg-background text-foreground" />
               </div>
               <div className="flex gap-2">
                 {status === 'draft' && onStatusChange && (
                   <Button variant="outline" size="sm" onClick={() => onStatusChange(url, 'scheduled')}
-                    className="text-amber-700 border-amber-200 hover:bg-amber-50">
-                    ✅ Approve
+                    className="text-warning border-warning/25 hover:bg-warning/10">
+                    Approve
                   </Button>
                 )}
                 <Button onClick={() => postToFbChannels()}
                   disabled={facebookChannels.filter(c => selectedChannels.has(c.id)).length === 0}
-                  size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-                  📘 Post Now {facebookChannels.filter(c => selectedChannels.has(c.id)).length > 0 && `(${facebookChannels.filter(c => selectedChannels.has(c.id)).length})`}
+                  size="sm" className="flex-1 bg-info hover:bg-info/90 text-white">
+                  Post Now {facebookChannels.filter(c => selectedChannels.has(c.id)).length > 0 && `(${facebookChannels.filter(c => selectedChannels.has(c.id)).length})`}
                 </Button>
                 <Button onClick={() => {
                   const input = document.getElementById(`schedule-fb-${encodeURIComponent(url)}`) as HTMLInputElement;
-                  if (!input?.value) { alert('Pick a date and time first.'); return; }
+                  if (!input?.value) { toast('Pick a date and time first.'); return; }
                   postToFbChannels(new Date(input.value).toISOString());
                 }} disabled={facebookChannels.filter(c => selectedChannels.has(c.id)).length === 0}
-                  variant="outline" size="sm" className="flex-1 text-amber-700 border-amber-200 hover:bg-amber-50">
-                  📅 Schedule
+                  variant="outline" size="sm" className="flex-1 text-warning border-warning/25 hover:bg-warning/10">
+                  Schedule
                 </Button>
               </div>
             </div>
@@ -679,12 +696,12 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
               onClick={() => setShowOtherPlatforms(!showOtherPlatforms)}
               className="flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
             >
-              <span>{showOtherPlatforms ? '▼' : '▶'}</span>
-              <span>📱 {otherPlatforms.length} Other Platform Draft{otherPlatforms.length > 1 ? 's' : ''}</span>
+              {showOtherPlatforms ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <span>{otherPlatforms.length} Other Platform Draft{otherPlatforms.length > 1 ? 's' : ''}</span>
               <div className="flex gap-1">
                 {otherPlatforms.map(([platform]) => {
                   const cfg = PLATFORM_CONFIG[platform];
-                  return <span key={platform}>{cfg?.icon ?? '📱'}</span>;
+                  return <span key={platform} className="text-xs text-muted-foreground">{cfg?.label ?? platform}</span>;
                 })}
               </div>
             </button>
