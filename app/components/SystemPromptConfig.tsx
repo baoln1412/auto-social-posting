@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface SystemPromptConfigProps {
   prompt: string;
@@ -13,10 +14,10 @@ interface SystemPromptConfigProps {
 }
 
 const PLATFORMS = [
-  { key: 'facebook', label: 'Facebook', icon: '📘', description: 'Default platform — main content generation prompt' },
-  { key: 'instagram', label: 'Instagram', icon: '📸', description: 'Instagram-specific content style' },
-  { key: 'threads', label: 'Threads', icon: '🧵', description: 'Threads-specific content style' },
-  { key: 'tiktok', label: 'TikTok', icon: '🎵', description: 'TikTok-specific content style' },
+  { key: 'facebook', label: 'Facebook', description: 'Default platform — main content generation prompt' },
+  { key: 'instagram', label: 'Instagram', description: 'Instagram-specific content style' },
+  { key: 'threads', label: 'Threads', description: 'Threads-specific content style' },
+  { key: 'tiktok', label: 'TikTok', description: 'TikTok-specific content style' },
 ];
 
 type ActiveSection = 'system' | 'user' | 'platform';
@@ -85,9 +86,9 @@ export default function SystemPromptConfig({ prompt, userPrompt, platformPrompts
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-foreground hover:bg-accent/50 transition-colors rounded-t-xl"
       >
-        <span>⚙️ Content Generation Prompts</span>
+        <span>Content Generation Prompts</span>
         <span className="text-muted-foreground text-xs">
-          {isOpen ? '▲ Collapse' : '▼ Expand'}
+          {isOpen ? <><ChevronUp size={13} />Collapse</> : <><ChevronDown size={13} />Expand</>}
         </span>
       </button>
 
@@ -96,14 +97,14 @@ export default function SystemPromptConfig({ prompt, userPrompt, platformPrompts
           {/* Section tabs: System Prompt | User Prompt | Platform Prompts */}
           <div className="flex gap-1 p-1 rounded-lg bg-muted/50">
             {([
-              { key: 'system', label: '🧠 System Prompt', hint: 'AI persona, tone, brand rules' },
-              { key: 'user', label: '📝 User Prompt', hint: 'Output format, examples, article injection' },
-              { key: 'platform', label: '📱 Platform Prompts', hint: 'Platform-specific overrides' },
+              { key: 'system', label: 'System Prompt', hint: 'AI persona, tone, brand rules' },
+              { key: 'user', label: 'User Prompt', hint: 'Output format, examples, article injection' },
+              { key: 'platform', label: 'Platform Prompts', hint: 'Platform-specific overrides' },
             ] as const).map((section) => (
               <button
                 key={section.key}
                 onClick={() => setActiveSection(section.key)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all flex-1 justify-center
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-normal transition-colors flex-1 justify-center
                   ${activeSection === section.key
                     ? 'bg-background shadow-sm text-foreground'
                     : 'text-muted-foreground hover:text-foreground'
@@ -125,7 +126,7 @@ export default function SystemPromptConfig({ prompt, userPrompt, platformPrompts
                 value={systemPromptVal}
                 onChange={(e) => setSystemPromptVal(e.target.value)}
                 className="min-h-[250px] max-h-[500px] font-mono text-sm resize-y bg-muted/30 border-border"
-                placeholder="Enter your system prompt — AI persona, brand voice, tone, content structure rules..."
+                placeholder="Enter your system prompt — AI persona, brand voice, tone, content structure rules…"
               />
             </div>
           )}
@@ -138,11 +139,11 @@ export default function SystemPromptConfig({ prompt, userPrompt, platformPrompts
                 Use <code className="bg-muted px-1 rounded">{'{articles}'}</code> as a placeholder — it will be replaced with the actual article data at runtime.
               </p>
               <div className="flex items-center gap-2 px-1">
-                <span className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
-                  ⚠️ Must contain {'{articles}'} placeholder
+                <span className="inline-flex items-center gap-1 text-[10px] bg-warning/15 text-warning px-2 py-0.5 rounded-full font-medium">
+                  Must contain {'{articles}'} placeholder
                 </span>
-                <span className="inline-flex items-center gap-1 text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-medium">
-                  💡 Keep examples minimal — system prompt controls tone
+                <span className="inline-flex items-center gap-1 text-[10px] bg-info/15 text-info px-2 py-0.5 rounded-full font-medium">
+                  Keep examples minimal — system prompt controls tone
                 </span>
               </div>
               <Textarea
@@ -168,16 +169,15 @@ export default function SystemPromptConfig({ prompt, userPrompt, platformPrompts
                     <button
                       key={platform.key}
                       onClick={() => setActiveTab(platform.key)}
-                      className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all flex-1 justify-center
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-normal transition-colors flex-1 justify-center
                         ${isActive
                           ? 'bg-background shadow-sm text-foreground'
                           : 'text-muted-foreground hover:text-foreground'
                         }`}
                     >
-                      <span>{platform.icon}</span>
                       <span>{platform.label}</span>
                       {hasContent && platform.key !== 'facebook' && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-success" />
                       )}
                     </button>
                   );
@@ -214,13 +214,13 @@ export default function SystemPromptConfig({ prompt, userPrompt, platformPrompts
               onClick={handleSave}
               disabled={saving || !hasChanges}
               size="sm"
-              className={hasChanges ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+              className={hasChanges ? 'bg-success hover:bg-success/90 text-white' : ''}
               variant={hasChanges ? 'default' : 'secondary'}
             >
-              {saving ? 'Saving...' : saved ? '✓ Saved' : 'Save All Prompts'}
+              {saving ? 'Saving…' : saved ? 'Saved' : 'Save All Prompts'}
             </Button>
             {hasChanges && (
-              <span className="text-xs text-primary font-medium">
+              <span className="text-xs text-primary font-normal">
                 Unsaved changes
               </span>
             )}

@@ -5,16 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PageChannel } from '../types';
+import { toast, confirmDialog } from './feedback';
+import { X } from 'lucide-react';
 
 interface ChannelManagerProps {
   pageId: string;
 }
 
-const PLATFORM_CONFIG: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-  facebook: { label: 'Facebook', icon: '📘', color: 'text-blue-600', bg: 'bg-blue-50' },
-  instagram: { label: 'Instagram', icon: '📸', color: 'text-pink-600', bg: 'bg-pink-50' },
-  threads: { label: 'Threads', icon: '🧵', color: 'text-stone-700', bg: 'bg-stone-100' },
-  tiktok: { label: 'TikTok', icon: '🎵', color: 'text-stone-700', bg: 'bg-stone-100' },
+const PLATFORM_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  facebook: { label: 'Facebook', color: 'text-info', bg: 'bg-info/10' },
+  instagram: { label: 'Instagram', color: 'text-primary', bg: 'bg-primary/10' },
+  threads: { label: 'Threads', color: 'text-foreground', bg: 'bg-muted' },
+  tiktok: { label: 'TikTok', color: 'text-foreground', bg: 'bg-muted' },
 };
 
 const COMING_SOON = ['instagram', 'threads', 'tiktok'];
@@ -41,27 +43,34 @@ export default function ChannelManager({ pageId }: ChannelManagerProps) {
     window.location.href = `/api/auth/facebook?pageId=${pageId}`;
   };
 
+  // Stays a confirm rather than optimistic + Undo: reconnecting requires an
+  // OAuth round trip, so there is nothing to undo client-side.
   const handleDisconnect = async (channelId: string) => {
-    if (!confirm('Disconnect this channel?')) return;
+    const ok = await confirmDialog({
+      title: 'Disconnect this channel?',
+      body: 'You can reconnect it at any time.',
+      confirmLabel: 'Disconnect',
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/facebook/status?channelId=${channelId}`, { method: 'DELETE' });
       if (res.ok) setChannels((prev) => prev.filter((c) => c.id !== channelId));
     } catch {
-      alert('Failed to disconnect');
+      toast('Failed to disconnect');
     }
   };
 
   return (
     <Card className="card-warm">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-base font-semibold">📡 Connected Channels</CardTitle>
+        <CardTitle className="text-base font-semibold">Connected Channels</CardTitle>
         <Button size="sm" variant="outline" onClick={handleConnect} className="border-primary text-primary hover:bg-primary/5">
           + Add Channel
         </Button>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading channels...</p>
+          <p className="text-sm text-muted-foreground">Loading channels…</p>
         ) : channels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No channels connected. Click &quot;+ Add Channel&quot; to connect a Facebook page.
@@ -77,7 +86,7 @@ export default function ChannelManager({ pageId }: ChannelManagerProps) {
                 >
                   <div className="flex items-center gap-3">
                     <span className={`w-9 h-9 rounded-full flex items-center justify-center text-lg ${cfg.bg}`}>
-                      {cfg.icon}
+                      {cfg.label.charAt(0)}
                     </span>
                     <div>
                       <p className="text-sm font-semibold text-foreground">{ch.platformPageName}</p>
@@ -85,7 +94,7 @@ export default function ChannelManager({ pageId }: ChannelManagerProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 text-[10px]">
+                    <Badge variant="secondary" className="bg-success/10 text-success text-[10px]">
                       Connected
                     </Badge>
                     <Button
@@ -94,7 +103,7 @@ export default function ChannelManager({ pageId }: ChannelManagerProps) {
                       onClick={() => handleDisconnect(ch.id)}
                       className="text-muted-foreground hover:text-destructive text-xs"
                     >
-                      ✕
+                      <X size={14} />
                     </Button>
                   </div>
                 </div>
@@ -109,7 +118,7 @@ export default function ChannelManager({ pageId }: ChannelManagerProps) {
             const cfg = PLATFORM_CONFIG[platform];
             return (
               <Badge key={platform} variant="outline" className="text-xs text-muted-foreground gap-1.5 py-1">
-                {cfg.icon} {cfg.label}
+                {cfg.label}
                 <span className="text-[9px] opacity-60">Soon</span>
               </Badge>
             );

@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { KeywordConfig } from '../types';
+import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 
 interface KeywordFilterConfigProps {
   config: KeywordConfig;
@@ -121,18 +122,18 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-foreground hover:bg-accent/50 transition-colors rounded-t-xl"
       >
-        <span>🔑 Keyword Content Filter</span>
+        <span>Keyword Content Filter</span>
         <div className="flex items-center gap-3">
           {useCrimeFilter && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
-              🚨 Crime Filter ON
+            <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/15 text-destructive font-normal">
+              Crime Filter ON
             </span>
           )}
           <span className="text-muted-foreground text-xs">
             {totalKeywords} keywords
           </span>
           <span className="text-muted-foreground text-xs">
-            {isOpen ? '▲ Collapse' : '▼ Expand'}
+            {isOpen ? <><ChevronUp size={13} />Collapse</> : <><ChevronDown size={13} />Expand</>}
           </span>
         </div>
       </button>
@@ -143,17 +144,17 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
           {tier1Count > 0 && <KeywordBadge count={tier1Count} label="Tier 1 (required)" />}
           {tier2Count > 0 && <KeywordBadge count={tier2Count} label="Tier 2 (broad)" />}
           {useCrimeFilter && crimeCount > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-mono">
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-mono">
               {crimeCount} crime
             </span>
           )}
           {useCrimeFilter && excludeCount > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 font-mono">
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono">
               {excludeCount} exclude
             </span>
           )}
           {useCrimeFilter && politicalCount > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 font-mono">
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-mono">
               {politicalCount} political ban
             </span>
           )}
@@ -169,7 +170,7 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
             Articles are scored by keyword matches. <strong className="text-primary">Tier 1</strong> keywords give <strong>+3 points</strong>,{' '}
             <strong className="text-muted-foreground">Tier 2</strong> give <strong>+1 point</strong>. Articles need ≥ {minScore} point(s) to pass the pipeline filter.
             {useCrimeFilter && (
-              <> The <strong className="text-red-600">Crime Filter</strong> runs earlier at the <em>fetch stage</em> — articles must match crime keywords (or come from a crime-specific feed) and must not match exclude/political lists.</>
+              <> The <strong className="text-destructive">Crime Filter</strong> runs earlier at the <em>fetch stage</em> — articles must match crime keywords (or come from a crime-specific feed) and must not match exclude/political lists.</>
             )}
           </p>
 
@@ -183,7 +184,7 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
               className="h-4 w-4 accent-red-600 cursor-pointer"
             />
             <label htmlFor="useCrimeFilter" className="text-sm font-semibold cursor-pointer select-none">
-              🚨 Enable Crime Pre-Filter
+              Enable Crime Pre-Filter
             </label>
             <span className="text-xs text-muted-foreground">
               (hard-filters articles at RSS fetch time — before the pipeline keyword scorer)
@@ -194,10 +195,10 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-primary uppercase tracking-wider">
-                🏆 Tier 1 — High Weight (+3 pts) · {tier1Count} keywords
+                Tier 1 — High Weight (+3 pts) · {tier1Count} keywords
               </label>
               <Button variant="outline" size="sm" className="text-xs h-6" onClick={() => handleLoadTemplate('tier1')}>
-                📋 Load AU Template
+                Load AU Template
               </Button>
             </div>
             <Textarea
@@ -212,14 +213,14 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                📌 Tier 2 — Broad Terms (+1 pt) · {tier2Count} keywords
+                Tier 2 — Broad Terms (+1 pt) · {tier2Count} keywords
               </label>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="text-xs h-6" onClick={() => handleLoadTemplate('tier2')}>
-                  📋 Load AU Template
+                  Load AU Template
                 </Button>
                 <Button variant="outline" size="sm" className="text-xs h-6" onClick={handleAiSuggest} disabled={aiSuggesting}>
-                  {aiSuggesting ? '⏳...' : '🤖 AI Suggest'}
+                  {aiSuggesting ? <><Loader2 size={13} className="animate-spin" />Suggesting…</> : 'AI Suggest'}
                 </Button>
               </div>
             </div>
@@ -233,7 +234,7 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
 
           {/* ── Min score ──────────────────────────────────────────── */}
           <div className="flex items-center gap-3">
-            <label className="text-xs font-medium text-foreground whitespace-nowrap">
+            <label className="text-xs font-normal text-foreground whitespace-nowrap">
               Min Score to Pass Pipeline:
             </label>
             <input
@@ -244,25 +245,25 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
               onChange={(e) => setMinScore(parseInt(e.target.value))}
               className="flex-1 accent-primary"
             />
-            <span className="text-sm font-bold text-primary w-8 text-center">{minScore}</span>
+            <span className="text-sm font-semibold text-primary w-8 text-center">{minScore}</span>
           </div>
 
           {/* ── Crime keywords (only when crime filter is on) ───────── */}
           {useCrimeFilter && (
             <>
-              <div className="border-t border-dashed border-red-200 pt-4 space-y-4">
-                <p className="text-xs font-semibold text-red-700 uppercase tracking-wider">
-                  🚨 Crime Pre-Filter Keywords (applied at RSS fetch stage)
+              <div className="border-t border-dashed border-destructive/25 pt-4 space-y-4">
+                <p className="text-xs font-semibold text-destructive uppercase tracking-wider">
+                  Crime Pre-Filter Keywords (applied at RSS fetch stage)
                 </p>
 
                 {/* Crime must-include */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-red-600 uppercase tracking-wider">
-                      ✅ Crime Must-Match · {crimeCount} keywords
+                    <label className="text-xs font-semibold text-destructive uppercase tracking-wider">
+                      Crime Must-Match · {crimeCount} keywords
                     </label>
-                    <Button variant="outline" size="sm" className="text-xs h-6 border-red-200 text-red-600" onClick={() => handleLoadTemplate('crime')}>
-                      📋 Load Crime Template
+                    <Button variant="outline" size="sm" className="text-xs h-6 border-destructive/25 text-destructive" onClick={() => handleLoadTemplate('crime')}>
+                      Load Crime Template
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -271,7 +272,7 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
                   <Textarea
                     value={crimeText}
                     onChange={(e) => setCrimeText(e.target.value)}
-                    className="min-h-[100px] max-h-[160px] font-mono text-xs resize-y bg-red-50/30 border-red-200"
+                    className="min-h-[100px] max-h-[160px] font-mono text-xs resize-y bg-destructive/30 border-destructive/25"
                     placeholder="murder, arrest, shooting, homicide, ..."
                   />
                 </div>
@@ -279,11 +280,11 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
                 {/* Exclude (international) */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-orange-600 uppercase tracking-wider">
-                      🚫 Exclude (International) · {excludeCount} keywords
+                    <label className="text-xs font-semibold text-primary uppercase tracking-wider">
+                      Exclude (International) · {excludeCount} keywords
                     </label>
-                    <Button variant="outline" size="sm" className="text-xs h-6 border-orange-200 text-orange-600" onClick={() => handleLoadTemplate('exclude')}>
-                      📋 Load Exclude Template
+                    <Button variant="outline" size="sm" className="text-xs h-6 border-primary/25 text-primary" onClick={() => handleLoadTemplate('exclude')}>
+                      Load Exclude Template
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -292,7 +293,7 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
                   <Textarea
                     value={excludeText}
                     onChange={(e) => setExcludeText(e.target.value)}
-                    className="min-h-[80px] max-h-[140px] font-mono text-xs resize-y bg-orange-50/30 border-orange-200"
+                    className="min-h-[80px] max-h-[140px] font-mono text-xs resize-y bg-primary/30 border-primary/25"
                     placeholder="ukraine, russia, gaza, nato, ..."
                   />
                 </div>
@@ -300,11 +301,11 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
                 {/* Political exclusion */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-yellow-700 uppercase tracking-wider">
-                      🏛️ Exclude (Political) · {politicalCount} keywords
+                    <label className="text-xs font-semibold text-warning uppercase tracking-wider">
+                      Exclude (Political) · {politicalCount} keywords
                     </label>
-                    <Button variant="outline" size="sm" className="text-xs h-6 border-yellow-200 text-yellow-700" onClick={() => handleLoadTemplate('political')}>
-                      📋 Load Political Template
+                    <Button variant="outline" size="sm" className="text-xs h-6 border-warning/25 text-warning" onClick={() => handleLoadTemplate('political')}>
+                      Load Political Template
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -313,7 +314,7 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
                   <Textarea
                     value={politicalText}
                     onChange={(e) => setPoliticalText(e.target.value)}
-                    className="min-h-[80px] max-h-[140px] font-mono text-xs resize-y bg-yellow-50/30 border-yellow-200"
+                    className="min-h-[80px] max-h-[140px] font-mono text-xs resize-y bg-warning/30 border-warning/25"
                     placeholder="election, ballot, senator, white house, ..."
                   />
                 </div>
@@ -323,8 +324,8 @@ export default function KeywordFilterConfig({ config, onSave }: KeywordFilterCon
 
           {/* ── Save actions ──────────────────────────────────────────── */}
           <div className="flex items-center gap-3 pt-1">
-            <Button onClick={handleSave} disabled={saving} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              {saving ? 'Saving...' : saved ? '✓ Saved' : 'Save Keywords'}
+            <Button onClick={handleSave} disabled={saving} size="sm" className="bg-success hover:bg-success/90 text-white">
+              {saving ? 'Saving…' : saved ? 'Saved' : 'Save Keywords'}
             </Button>
           </div>
         </CardContent>

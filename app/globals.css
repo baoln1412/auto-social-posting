@@ -54,8 +54,27 @@
     --accent: 30 20% 96%;
     --accent-foreground: 20 14% 9%;
 
-    --destructive: 0 84% 60%;
+    /* Status colours. One token per role — soft surfaces come from the /10 and
+       /20 opacity modifiers (same pattern the sidebar already uses for primary),
+       not from four hand-picked tints per role.
+       Each is dark enough to pass AA as text on paper AND to carry white text
+       as a solid fill, so a single value serves both jobs. */
+    --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
+    --success: 161 94% 27%;
+    --success-foreground: 0 0% 100%;
+    /* Warning sits at 45° not amber's 26° — at 26° it is indistinguishable from
+       --primary (25°) and every warning reads as a primary action. */
+    --warning: 45 93% 30%;
+    --warning-foreground: 0 0% 100%;
+    --info: 221 83% 45%;
+    --info-foreground: 0 0% 100%;
+
+    /* Platform brand. Not ours to normalise — a Facebook button is Facebook
+       blue. Named here so they live in the token layer instead of leaking in
+       as raw palette classes. Threads and TikTok are black: use --foreground. */
+    --brand-facebook: 214 89% 52%;
+    --brand-instagram: 340 75% 54%;
 
     --border: 20 5% 90%;
     --input: 20 5% 90%;
@@ -81,6 +100,20 @@
 }
 
 @layer base {
+  /* Spatial motion collapses to a short crossfade. The chat panel's slide-up,
+     the pulsing dots and the spinners all opt out here rather than each
+     re-implementing it. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   * {
     border-color: hsl(var(--border));
   }

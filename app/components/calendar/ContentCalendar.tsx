@@ -20,10 +20,10 @@ interface ContentCalendarProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-stone-200 text-stone-700',
-  scheduled: 'bg-amber-100 text-amber-700',
-  published: 'bg-emerald-100 text-emerald-700',
-  failed: 'bg-red-100 text-red-700',
+  draft: 'bg-muted text-foreground',
+  scheduled: 'bg-warning/15 text-warning',
+  published: 'bg-success/15 text-success',
+  failed: 'bg-destructive/15 text-destructive',
 };
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -123,7 +123,7 @@ export default function ContentCalendar({ pageId }: ContentCalendarProps) {
       {/* Calendar grid */}
       <div className="flex-1">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-foreground">
+          <h2 className="text-display text-foreground">
             {MONTHS[month]} {year}
           </h2>
           <div className="flex items-center gap-2">
@@ -140,7 +140,7 @@ export default function ContentCalendar({ pageId }: ContentCalendarProps) {
         </div>
 
         {loading ? (
-          <div className="text-center py-20 text-muted-foreground">Loading calendar...</div>
+          <div className="text-center py-20 text-muted-foreground">Loading calendar…</div>
         ) : (
           <div className="border border-border rounded-xl overflow-hidden bg-card">
             {/* Weekday headers */}
@@ -174,7 +174,7 @@ export default function ContentCalendar({ pageId }: ContentCalendarProps) {
                     `}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm font-medium w-7 h-7 flex items-center justify-center rounded-full
+                      <span className={`text-sm font-normal w-7 h-7 flex items-center justify-center rounded-full
                         ${isToday ? 'bg-primary text-primary-foreground font-bold' : 'text-foreground'}
                       `}>
                         {day}
@@ -214,9 +214,9 @@ export default function ContentCalendar({ pageId }: ContentCalendarProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">
               {selectedDay ? (
-                <>📋 {MONTHS[month]} {selectedDay}, {year}</>
+                <>{MONTHS[month]} {selectedDay}, {year}</>
               ) : (
-                <>📋 Select a day</>
+                <>Select a day</>
               )}
             </CardTitle>
           </CardHeader>
@@ -230,7 +230,7 @@ export default function ContentCalendar({ pageId }: ContentCalendarProps) {
                 {selectedPosts.map((post, i) => (
                   <div key={i} className="p-3 rounded-lg border border-border bg-background hover:bg-accent/50 transition-colors">
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <p className="text-sm font-medium text-foreground leading-snug line-clamp-2">
+                      <p className="text-sm font-normal text-foreground leading-snug line-clamp-2">
                         {post.emojiTitle}
                       </p>
                       <Badge variant="secondary" className={`text-[10px] shrink-0 ${STATUS_COLORS[post.status]}`}>

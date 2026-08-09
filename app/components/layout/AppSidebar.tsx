@@ -1,5 +1,6 @@
 'use client';
 
+import { BarChart3, CalendarDays, FileText, Plus, Settings, TrendingUp } from 'lucide-react';
 import { ContentPage } from '../../types';
 
 interface AppSidebarProps {
@@ -12,11 +13,11 @@ interface AppSidebarProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'content', label: 'Content', icon: '📝' },
-  { id: 'calendar', label: 'Calendar', icon: '📅' },
-  { id: 'analytics', label: 'Analytics', icon: '📊' },
-  { id: 'usage', label: 'Usage', icon: '📈' },
-  { id: 'settings', label: 'Settings', icon: '⚙️' },
+  { id: 'content', label: 'Content', Icon: FileText },
+  { id: 'calendar', label: 'Calendar', Icon: CalendarDays },
+  { id: 'analytics', label: 'Analytics', Icon: BarChart3 },
+  { id: 'usage', label: 'Usage', Icon: TrendingUp },
+  { id: 'settings', label: 'Settings', Icon: Settings },
 ];
 
 export default function AppSidebar({
@@ -34,7 +35,9 @@ export default function AppSidebar({
       {/* Logo */}
       <div className="px-4 py-5">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">⚡</span>
+          {/* The wordmark is type, not an emoji: a filled square in the anchor
+              hue reads as a mark at 20px and renders identically everywhere. */}
+          <span aria-hidden className="w-5 h-5 rounded-[5px] bg-primary shrink-0" />
           <div>
             <h1 className="text-base font-bold text-primary tracking-tight">
               Auto Social
@@ -48,18 +51,20 @@ export default function AppSidebar({
 
       {/* Navigation */}
       <nav className="flex-1 px-3 space-y-1">
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS.map(({ id, label, Icon }) => (
           <button
-            key={item.id}
-            onClick={() => onViewChange(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${activeView === item.id
+            key={id}
+            onClick={() => onViewChange(id)}
+            aria-current={activeView === id ? 'page' : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-normal
+              transition-colors motion-reduce:transition-none
+              ${activeView === id
                 ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'text-foreground hover:bg-accent'
               }`}
           >
-            <span className="text-base">{item.icon}</span>
-            <span>{item.label}</span>
+            <Icon size={16} className="shrink-0" />
+            <span>{label}</span>
           </button>
         ))}
 
@@ -67,9 +72,9 @@ export default function AppSidebar({
         <div className="pt-4">
           <button
             onClick={onAddPage}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all border-2 border-dashed border-primary/30 text-primary hover:bg-primary/5 hover:border-primary/50"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors motion-reduce:transition-none border-2 border-dashed border-primary/30 text-primary hover:bg-primary/5 hover:border-primary/50"
           >
-            <span>＋</span>
+            <Plus size={16} className="shrink-0" />
             <span>New Page</span>
           </button>
         </div>
@@ -86,13 +91,14 @@ export default function AppSidebar({
             <button
               key={page.id}
               onClick={() => onPageChange(page.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all text-left
+              aria-current={page.id === activePageId ? 'true' : undefined}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors motion-reduce:transition-none text-left
                 ${page.id === activePageId
                   ? 'bg-primary/10 text-primary font-semibold border border-primary/20'
                   : 'text-foreground hover:bg-accent border border-transparent'
                 }`}
             >
-              <span className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+              <span className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
                 {page.name.charAt(0)}
               </span>
               <span className="truncate">{page.name}</span>

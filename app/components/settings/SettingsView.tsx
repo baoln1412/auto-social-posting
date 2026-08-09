@@ -29,7 +29,7 @@ function TopicSelector({
   return (
     <Card className="card-warm">
       <CardHeader>
-        <CardTitle className="text-base">🏷️ Topics for this market</CardTitle>
+        <CardTitle className="text-base">Topics for this market</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
@@ -58,7 +58,7 @@ function TopicSelector({
             Select all
           </button>
           {selected.length === 0 && (
-            <span className="text-xs text-red-600">Pick at least one topic.</span>
+            <span className="text-xs text-destructive">Pick at least one topic.</span>
           )}
         </div>
       </CardContent>
@@ -101,12 +101,12 @@ export default function SettingsView({
 }: SettingsViewProps) {
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
-      <h2 className="text-xl font-bold text-foreground">⚙️ Market Settings</h2>
+      <h2 className="text-display text-foreground">Market Settings</h2>
 
       {/* Market info */}
       <Card className="card-warm">
         <CardHeader>
-          <CardTitle className="text-base">🌍 Market</CardTitle>
+          <CardTitle className="text-base">Market</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
@@ -118,10 +118,10 @@ export default function SettingsView({
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={onRenamePage}>
-                ✏️ Rename
+                Rename
               </Button>
-              <Button variant="outline" size="sm" className="text-red-600 hover:bg-red-50 border-red-200" onClick={onDeletePage}>
-                🗑️ Delete
+              <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10 border-destructive/25" onClick={onDeletePage}>
+                Delete
               </Button>
             </div>
           </div>
@@ -148,11 +148,11 @@ export default function SettingsView({
       {/* ── Maintenance ────────────────────────────────────────── */}
       <Card className="card-warm">
         <CardHeader>
-          <CardTitle className="text-base">🔧 Maintenance</CardTitle>
+          <CardTitle className="text-base">Maintenance</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="text-sm font-medium text-foreground mb-0.5">Backfill enrichment data</p>
+            <p className="text-sm font-normal text-foreground mb-0.5">Backfill enrichment data</p>
             <p className="text-xs text-muted-foreground mb-3">
               Re-process existing posts to fill in fields that were added or changed
               after the posts were first generated. Safe to run at any time.

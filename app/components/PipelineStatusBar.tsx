@@ -30,9 +30,9 @@ export default function PipelineStatusBar({ pageId, refreshKey }: { pageId: stri
 
   return (
     <div className="text-xs text-muted-foreground flex items-center gap-2">
-      <span>🕐 Last run: {relativeTime(status.lastRunAt)}</span>
+      <span>Last run: {relativeTime(status.lastRunAt)}</span>
       <span className="opacity-50">·</span>
-      <span>✨ {status.postsSinceLastRun} post{status.postsSinceLastRun === 1 ? '' : 's'} generated</span>
+      <span>{status.postsSinceLastRun} post{status.postsSinceLastRun === 1 ? '' : 's'} generated</span>
     </div>
   );
 }

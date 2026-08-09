@@ -91,7 +91,7 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-foreground">Script</h3>
-              {vg.approved && <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">Đã approve</Badge>}
+              {vg.approved && <Badge className="bg-success/15 text-success text-[10px]">Đã approve</Badge>}
             </div>
 
             <Textarea
@@ -103,7 +103,7 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
             />
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={vg.generate} disabled={vg.loading} size="sm" className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button onClick={vg.generate} disabled={vg.loading} size="sm" className="bg-primary hover:bg-primary/90 text-white">
                 {vg.loading ? '⏳ Đang tạo…' : '✨ Tạo script'}
               </Button>
               {vg.script && (
@@ -123,7 +123,7 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
             </div>
 
             {vg.script && !vg.approved && (
-              <Button onClick={() => vg.setApproved(true)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Button onClick={() => vg.setApproved(true)} className="w-full bg-success hover:bg-success/90 text-white">
                 ✅ Approve
               </Button>
             )}
@@ -149,7 +149,7 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
 
             {mediaExpanded && (
               <div className="space-y-3 pl-6">
-                <label className="flex items-center gap-2 text-sm text-rose-600 font-medium cursor-pointer w-fit">
+                <label className="flex items-center gap-2 text-sm text-primary font-normal cursor-pointer w-fit">
                   <Upload className="w-4 h-4" /> Thêm file
                   <input type="file" multiple accept="image/*,video/*" className="hidden"
                     onChange={(e) => { vg.addFiles(e.target.files); e.target.value = ''; }} />
@@ -163,7 +163,7 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
                           {i + 1}
                         </span>
                         <button onClick={() => vg.removeMedia(m.id)}
-                          className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-red-600 text-white text-[10px] flex items-center justify-center hover:bg-red-700">
+                          className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-destructive text-white text-[10px] flex items-center justify-center hover:bg-destructive/90">
                           ✕
                         </button>
                         {m.uploading ? (
@@ -201,7 +201,7 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
                 <ul className="text-sm space-y-1.5 text-foreground/90">
                   {CHECKLIST_LINES.map((line, i) => (
                     <li key={i} className="flex gap-2">
-                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />
+                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                       <span>{line}</span>
                     </li>
                   ))}
@@ -217,18 +217,18 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
                 <Button
                   onClick={vg.render}
                   disabled={vg.jobStatus === 'running'}
-                  className="w-full bg-violet-600 hover:bg-violet-700 text-white"
+                  className="w-full bg-primary hover:bg-primary/90 text-white"
                 >
                   {vg.jobStatus === 'running' ? 'Đang render…' : vg.jobStatus === 'error' ? '🔁 Thử lại render' : '🎥 Bắt đầu render'}
                 </Button>
 
                 {vg.jobStatus === 'running' && (
-                  <p className="text-xs rounded-md bg-amber-50 text-amber-700 border border-amber-200 px-3 py-2">
+                  <p className="text-xs rounded-md bg-warning/10 text-warning border border-warning/25 px-3 py-2">
                     Render đang chạy ngầm — bạn có thể đóng khung này.
                   </p>
                 )}
                 {vg.jobStatus === 'error' && vg.jobError && (
-                  <p className="text-xs text-red-600 whitespace-pre-wrap">{vg.jobError}</p>
+                  <p className="text-xs text-destructive whitespace-pre-wrap">{vg.jobError}</p>
                 )}
               </div>
             </>

@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AIChatWindow, { DashboardFilters, AIChatHandle } from './components/chat/AIChatWindow';
+import { toast, confirmDialog, promptDialog } from './components/feedback';
+import { Loader2, PlayCircle, RefreshCw, Rss } from 'lucide-react';
 
 export default function Home() {
   const chatRef = useRef<AIChatHandle>(null);
@@ -127,11 +129,11 @@ export default function Home() {
         setActiveView('settings');
         setNewPageOpen(false);
       } else {
-        alert(data.error ?? 'Failed to create page');
+        toast(data.error ?? 'Failed to create page');
       }
     } catch (err) {
       console.error('Failed to create market:', err);
-      alert('Failed to create page');
+      toast('Failed to create page');
     } finally {
       setNpSaving(false);
     }
@@ -199,14 +201,25 @@ export default function Home() {
 
   const handleRenamePage = async () => {
     if (!activePage) return;
-    const name = prompt('Enter new page name:', activePage.name);
+    const name = await promptDialog({
+      title: 'Rename market',
+      label: 'Name',
+      defaultValue: activePage.name,
+    });
     if (!name?.trim() || name.trim() === activePage.name) return;
     await fetch('/api/pages', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: activePageId, name: name.trim() }) });
     setPages((prev) => prev.map((p) => (p.id === activePageId ? { ...p, name: name.trim() } : p)));
   };
 
   const handleDeletePage = async () => {
-    if (!activePage || !confirm(`Delete "${activePage.name}"? This cannot be undone.`)) return;
+    if (!activePage) return;
+    const ok = await confirmDialog({
+      title: `Delete “${activePage.name}”?`,
+      body: 'The market and its posts go with it. This cannot be undone.',
+      confirmLabel: 'Delete market',
+      destructive: true,
+    });
+    if (!ok) return;
     await fetch(`/api/pages?id=${activePageId}`, { method: 'DELETE' });
     setPages((prev) => prev.filter((p) => p.id !== activePageId));
     setActivePageId(pages.find((p) => p.id !== activePageId)?.id ?? null);
@@ -251,7 +264,12 @@ export default function Home() {
   // Triggers the same Claude Code skill the 4h schedule uses, then polls until
   // the run finishes and reloads the generated posts.
   const handleRunFullPipeline = async () => {
-    if (!confirm('Run the full pipeline now (crawl → filter → generate)?\nThis uses Claude Code and can take a few minutes.')) return;
+    const ok = await confirmDialog({
+      title: 'Run the full pipeline now?',
+      body: 'Crawl → filter → generate. This uses Claude Code and can take a few minutes.',
+      confirmLabel: 'Run pipeline',
+    });
+    if (!ok) return;
     setFullRunning(true);
     setProgress('Starting full pipeline (crawl → silver → gold)…');
     try {
@@ -284,8 +302,8 @@ export default function Home() {
 
   if (pagesLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background text-primary font-semibold">
-        Loading...
+      <div className="flex items-center justify-center gap-2 min-h-screen bg-background text-primary font-semibold">
+        <Loader2 size={18} className="animate-spin" />Loading…
       </div>
     );
   }
@@ -295,6 +313,11 @@ export default function Home() {
     if (!activePage) return null;
     return (
       <div className="flex flex-col gap-5 max-w-[1600px]">
+        {/* The one element at the display rung on this view — the measured scale
+            had nothing above 24px, so no size said "top of the page". The
+            breadcrumb above is nav chrome at 14px; this is the page's identity. */}
+        <h2 className="text-display text-foreground">{activePage.name}</h2>
+
         {/* Market sub-tabs */}
         <PageTabs
           pages={pages}
@@ -308,17 +331,21 @@ export default function Home() {
         {/* Pipeline controls */}
         <div className="flex items-center gap-3">
           <Button onClick={handleRunPipeline} disabled={pipelineRunning || fullRunning} size="default"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
-            {pipelineRunning ? '⏳ Crawling...' : '🚀 Crawl News (bronze)'}
+            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
+            {pipelineRunning
+              ? <><Loader2 size={16} className="animate-spin" />Crawling…</>
+              : <><Rss size={16} />Crawl News (bronze)</>}
           </Button>
           <Button onClick={handleRunFullPipeline} disabled={fullRunning || pipelineRunning} size="default"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
-            {fullRunning ? '⏳ Running full pipeline…' : '⚡ Run Full Pipeline'}
+            className="gap-2 bg-success hover:bg-success/90 text-success-foreground font-bold">
+            {fullRunning
+              ? <><Loader2 size={16} className="animate-spin" />Running full pipeline…</>
+              : <><PlayCircle size={16} />Run Full Pipeline</>}
           </Button>
-          <Button onClick={loadPosts} disabled={postsLoading} variant="outline" size="default">
-            🔄 Refresh
+          <Button onClick={loadPosts} disabled={postsLoading} variant="outline" size="default" className="gap-2">
+            <RefreshCw size={16} className={postsLoading ? 'animate-spin' : undefined} />Refresh
           </Button>
-          {progress && <span className="text-xs text-primary font-medium">{progress}</span>}
+          {progress && <span className="text-xs text-primary font-normal">{progress}</span>}
         </div>
 
         {/* Filters */}
@@ -327,7 +354,7 @@ export default function Home() {
             type="text"
             value={filterKeyword}
             onChange={(e) => setFilterKeyword(e.target.value)}
-            placeholder="🔍 Search keywords..."
+            placeholder="Search keywords…"
             className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground w-44"
           />
           <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}
@@ -360,7 +387,7 @@ export default function Home() {
 
         {/* Posts */}
         {postsLoading ? (
-          <div className="text-center py-16 text-muted-foreground">Loading posts...</div>
+          <div className="text-center py-16 text-muted-foreground">Loading posts…</div>
         ) : posts.length === 0 ? (
           <div className="text-center py-16 rounded-xl border border-dashed border-border bg-card text-muted-foreground">
             <p className="text-lg mb-2 font-medium">No content yet</p>
@@ -467,19 +494,19 @@ export default function Home() {
             <DialogTitle>New page / market</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3 py-2">
-            <label className="text-sm font-medium">
-              Name<span className="text-red-500">*</span>
+            <label className="text-sm font-normal">
+              Name<span className="text-destructive">*</span>
               <Input className="mt-1" autoFocus placeholder='e.g. "Czech Republic / Người Việt"'
                 value={npName} onChange={(e) => setNpName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') submitNewPage(); }} />
             </label>
             <div className="flex gap-3">
-              <label className="text-sm font-medium flex-1">
+              <label className="text-sm font-normal flex-1">
                 Country code
                 <Input className="mt-1" placeholder="CZ" maxLength={2}
                   value={npCode} onChange={(e) => setNpCode(e.target.value)} />
               </label>
-              <label className="text-sm font-medium flex-[2]">
+              <label className="text-sm font-normal flex-[2]">
                 Country name
                 <Input className="mt-1" placeholder="Czech Republic"
                   value={npCountry} onChange={(e) => setNpCountry(e.target.value)} />

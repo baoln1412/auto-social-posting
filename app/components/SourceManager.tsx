@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { toast } from './feedback';
+import { ChevronDown, ChevronUp, Loader2, X } from 'lucide-react';
 
 interface Feed {
   id: string;
@@ -27,9 +29,9 @@ interface SourceManagerProps {
 }
 
 const FEED_BADGE: Record<string, { label: string; className: string }> = {
-  rss: { label: 'RSS', className: 'bg-blue-50 text-blue-600' },
-  atom: { label: 'ATOM', className: 'bg-emerald-50 text-emerald-600' },
-  web_scrape: { label: 'SCRAPE', className: 'bg-amber-50 text-amber-700' },
+  rss: { label: 'RSS', className: 'bg-info/10 text-info' },
+  atom: { label: 'ATOM', className: 'bg-success/10 text-success' },
+  web_scrape: { label: 'SCRAPE', className: 'bg-warning/10 text-warning' },
 };
 
 export default function SourceManager({ pageId }: SourceManagerProps) {
@@ -45,7 +47,7 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
   const [detecting, setDetecting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [discovered, setDiscovered] = useState<DiscoveredFeed[]>([]);
-  const [detectStatus, setDetectStatus] = useState<string | null>(null);
+  const [detectStatus, setDetectStatus] = useState<{ text: string; tone: 'ok' | 'bad' | 'busy' } | null>(null);
 
   const loadFeeds = useCallback(async () => {
     try {
@@ -75,7 +77,7 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
     setDetecting(true);
     setError(null);
     setDiscovered([]);
-    setDetectStatus('🔍 Scanning for RSS feeds...');
+    setDetectStatus({ text: 'Scanning for RSS feeds…', tone: 'busy' });
     try {
       const res = await fetch('/api/feeds/discover', {
         method: 'POST',
@@ -85,7 +87,7 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
       const data = await res.json();
       const foundFeeds: DiscoveredFeed[] = data.feeds ?? [];
       if (foundFeeds.length === 0) {
-        setDetectStatus('⚠️ No RSS found. Enter URL manually with "Web Scrape" type.');
+        setDetectStatus({ text: 'No RSS found. Enter the URL manually with the "Web Scrape" type.', tone: 'bad' });
         setNewName(guessName(url));
         setNewFeedUrl(url);
         setNewFeedType('web_scrape');
@@ -93,14 +95,14 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
         const f = foundFeeds[0];
         setNewFeedUrl(f.url);
         setNewName(f.title || guessName(url));
-        setDetectStatus(`✅ ${f.method || 'Found'}: ${f.url}`);
+        setDetectStatus({ text: `Found via ${f.method || 'discovery'}: ${f.url}`, tone: 'ok' });
         setNewFeedType(f.feedType || 'rss');
       } else {
         setDiscovered(foundFeeds);
-        setDetectStatus(`Found ${foundFeeds.length} feeds — pick one:`);
+        setDetectStatus({ text: `Found ${foundFeeds.length} feeds — pick one:`, tone: 'ok' });
       }
     } catch {
-      setDetectStatus('❌ Detection failed.');
+      setDetectStatus({ text: 'Detection failed.', tone: 'bad' });
       setNewName(guessName(url));
     } finally {
       setDetecting(false);
@@ -111,7 +113,7 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
     setNewFeedUrl(df.url);
     setNewName(df.title || guessName(inputUrl));
     setDiscovered([]);
-    setDetectStatus(`✅ Selected: ${df.url}`);
+    setDetectStatus({ text: `Selected: ${df.url}`, tone: 'ok' });
     setNewFeedType(df.feedType || 'rss');
   };
 
@@ -153,13 +155,36 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
     } catch { setFeeds((prev) => prev.map((f) => (f.id === id ? { ...f, enabled: !enabled } : f))); }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Remove "${name}"?`)) return;
-    setFeeds((prev) => prev.filter((f) => f.id !== id));
+  // No confirm dialog: removing a feed is cheaply reversible, so it takes the
+  // optimistic-delete + Undo path instead of asking first. Undo re-creates the
+  // feed through the POST the API already exposes — no soft-delete needed
+  // server-side. Articles already ingested are never touched either way.
+  const handleDelete = async (feed: Feed) => {
+    setFeeds((prev) => prev.filter((f) => f.id !== feed.id));
     try {
-      const res = await fetch(`/api/feeds?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/feeds?id=${feed.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
-    } catch { await loadFeeds(); }
+    } catch {
+      await loadFeeds();
+      toast(`Could not remove “${feed.name}”.`);
+      return;
+    }
+    toast(`Removed “${feed.name}”.`, 'info', {
+      label: 'Undo',
+      run: async () => {
+        try {
+          const res = await fetch('/api/feeds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pageId, name: feed.name, url: feed.url, feedType: feed.feedType }),
+          });
+          if (!res.ok) throw new Error('Restore failed');
+        } catch {
+          toast(`Could not restore “${feed.name}”.`);
+        }
+        await loadFeeds();
+      },
+    });
   };
 
   const enabledCount = feeds.filter((f) => f.enabled).length;
@@ -171,20 +196,20 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
         className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-foreground hover:bg-accent/50 transition-colors rounded-t-xl"
       >
         <span>
-          📡 Feed Sources
+          Feed Sources
           <span className="ml-2 text-xs text-muted-foreground font-normal">
             {enabledCount} active / {feeds.length} total
           </span>
         </span>
         <span className="text-muted-foreground text-xs">
-          {isOpen ? '▲' : '▼'}
+          {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </span>
       </button>
 
       {isOpen && (
         <CardContent className="pt-0 space-y-3">
-          {loading && <p className="text-sm text-primary">Loading feeds...</p>}
-          {error && <p className="text-sm text-destructive">⚠️ {error}</p>}
+          {loading && <p className="text-sm text-primary">Loading feeds…</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex flex-col gap-2">
             {feeds.map((feed) => {
@@ -192,14 +217,14 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
               return (
                 <div
                   key={feed.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${feed.enabled ? 'border-border bg-background' : 'border-border/50 bg-muted/30 opacity-50'}`}
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-[background-color,border-color,opacity] ${feed.enabled ? 'border-border bg-background' : 'border-border/50 bg-muted/30 opacity-50'}`}
                 >
                   {/* Toggle switch */}
                   <button
                     onClick={() => handleToggle(feed.id, !feed.enabled)}
-                    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${feed.enabled ? 'bg-emerald-500' : 'bg-stone-300'}`}
+                    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${feed.enabled ? 'bg-success' : 'bg-foreground'}`}
                   >
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${feed.enabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform motion-reduce:transition-none ${feed.enabled ? 'translate-x-4' : 'translate-x-0'}`} />
                   </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -211,10 +236,10 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDelete(feed.id, feed.name)}
+                    onClick={() => handleDelete(feed)}
                     className="text-muted-foreground hover:text-destructive shrink-0"
                   >
-                    ✕
+                    <X size={14} />
                   </Button>
                 </div>
               );
@@ -224,13 +249,13 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
           {/* Add new feed */}
           <div className="rounded-lg p-4 bg-muted/30 border border-border space-y-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              ➕ Add New Source
+              Add New Source
             </p>
 
             <div className="flex gap-2">
               <Input
                 type="url"
-                placeholder="Paste any website or RSS URL..."
+                placeholder="Paste any website or RSS URL…"
                 value={inputUrl}
                 onChange={(e) => setInputUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleDetect()}
@@ -242,13 +267,13 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
                 size="sm"
                 variant="default"
               >
-                {detecting ? '🔍...' : '🔍 Detect'}
+                {detecting ? <><Loader2 size={13} className="animate-spin" />Detecting…</> : 'Detect'}
               </Button>
             </div>
 
             {detectStatus && (
-              <p className={`text-xs ${detectStatus.startsWith('✅') ? 'text-emerald-600' : detectStatus.startsWith('⚠️') || detectStatus.startsWith('❌') ? 'text-destructive' : 'text-primary'}`}>
-                {detectStatus}
+              <p className={`text-xs ${detectStatus.tone === 'ok' ? 'text-success' : detectStatus.tone === 'bad' ? 'text-destructive' : 'text-primary'}`}>
+                {detectStatus.text}
               </p>
             )}
 
@@ -305,7 +330,7 @@ export default function SourceManager({ pageId }: SourceManagerProps) {
                 disabled={adding || !newName.trim() || !newFeedUrl.trim()}
                 size="sm"
               >
-                {adding ? 'Adding...' : 'Add'}
+                {adding ? 'Adding…' : 'Add'}
               </Button>
             </div>
           </div>

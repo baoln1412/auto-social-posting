@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import AppSidebar from './AppSidebar';
 import { ContentPage } from '../../types';
 
@@ -16,11 +17,11 @@ interface AppLayoutProps {
 }
 
 const VIEW_LABELS: Record<string, string> = {
-  content: '📝 Content',
-  calendar: '📅 Calendar',
-  analytics: '📊 Analytics',
-  usage: '📈 Usage',
-  settings: '⚙️ Settings',
+  content: 'Content',
+  calendar: 'Calendar',
+  analytics: 'Analytics',
+  usage: 'Usage',
+  settings: 'Settings',
 };
 
 export default function AppLayout({
@@ -38,8 +39,12 @@ export default function AppLayout({
   return (
     <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
+      {/* ponytail: names the property instead of transition-all, so the border
+          and colours no longer animate with it. Width is still a layout
+          property — a transform-based drawer is the upgrade if this ever janks,
+          but it fires once per click, not per scroll frame. */}
       <aside
-        className="shrink-0 transition-all duration-200 ease-in-out overflow-hidden border-r border-border"
+        className="shrink-0 transition-[width] duration-200 ease-in-out motion-reduce:transition-none overflow-hidden border-r border-border"
         style={{ width: sidebarOpen ? '16rem' : '0rem' }}
       >
         <div className="w-64 h-screen sticky top-0 overflow-y-auto bg-sidebar">
@@ -62,8 +67,10 @@ export default function AppLayout({
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground"
             title="Toggle sidebar"
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-expanded={sidebarOpen}
           >
-            {sidebarOpen ? '◀' : '▶'}
+            {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
           </button>
           <div className="h-5 w-px bg-border" />
           <nav className="flex items-center gap-1.5 text-sm">
