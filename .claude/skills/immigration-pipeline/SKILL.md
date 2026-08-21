@@ -197,24 +197,46 @@ For each market id:
    - If `systemPrompt` is non-empty, treat it as an additional master instruction.
    - If `userPrompt` is non-empty, follow it as extra generation guidance.
    - **FORMAT (non-negotiable) — impactful but FACT-BASED/neutral, not personal judgment:**
-     - `emoji_title`: **ALL-CAPS, starts with `FLAG + COUNTRY:`** (e.g. `🇺🇸 MỸ:`,
-       `🇦🇺 ÚC:`, `🇩🇪 ĐỨC:`) then a punchy, urgent/shocking headline; **END the title
-       with ONE thematic emoji** matched to content (🚨 🚛 ⚖️ 💰 🎉 📋). **NO `?` in the
-       title.** No lowercase. (SOP §1.)
-     - `body_text`: **400–600 words.** Open with a **2–3-sentence prose lead** (flowing,
-       NO bullets, NO `-`). Then **3–4 sections**, each with an emoji sub-heading (never
-       a question, never "tại sao/nói gì/chuyện gì xảy ra"). **List items ONLY with `🔹`
-       — NEVER use the `-` dash anywhere in the post.** Prioritise concrete numbers,
-       names, places, dates. No paragraph over 4 lines. End body with the TWO mandatory
-       parts: a **💡 GÓC NHÌN CHO CỘNG ĐỒNG NGƯỜI VIỆT** block (3–4 sentences, practical
-       actionable advice, include phone/website if any), then a **debate-provoking closing**
-       (a rhetorical question — allowed here — or a strong statement, left open). (SOP §2–4.)
-     - `hashtags`: 4–6 Vietnamese tags incl. one Vietnamese-community tag; **ALWAYS end
-       with `#TinQuốcTếMớiNhất`** (or `#TinMỹMớiNhất`/`#TinÚcMớiNhất`… per country). (SOP §5.)
-     - `comment_1` (2–3 sentences, ordinary-reader reaction, casual, **NO emoji**) **and**
-       `comment_2` (2–3 sentences, community-expert + advice) — **MANDATORY** (SOP §6).
-       `comment_2` MUST end with the exact line: `Cả nhà theo dõi page để cập nhật tin
-       tức cộng đồng người Việt và thời sự quốc tế mới nhất nhé ạ!`
+     - `emoji_title`: **starts with `FLAG + COUNTRY:`** in caps (e.g. `🇺🇸 MỸ:`, `🇦🇺 ÚC:`,
+       `🇩🇪 ĐỨC:`), then **sentence case — NOT all-caps.** Short and plain, no academic
+       wording. Weave in the Vietnamese angle when the news genuinely affects them; keep
+       it pure news (no forced Vietnamese angle) when someone named has died, when it is
+       distant politics, or when it concerns another community. For scam/warning stories,
+       name the **behaviour to avoid, not the perpetrator**. **END with ONE thematic
+       emoji** (⚠️ 🚨 💸 📋 ⚖️ 🕯️ 📊). **NO `?` in the title.** (SOP §1.)
+     - `body_text`: **400–600 words.** Open **INDIRECTLY** — an image, a rhetorical
+       question or a scene first; never the event itself in sentence one (2–3 sentences,
+       flowing prose, NO bullets). Then **usually 2–4 sections** with an **emoji + CAPS
+       sub-heading** (never a question, never "tại sao/nói gì/chuyện gì xảy ra"), **3–5
+       `▪` bullets each** — `▪` is the ONLY bullet character; never `-` or `•`. One or two
+       flowing paragraphs may replace the breakdown on short items. **If the post lands
+       under 400 words, ADD ANOTHER SECTION drawn from the source** (context, official
+       response, comparative figures) — never pad the prose, never invent detail; if the
+       source has nothing left to add, leave it short. Untried criminal cases MUST
+       carry "đây mới là cáo buộc, chưa có phán quyết của tòa"; policy items MUST separate
+       "đề xuất" from "đã có hiệu lực". Then the community-impact paragraph **only if a
+       real link exists** (single paragraph, no bullets, calm, no scare-mongering — omit
+       entirely rather than force it), and finally a **mandatory closing rhetorical
+       question**, no exceptions. (SOP §2–5.)
+     - `hashtags`: **5–7 tags, NO diacritics**, pattern
+       `#NguoiVietTai[Nước] #Tin[Nước] #<topic> #CongDongVietNam #TinQuocTe`;
+       **ALWAYS end with `#TinQuocTe`**. (SOP §6.)
+     - `comment_1`, `comment_2` **and** `comment_3` — **ALL THREE MANDATORY** (SOP §7).
+       `comment_1`: emotional reaction to the most striking detail, 2–3 sentences,
+       **NO emoji**, and must **not** contain the phrase "điều đáng chú ý".
+       `comment_2`: follow-the-page call, connects to Vietnamese people living in that
+       country + short practical advice; MUST end with the exact line: `Cả nhà theo dõi
+       page để cập nhật tin tức cộng đồng người Việt, thời sự và di trú quốc tế mới nhất
+       nhé ạ!`
+       `comment_3`: call to share, with a **concrete reason** why this post should reach
+       friends and family (who needs it and what for).
+     - Address readers as "cả nhà" / "anh chị em" / "mọi người" — never stiff newswire
+       register. Never use "vượt biên" (use "rời khỏi Việt Nam" or "vượt biển"). (SOP §8.)
+     - **Refuse to write** if: the victim is a child in a sexual-abuse case; the source
+       uses racial/ethnic slurs. Never describe the method of a violent/abuse crime. For
+       named individuals in a case circulating on social media, verify before asserting —
+       if the core claim is not independently confirmed, write neutrally and attribute
+       nothing. (SOP §9.)
    - Also produce `summary` (2–3 sentences, internal) and `image_prompt` (English).
    - If `platformPrompts` is non-empty, also produce `platform_drafts`
      ({"<platform>": "<draft>", …}) adapting the post per each instruction.

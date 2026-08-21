@@ -181,7 +181,7 @@ function PlatformDraftSection({
 }
 
 export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pageId, pageName, onShowChecklistInChat }: PostCardProps) {
-  const { article, facebookText, emojiTitle, hashtags, comment1, comment2, generatedImageUrl, platformDrafts } = post;
+  const { article, facebookText, emojiTitle, hashtags, comment1, comment2, comment3, generatedImageUrl, platformDrafts } = post;
   const { title, pubDate, source, imageUrl, imageUrls, url } = article;
   const status = post.status ?? (post.isDone ? 'published' : 'draft');
 
@@ -597,12 +597,12 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
         </div>
 
         {/* ═══════ SEED COMMENTS (post as the first comments to spark engagement) ═══════ */}
-        {(comment1?.trim() || comment2?.trim()) && (
+        {(comment1?.trim() || comment2?.trim() || comment3?.trim()) && (
           <div className="rounded-lg border border-border overflow-hidden bg-muted/10">
             <div className="px-4 py-2 border-b border-border">
               <span className="text-xs font-semibold text-warning uppercase tracking-wider">Seed Comments</span>
             </div>
-            {[comment1, comment2].map((c, i) =>
+            {[comment1, comment2, comment3].map((c, i) =>
               c?.trim() ? (
                 <div key={i} className="flex items-start gap-2 px-4 py-2.5 border-b border-border last:border-b-0">
                   <span className="text-xs font-semibold text-muted-foreground mt-1 shrink-0">#{i + 1}</span>
