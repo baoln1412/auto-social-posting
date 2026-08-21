@@ -86,6 +86,7 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
       hashtags        TEXT,
       comment_1       TEXT,
       comment_2       TEXT,
+      comment_3       TEXT,
       image_prompt    TEXT,
       platform_drafts TEXT,
       language        TEXT,
@@ -98,6 +99,7 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
     -- Migrations for tables created before these columns existed.
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS comment_1 TEXT;
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS comment_2 TEXT;
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS comment_3 TEXT;
     ALTER TABLE bronze_news        ADD COLUMN IF NOT EXISTS image_urls TEXT;
     ALTER TABLE silver_immigration ADD COLUMN IF NOT EXISTS image_urls TEXT;
     ALTER TABLE gold_content       ADD COLUMN IF NOT EXISTS image_urls TEXT;
@@ -400,6 +402,7 @@ export interface GoldInput {
   hashtags?: string;
   comment_1?: string;
   comment_2?: string;
+  comment_3?: string;
   image_prompt?: string;
   platform_drafts?: Record<string, string>;
   language?: string;
@@ -425,14 +428,14 @@ export async function insertGold(rows: GoldInput[]): Promise<number> {
     if (num(dup[0]?.c) > 0) continue;
     await run(
       `INSERT INTO gold_content
-        (id, silver_id, market_id, article_url, article_title, source_name, location, image_url, image_urls, emoji_title, body_text, summary, hook, hashtags, comment_1, comment_2, image_prompt, platform_drafts, language, topics, status, is_done, pub_date, generated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', false, ?, ?)`,
+        (id, silver_id, market_id, article_url, article_title, source_name, location, image_url, image_urls, emoji_title, body_text, summary, hook, hashtags, comment_1, comment_2, comment_3, image_prompt, platform_drafts, language, topics, status, is_done, pub_date, generated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', false, ?, ?)`,
       [
         randomUUID(), r.silver_id, r.market_id, r.article_url ?? null, r.article_title ?? null,
         r.source_name ?? '', r.location ?? null, r.image_url ?? null,
         JSON.stringify(r.image_urls ?? []),
         r.emoji_title, r.body_text,
-        r.summary ?? '', r.hook ?? '', r.hashtags ?? '', r.comment_1 ?? '', r.comment_2 ?? '',
+        r.summary ?? '', r.hook ?? '', r.hashtags ?? '', r.comment_1 ?? '', r.comment_2 ?? '', r.comment_3 ?? '',
         r.image_prompt ?? '',
         JSON.stringify(r.platform_drafts ?? {}), r.language ?? 'vi',
         JSON.stringify(r.topics ?? []),
@@ -519,7 +522,7 @@ export async function setGoldImages(id: string, imageUrl: string, insetUrl: stri
 /** Text fields of a published post that may be corrected in place. */
 const EDITABLE_GOLD_FIELDS = [
   'emoji_title', 'body_text', 'summary', 'hook', 'hashtags',
-  'comment_1', 'comment_2', 'image_prompt',
+  'comment_1', 'comment_2', 'comment_3', 'image_prompt',
 ] as const;
 export type EditableGoldField = (typeof EDITABLE_GOLD_FIELDS)[number];
 

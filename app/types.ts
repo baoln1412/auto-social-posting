@@ -32,6 +32,8 @@ export interface PostDraft {
   comment1?: string;
   /** Seed comment 2 — importance + follow-page call-to-action */
   comment2?: string;
+  /** Seed comment 3 — call to share, with a concrete reason (SOP §7) */
+  comment3?: string;
   /** SOP §5 — English visual concept, used to AI-generate a card background
    *  when the article has no image (Case 2). */
   imagePrompt?: string;
