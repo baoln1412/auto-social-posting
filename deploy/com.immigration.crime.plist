@@ -13,17 +13,22 @@
 
   <key>EnvironmentVariables</key>
   <dict>
-    <!-- Series per run. 3h interval x 1 = 8/day, which is the stated target.
-         The generator can sustain that; the case queue is what will not, so the
-         run exits quietly when the queue is empty rather than inventing a case. -->
+    <!-- Cases attempted per daily batch. Measured: ~13 min to write one, ~4 min to reject
+         one, so 8 finishes well before mid-morning. Each case is its own claude
+         invocation, so raising this costs time, not output quality. -->
     <key>CRIME_SERIES_PER_RUN</key>
-    <string>1</string>
+    <string>8</string>
   </dict>
 
-  <!-- Every 3 hours. One series takes roughly 10 minutes of headless Claude, so the
-       interval is set by how fast the queue can be refilled, not by compute. -->
-  <key>StartInterval</key>
-  <integer>10800</integer>
+  <!-- Once a day at 06:00, so the batch is finished and waiting at the start of the day
+       rather than arriving in pieces through it. -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>6</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
 
   <key>RunAtLoad</key>
   <false/>
