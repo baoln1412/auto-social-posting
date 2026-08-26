@@ -46,8 +46,18 @@ interface Hit {
 const PROCEDURAL = /1170\.95|1172\.6|habeas|resentenc|petition for writ|coram nobis/i;
 // A conviction that was reversed leaves the story with no ending, and KỲ III needs a final
 // judgment. Reversals are skipped unless the same text also records an affirmance.
-const REVERSED = /revers|vacat|remand/i;
+//
+// "remand" and "vacat" used to sit here too, and measured against a labelled set they caught
+// none of six real rejections while killing a good case outright: G053424 was remanded for a
+// youth-offender parole hearing with the murder conviction left standing, and it went on to
+// produce a series. A remand is not a missing ending.
+const REVERSED = /\brevers/i;
 const AFFIRMED = /affirm/i;
+// Appeals that argue only about the sentence: Three Strikes priors, prior-prison-term and
+// firearm enhancements, §654 double-counting. The crime is real but the opinion never
+// narrates it, so there is no scene, no victim and no investigation to write from. Two of
+// today's six rejections read exactly like this in the snippet, and no good case does.
+const SENTENCE_ONLY = /\bstrike\b.{0,20}prior|prior.{0,20}\bstrike\b|§§?\s*667|1170\.12|667\.5|12022|\benhancements?\b|Penal Code section 654|§\s*654/i;
 
 /**
  * One crime can appear in the archive several times over: the direct appeal, an order
@@ -171,6 +181,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             // Skip reviews of prior proceedings, and reversals with no recorded affirmance.
             if (PROCEDURAL.test(snip)) continue;
             if (REVERSED.test(snip) && !AFFIRMED.test(snip)) continue;
+            if (SENTENCE_ONLY.test(snip)) continue;
             const title = (r.caseName ?? '').trim();
             // "In re X" is habeas or juvenile: a review of a prior proceeding, never a
             // trial record. Belt-and-braces on top of the query.
