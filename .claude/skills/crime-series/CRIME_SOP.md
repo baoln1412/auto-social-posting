@@ -112,7 +112,10 @@ người; muốn thấy công lý được thực thi.
 | Tự tử, tự sát | tự kết thúc cuộc đời · quyên sinh |
 | Chặt xác | phân tách thân thể · tổn hại thân thể nghiêm trọng |
 
-Bảng này áp dụng cho **câu văn tường thuật**. KHÔNG áp dụng cho **tên tội danh** (§1).
+Bảng này áp dụng cho **câu văn tường thuật VÀ CHO TIÊU ĐỀ**. Tiêu đề là chỗ dễ quên nhất
+và lại là chỗ hiển thị nhiều nhất: một bộ ba kỳ dùng đúng "xâm phạm thân thể" 18 lần trong
+thân bài vẫn để lọt từ trực diện lên tiêu đề, và tiêu đề đó xuất hiện ở cả ba bài.
+KHÔNG áp dụng cho **tên tội danh** (§1).
 
 ### 3b. Giới hạn tuyệt đối
 
@@ -132,6 +135,15 @@ Bảng này áp dụng cho **câu văn tường thuật**. KHÔNG áp dụng cho
 **Tiêu đề đại án (dùng chung cả bộ):** 12 đến 14 từ, mở đầu bằng biểu tượng `🩸`, VIẾT HOA
 toàn bộ, rúng động nhưng dễ hiểu, nêu bật địa danh, hung thủ, nạn nhân hoặc động cơ. Ưu
 tiên nhắc yếu tố người gốc Việt nếu có.
+
+**TỘI DANH NHẠY CẢM KHÔNG ĐƯA LÊN TIÊU ĐỀ.** Với các vụ có yếu tố xâm phạm tình dục, tiêu
+đề nêu **tội danh khái quát nhất** (vụ cướp có vũ trang, vụ đột nhập, vụ trọng án) và để
+phần còn lại cho thân bài, nơi đã có bảng §3a xử lý. Lý do: tiêu đề là vị trí phơi bày nhất
+trên bảng tin, chuẩn cộng đồng về nội dung bạo lực tình dục chặt hơn phần tường thuật tội
+phạm thông thường, và tiêu đề không nói thêm được điều gì mà thân bài chưa nói.
+  - Sai: `🩸 BĂNG CƯỚP GỐC VIỆT ĐỘT KÍCH TIỆM MASSAGE SACRAMENTO, XÂM HẠI CHỦ TIỆM`
+  - Đúng: `🩸 TÁM TAY SÚNG ĐỘT KÍCH TIỆM MASSAGE SACRAMENTO, CƯỚP VÀ KHỐNG CHẾ CHỦ TIỆM`
+  - Vụ có nạn nhân trẻ em bị xâm hại tình dục vẫn **từ chối viết** hoàn toàn (§3b).
 
 **Tiêu đề từng kỳ:** 12 đến 14 từ, VIẾT HOA, mở đầu bằng ký hiệu kỳ (`🥀 KỲ I:`,
 `🔍 KỲ II:`, `⚖️ KỲ III (KỲ CUỐI):`). Phải phản ánh đúng nội dung chính của kỳ đó, đồng
@@ -213,7 +225,10 @@ viết bằng tiếng Anh, vì đó là đầu vào cho công cụ tạo ảnh.
 - Tiêu đề kỳ không cài chi tiết gây tò mò → SỬA (§4).
 - Mở bài thiếu một trong hai nhịp, hoặc kỳ II và III không nối lại nút thắt kỳ trước → SỬA (§5a).
 - Kết bài thiếu đúc kết, hoặc thiếu lời chuyển tiếp đúng loại kỳ → SỬA (§5b).
-- Từ trực diện chưa quy đổi theo §3a → SỬA. Tên tội danh bị đổi thành từ tường thuật → SỬA.
+- Từ trực diện chưa quy đổi theo §3a → SỬA. **Kiểm cả tiêu đề đại án và tiêu đề từng kỳ,
+  không chỉ thân bài** (đây là lỗi đã xảy ra thật). Tên tội danh bị đổi thành từ tường
+  thuật → SỬA.
+- Tiêu đề có nhắc yếu tố xâm phạm tình dục → VIẾT LẠI theo tội danh khái quát (§4).
 - Còn mô tả phương thức gây án hoặc tự hại chi tiết → CẮT (§3b).
 - Dữ kiện (tên, tuổi, nghề, quan hệ, ngày tháng, con số, địa danh) không truy được về
   nguồn → CẮT. Mốc thời gian mâu thuẫn giữa các kỳ → SỬA.
