@@ -455,7 +455,12 @@ export async function extractArticleBody(url: string): Promise<string> {
       .join(' ')
       .replace(/\s+/g, ' ')
       .trim()
-      .slice(0, 1200);
+      // 1200 was the ceiling on post length, not a storage saving: ~200 English
+      // words of source cannot support a grounded 500-word Vietnamese post, and
+      // the SOP forbids padding, so generation kept landing just under target.
+      // Real article bodies run 3–20K chars. At the top-15-per-market fetch rate
+      // this costs ~1K tokens per article and nothing measurable in disk.
+      .slice(0, 6000);
   } catch {
     return '';
   }

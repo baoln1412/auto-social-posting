@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.immigration.crime</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>/Users/nguyenbaole/auto-social-posting/deploy/run-crime.sh</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- Series per run. 3h interval x 1 = 8/day, which is the stated target.
+         The generator can sustain that; the case queue is what will not, so the
+         run exits quietly when the queue is empty rather than inventing a case. -->
+    <key>CRIME_SERIES_PER_RUN</key>
+    <string>1</string>
+  </dict>
+
+  <!-- Every 3 hours. One series takes roughly 10 minutes of headless Claude, so the
+       interval is set by how fast the queue can be refilled, not by compute. -->
+  <key>StartInterval</key>
+  <integer>10800</integer>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/nguyenbaole/auto-social-posting/data/crime.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/nguyenbaole/auto-social-posting/data/crime.log</string>
+</dict>
+</plist>

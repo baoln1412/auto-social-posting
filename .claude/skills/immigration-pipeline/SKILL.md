@@ -198,15 +198,16 @@ For each market id:
    - If `userPrompt` is non-empty, follow it as extra generation guidance.
    - **FORMAT (non-negotiable) — impactful but FACT-BASED/neutral, not personal judgment:**
      - `emoji_title`: **starts with `FLAG + COUNTRY:`** in caps (e.g. `🇺🇸 MỸ:`, `🇦🇺 ÚC:`,
-       `🇩🇪 ĐỨC:`), then **sentence case — NOT all-caps.** Short and plain, no academic
+       `🇩🇪 ĐỨC:`), then **ALL-CAPS for the whole title.** Short and plain, no academic
        wording. Weave in the Vietnamese angle when the news genuinely affects them; keep
        it pure news (no forced Vietnamese angle) when someone named has died, when it is
        distant politics, or when it concerns another community. For scam/warning stories,
        name the **behaviour to avoid, not the perpetrator**. **END with ONE thematic
        emoji** (⚠️ 🚨 💸 📋 ⚖️ 🕯️ 📊). **NO `?` in the title.** (SOP §1.)
-     - `body_text`: **400–600 words.** Open **INDIRECTLY** — an image, a rhetorical
+     - `body_text`: **target ~500 words, floor 450, cap 600** — don't stop at the floor; the
+       only exception is a source with nothing left to say, where short beats padded. Open **INDIRECTLY** — an image, a rhetorical
        question or a scene first; never the event itself in sentence one (2–3 sentences,
-       flowing prose, NO bullets). Then **usually 2–4 sections** with an **emoji + CAPS
+       flowing prose, NO bullets). Then **3 sections by default** (max 4; drop to 2 only when the source genuinely lacks material) with an **emoji + CAPS
        sub-heading** (never a question, never "tại sao/nói gì/chuyện gì xảy ra"), **3–5
        `▪` bullets each** — `▪` is the ONLY bullet character; never `-` or `•`. One or two
        flowing paragraphs may replace the breakdown on short items. **If the post lands

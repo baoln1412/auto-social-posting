@@ -34,6 +34,10 @@ export interface PostDraft {
   comment2?: string;
   /** Seed comment 3 — call to share, with a concrete reason (SOP §7) */
   comment3?: string;
+  /** Serialised long-form: parts of one case share seriesId and order by partNo. */
+  seriesId?: string;
+  partNo?: number;
+  seriesTitle?: string;
   /** SOP §5 — English visual concept, used to AI-generate a card background
    *  when the article has no image (Case 2). */
   imagePrompt?: string;

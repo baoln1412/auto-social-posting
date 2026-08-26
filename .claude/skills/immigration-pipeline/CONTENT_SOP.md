@@ -29,15 +29,24 @@
 ## 1. TIÊU ĐỀ (`emoji_title`)
 - **Bắt đầu bằng EMOJI LÁ CỜ QUỐC GIA + TÊN NƯỚC VIẾT HOA**, rồi dấu hai chấm `:`.
   Ví dụ: `🇺🇸 MỸ:`, `🇦🇺 ÚC:`, `🇬🇧 ANH:`, `🇩🇪 ĐỨC:`, `🇮🇳 ẤN ĐỘ:`.
-- **Phần còn lại viết thường (sentence case)** — chỉ tên nước ở đầu là in hoa.
-  KHÔNG in hoa toàn bộ tiêu đề.
+- **IN HOA TOÀN BỘ TIÊU ĐỀ.**
+  Đúng: `🇺🇸 MỸ: CA TỬ VONG ĐẦU TIÊN DO VIRUS WEST NILE TẠI L.A. ⚠️`
+  Sai: `🇺🇸 MỸ: Ca tử vong đầu tiên…` · Sai: `🇺🇸 MỸ: ca tử vong đầu tiên…`
 - Ngắn gọn, dễ hiểu; KHÔNG dùng từ ngữ khó hiểu hoặc hàn lâm.
-- **Nếu tin có tác động rõ tới người Việt**, lồng góc nhìn/ảnh hưởng người Việt ngay vào
-  tiêu đề (ví dụ: "…người Việt cần lưu ý", "…người Việt tại Úc cần cảnh giác").
-- **Nếu là tin cảnh báo/lừa đảo:** nói về **hành vi cần tránh**, KHÔNG nói về người vi phạm.
-- **Giữ tiêu đề THUẦN TIN, không gượng ép lồng người Việt** khi bài thuộc một trong ba
-  loại: có nạn nhân cụ thể qua đời · tin chính trị xa · tin về nhóm cộng đồng khác không
-  liên quan Việt Nam.
+- **Nếu tin có tác động rõ tới người Việt → BẮT BUỘC lồng góc nhìn/ảnh hưởng người Việt
+  NGAY TRONG TIÊU ĐỀ**, thường ở vế sau, ngăn bằng dấu `—` hoặc dấu phẩy:
+  `… — NGƯỜI VIỆT CẦN LƯU Ý` · `… — NGƯỜI VIỆT TẠI ÚC CẦN CẢNH GIÁC` ·
+  `… — NGƯỜI VIỆT ĐANG GIỮ VISA LAO ĐỘNG CẦN BIẾT`
+  Ví dụ đủ: `🇦🇺 ÚC: SIẾT VISA 482 TỪ THÁNG 7, CHỦ LAO ĐỘNG PHẢI TRẢ LƯƠNG CAO HƠN — NGƯỜI VIỆT CẦN LƯU Ý ⚠️`
+- **Nếu là tin cảnh báo/lừa đảo:** tiêu đề nói về **HÀNH VI CẦN TRÁNH**, KHÔNG nói về người
+  vi phạm.
+  Đúng: `🇩🇪 ĐỨC: CHIÊU LỪA GIẢ DANH SỞ NGOẠI KIỀU GỌI ĐIỆN ĐÒI PHÍ GIA HẠN — NGƯỜI VIỆT CẦN CẢNH GIÁC 💸`
+  Sai: `🇩🇪 ĐỨC: MỘT NGƯỜI VIỆT BỊ BẮT VÌ LỪA ĐẢO…`
+- **Giữ tiêu đề THUẦN TIN, KHÔNG gượng ép lồng người Việt** khi bài thuộc một trong ba
+  loại: **có nạn nhân cụ thể qua đời · tin chính trị xa · tin về nhóm cộng đồng khác không
+  liên quan Việt Nam.** Ba loại này KHÔNG được gắn "NGƯỜI VIỆT CẦN LƯU Ý".
+  Đúng: `🇺🇸 MỸ: CA TỬ VONG ĐẦU TIÊN DO VIRUS WEST NILE TẠI L.A. ⚠️`
+  Sai: `🇺🇸 MỸ: CA TỬ VONG ĐẦU TIÊN DO WEST NILE — NGƯỜI VIỆT CẦN LƯU Ý ⚠️`
 - Có thể thêm sắc thái cảm thán/gợi cảm xúc thay vì đưa tin đơn điệu, **khi phù hợp với
   tính chất bài — tránh với tin quá đau buồn.**
 - **KẾT THÚC bằng 1 emoji** khớp nội dung (⚠️ 🚨 💸 📋 ⚖️ 🕯️ 📊 …).
@@ -52,10 +61,10 @@
 ## 3. THÂN BÀI
 - Chia theo **H2 = 1 emoji + tiêu đề mục VIẾT HOA**, mỗi mục **3–5 gạch đầu dòng `▪`**.
   (Facebook không hiển thị markdown, nên "in đậm" thực hiện bằng emoji + VIẾT HOA.)
-- **Thường 2–4 mục.** Nếu toàn bài chưa đạt 400 chữ (§10), **THÊM MỘT MỤC có thật từ nguồn**
-  (bối cảnh, phản ứng của cơ quan chức năng, số liệu so sánh, khuyến cáo đã được nêu trong
-  bài) — **KHÔNG kéo dài câu chữ cho đủ số, KHÔNG thêm chi tiết không có trong bài gốc.**
-  Nếu nguồn không còn dữ kiện nào để thêm thì để bài ngắn, không bịa (§0).
+- **MẶC ĐỊNH 3 MỤC** (tối đa 4; hạ xuống 2 khi nguồn không đủ dữ kiện). Mục thứ 3 lấy
+  từ nguồn (bối cảnh, phản ứng của cơ quan chức năng, số liệu so sánh, khuyến cáo đã nêu
+  trong bài) — **KHÔNG kéo dài câu chữ cho đủ số, KHÔNG thêm chi tiết không có trong bài
+  gốc.** Nguồn hết dữ kiện thì để ngắn, không bịa (§0).
 - **Có thể để 1–2 đoạn diễn biến viết liền mạch, không cần breakdown**, nếu nội dung
   ngắn/đơn giản.
 - H2 KHÔNG đặt câu hỏi; KHÔNG dùng "Thứ nhất / Thứ hai"; KHÔNG dùng "tại sao", "nói gì",
@@ -110,7 +119,11 @@
   cách viết tiêu đề (§1).
 
 ## 10. ĐỘ DÀI & CÁC TRƯỜNG ĐẦU RA
-- **Toàn bài `body_text` (không kể hashtag & comment): 400–600 chữ.**
+- **Toàn bài `body_text` (không kể hashtag & comment): MỤC TIÊU ~500 chữ, tối thiểu 450,
+  tối đa 600.** Viết cho đủ ý ở mức ~500 chứ đừng dừng ngay khi vừa chạm mức tối thiểu.
+- **Ngoại lệ duy nhất:** nguồn không còn dữ kiện để viết tiếp. Khi đó để bài ngắn —
+  **viết ngắn luôn tốt hơn kéo dài câu chữ hoặc bịa chi tiết (§0).** Không bao giờ đánh
+  đổi độ chính xác lấy độ dài.
 - Mỗi mục H2: 3–5 gạch `▪` · Đoạn mở: 2–3 câu · Ảnh hưởng cộng đồng: 1 đoạn · Comment: 2–3 câu.
 - Trường: `emoji_title` (§1) · `body_text` (§2+§3+§4+§5, KHÔNG chứa hashtag) ·
   `hashtags` (§6) · `comment_1` + `comment_2` + `comment_3` (§7) ·
@@ -120,7 +133,7 @@
 Nguồn: newsweek.com — kỹ sư H-1B mắc kẹt ở Ấn Độ, tòa nói 18 tháng "không phi lý".
 
 **emoji_title:**
-`🇺🇸 MỸ: Về nước đóng dấu visa H-1B, kỹ sư mắc kẹt 18 tháng xa vợ con — người Việt cần lưu ý ⚠️`
+`🇺🇸 MỸ: VỀ NƯỚC ĐÓNG DẤU VISA H-1B, KỸ SƯ MẮC KẸT 18 THÁNG XA VỢ CON — NGƯỜI VIỆT CẦN LƯU Ý ⚠️`
 
 **body_text:**
 ```
@@ -168,12 +181,14 @@ hiện. Chỉ trích chính sách, KHÔNG miệt thị nhóm người. Vi phạm
 (Chuẩn: Meta Community Standards.)
 
 ## 14. TỰ KIỂM trước khi xuất (SỬA nếu vi phạm)
-- Tiêu đề: chưa mở đầu bằng CỜ + TÊN NƯỚC in hoa · in hoa toàn bộ phần còn lại · thiếu
+- Tiêu đề: chưa mở đầu bằng CỜ + TÊN NƯỚC · **chưa IN HOA toàn bộ** · thiếu
   emoji cuối · có dấu `?` · gượng ép lồng người Việt vào tin có người qua đời → SỬA.
 - Mở bài: đi thẳng vào sự kiện ngay câu đầu (phải viết gián tiếp) → SỬA.
 - Body: còn dấu `-` hoặc `•` đầu dòng thay vì `▪` · H2 là câu hỏi → SỬA.
-- Độ dài: **< 400 chữ → THÊM MỘT MỤC lấy từ nguồn (§3), TUYỆT ĐỐI không pad chữ cho đủ**;
-  > 600 chữ → cắt bớt ý phụ. Nguồn hết dữ kiện thì để ngắn, không bịa.
+- Số mục: **chỉ có 2 mục trong khi nguồn còn dữ kiện → THÊM MỤC THỨ 3 (§3)**.
+- Độ dài: **< 450 chữ mà nguồn còn dữ kiện → viết thêm cho tới ~500** (thêm mục §3 hoặc
+  khai thác sâu hơn dữ kiện đã có); > 600 chữ → cắt bớt ý phụ. **Nguồn hết dữ kiện thì
+  để ngắn — không pad, không bịa.**
 - Tin hình sự chưa xét xử thiếu câu "đây mới là cáo buộc, chưa có phán quyết của tòa" → SỬA.
 - Tin chính sách không phân biệt "đề xuất" / "đã có hiệu lực" → SỬA.
 - Mục ảnh hưởng cộng đồng: có mà không có liên hệ thật (gượng ép) → BỎ. Có mà viết bullet → SỬA.

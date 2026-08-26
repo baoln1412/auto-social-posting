@@ -87,6 +87,9 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
       comment_1       TEXT,
       comment_2       TEXT,
       comment_3       TEXT,
+      series_id       TEXT,
+      part_no         INTEGER,
+      series_title    TEXT,
       image_prompt    TEXT,
       platform_drafts TEXT,
       language        TEXT,
@@ -100,6 +103,25 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS comment_1 TEXT;
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS comment_2 TEXT;
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS comment_3 TEXT;
+    -- Serialised long-form (crime series): parts of one case share series_id and
+    -- order by part_no, so a set can be shown, chained and published per instalment.
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS series_id TEXT;
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS part_no INTEGER;
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS series_title TEXT;
+
+    -- Case queue for the crime vertical. Crime series are case-led, not feed-led:
+    -- nothing crawls them, so the scheduled run needs a list to draw down.
+    CREATE TABLE IF NOT EXISTS crime_cases (
+      id          TEXT PRIMARY KEY,
+      market_id   TEXT,
+      title       TEXT,
+      source_url  TEXT,
+      notes       TEXT,
+      status      TEXT DEFAULT 'queued',
+      series_id   TEXT,
+      created_at  TEXT,
+      updated_at  TEXT
+    );
     ALTER TABLE bronze_news        ADD COLUMN IF NOT EXISTS image_urls TEXT;
     ALTER TABLE silver_immigration ADD COLUMN IF NOT EXISTS image_urls TEXT;
     ALTER TABLE gold_content       ADD COLUMN IF NOT EXISTS image_urls TEXT;
@@ -403,6 +425,9 @@ export interface GoldInput {
   comment_1?: string;
   comment_2?: string;
   comment_3?: string;
+  series_id?: string;
+  part_no?: number;
+  series_title?: string;
   image_prompt?: string;
   platform_drafts?: Record<string, string>;
   language?: string;
@@ -428,14 +453,15 @@ export async function insertGold(rows: GoldInput[]): Promise<number> {
     if (num(dup[0]?.c) > 0) continue;
     await run(
       `INSERT INTO gold_content
-        (id, silver_id, market_id, article_url, article_title, source_name, location, image_url, image_urls, emoji_title, body_text, summary, hook, hashtags, comment_1, comment_2, comment_3, image_prompt, platform_drafts, language, topics, status, is_done, pub_date, generated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', false, ?, ?)`,
+        (id, silver_id, market_id, article_url, article_title, source_name, location, image_url, image_urls, emoji_title, body_text, summary, hook, hashtags, comment_1, comment_2, comment_3, series_id, part_no, series_title, image_prompt, platform_drafts, language, topics, status, is_done, pub_date, generated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', false, ?, ?)`,
       [
         randomUUID(), r.silver_id, r.market_id, r.article_url ?? null, r.article_title ?? null,
         r.source_name ?? '', r.location ?? null, r.image_url ?? null,
         JSON.stringify(r.image_urls ?? []),
         r.emoji_title, r.body_text,
         r.summary ?? '', r.hook ?? '', r.hashtags ?? '', r.comment_1 ?? '', r.comment_2 ?? '', r.comment_3 ?? '',
+        r.series_id ?? null, r.part_no ?? null, r.series_title ?? null,
         r.image_prompt ?? '',
         JSON.stringify(r.platform_drafts ?? {}), r.language ?? 'vi',
         JSON.stringify(r.topics ?? []),
@@ -522,7 +548,7 @@ export async function setGoldImages(id: string, imageUrl: string, insetUrl: stri
 /** Text fields of a published post that may be corrected in place. */
 const EDITABLE_GOLD_FIELDS = [
   'emoji_title', 'body_text', 'summary', 'hook', 'hashtags',
-  'comment_1', 'comment_2', 'comment_3', 'image_prompt',
+  'comment_1', 'comment_2', 'comment_3', 'series_title', 'image_prompt',
 ] as const;
 export type EditableGoldField = (typeof EDITABLE_GOLD_FIELDS)[number];
 
@@ -627,6 +653,42 @@ export async function deleteGold(ids: string[]): Promise<number> {
   const placeholders = clean.map(() => '?').join(',');
   await run(`DELETE FROM gold_content WHERE id IN (${placeholders})`, clean);
   return clean.length;
+}
+
+// ── Crime case queue ──────────────────────────────────────────────────────
+export interface CrimeCase {
+  id: string; market_id: string; title: string; source_url?: string;
+  notes?: string; status: string; series_id?: string;
+  created_at?: string; updated_at?: string;
+}
+
+export async function addCrimeCase(r: { market_id: string; title: string; source_url?: string; notes?: string }): Promise<string> {
+  const id = randomUUID(); const ts = nowIso();
+  await run(
+    `INSERT INTO crime_cases (id, market_id, title, source_url, notes, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)`,
+    [id, r.market_id, r.title, r.source_url ?? '', r.notes ?? '', ts, ts],
+  );
+  return id;
+}
+
+export async function listCrimeCases(marketId: string, status?: string): Promise<CrimeCase[]> {
+  const where = status ? 'WHERE market_id = ? AND status = ?' : 'WHERE market_id = ?';
+  const args = status ? [marketId, status] : [marketId];
+  return (await all(
+    `SELECT * FROM crime_cases ${where} ORDER BY created_at DESC`, args,
+  )) as unknown as CrimeCase[];
+}
+
+export async function setCrimeCaseStatus(id: string, status: string, seriesId?: string): Promise<void> {
+  await run(
+    `UPDATE crime_cases SET status = ?, series_id = COALESCE(?, series_id), updated_at = ? WHERE id = ?`,
+    [status, seriesId ?? null, nowIso(), id],
+  );
+}
+
+export async function deleteCrimeCase(id: string): Promise<void> {
+  await run(`DELETE FROM crime_cases WHERE id = ?`, [id]);
 }
 
 /** Status breakdown for the analytics view. */

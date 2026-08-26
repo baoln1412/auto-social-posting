@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart3, CalendarDays, FileText, Plus, Settings, TrendingUp } from 'lucide-react';
+import { BarChart3, CalendarDays, FileText, Plus, Settings, Skull, TrendingUp } from 'lucide-react';
 import { ContentPage } from '../../types';
 
 interface AppSidebarProps {
@@ -14,6 +14,7 @@ interface AppSidebarProps {
 
 const NAV_ITEMS = [
   { id: 'content', label: 'Content', Icon: FileText },
+  { id: 'crime', label: 'Crime Series', Icon: Skull },
   { id: 'calendar', label: 'Calendar', Icon: CalendarDays },
   { id: 'analytics', label: 'Analytics', Icon: BarChart3 },
   { id: 'usage', label: 'Usage', Icon: TrendingUp },

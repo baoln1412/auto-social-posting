@@ -7,6 +7,7 @@ import AppLayout from './components/layout/AppLayout';
 import PostCard from './components/PostCard';
 import Pagination from './components/Pagination';
 import ContentCalendar from './components/calendar/ContentCalendar';
+import CrimeSeriesView from './components/crime/CrimeSeriesView';
 import AnalyticsDashboard from './components/analytics/AnalyticsDashboard';
 import AuditView from './components/analytics/AuditView';
 import UsageView from './components/analytics/UsageView';
@@ -95,6 +96,10 @@ export default function Home() {
   useEffect(() => { setFilterTopic('All'); }, [activePageId]);
 
   const activePage = pages.find((p) => p.id === activePageId);
+  // ponytail: identified by name — there is no contentType column yet. Add one if a
+  // second non-geographic vertical appears, or if this page ever gets renamed.
+  const crimePage = pages.find((p) => /crime/i.test(p.name));
+  const marketPages = pages.filter((p) => p.id !== crimePage?.id);
 
   // ── Market actions ──
   // New-page modal (replaces window.prompt, which is blocked in embedded browsers).
@@ -320,7 +325,7 @@ export default function Home() {
 
         {/* Market sub-tabs */}
         <PageTabs
-          pages={pages}
+          pages={marketPages}
           activePageId={activePageId}
           onSelect={setActivePageId}
           onAddPage={handleAddPage}
@@ -424,6 +429,9 @@ export default function Home() {
     );
 
     switch (activeView) {
+      case 'crime': return crimePage
+        ? <CrimeSeriesView pageId={crimePage.id} />
+        : <div className="text-sm text-muted-foreground">No Crime Series page found.</div>;
       case 'calendar': return <ContentCalendar pageId={activePage.id} />;
       case 'usage': return <UsageView pageId={activePage.id} />;
       case 'analytics': return (
@@ -461,7 +469,7 @@ export default function Home() {
 
   return (
     <AppLayout
-      pages={pages}
+      pages={marketPages}
       activePageId={activePageId}
       activeView={activeView}
       activePageName={activePage?.name ?? ''}

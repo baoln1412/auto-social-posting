@@ -18,6 +18,7 @@ interface AppLayoutProps {
 
 const VIEW_LABELS: Record<string, string> = {
   content: 'Content',
+  crime: 'Crime Series',
   calendar: 'Calendar',
   analytics: 'Analytics',
   usage: 'Usage',
@@ -74,8 +75,14 @@ export default function AppLayout({
           </button>
           <div className="h-5 w-px bg-border" />
           <nav className="flex items-center gap-1.5 text-sm">
-            <span className="text-muted-foreground">{activePageName}</span>
-            <span className="text-muted-foreground/50">›</span>
+            {/* Crime Series is its own vertical, not scoped to a market — showing a
+                market name in front of it is what made the two entries read as one. */}
+            {activeView !== 'crime' && (
+              <>
+                <span className="text-muted-foreground">{activePageName}</span>
+                <span className="text-muted-foreground/50">›</span>
+              </>
+            )}
             <span className="font-semibold text-foreground">
               {VIEW_LABELS[activeView] ?? activeView}
             </span>
