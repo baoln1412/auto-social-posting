@@ -39,6 +39,7 @@ Thumbs.db
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/immigration-pipeline/
+!.claude/skills/crime-series/
 .vercel
 .env*.local
 
