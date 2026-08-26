@@ -50,6 +50,33 @@ const REVERSED = /revers|vacat|remand/i;
 const AFFIRMED = /affirm/i;
 
 /**
+ * One crime can appear in the archive several times over: the direct appeal, an order
+ * modifying that opinion, a later resentencing appeal. Each is a separate CourtListener
+ * record with its own URL, and captions vary ("People v. Ho Thai Nguyen" vs "People v.
+ * Nguyen"), so URL and title both fail as identity. That is not hypothetical — a batch
+ * wrote the same 1995 San Jose shooting twice, once from H050103 and once from H050103M.
+ *
+ * The trial court number is the one identifier that stays fixed across all of them, so
+ * prefer it. Fall back to the appellate docket with any suffix letter stripped, which at
+ * least collapses the modification-order case.
+ */
+function caseKeys(text: string, docket?: string): string[] {
+  const keys: string[] = [];
+  // Trial numbers are not all numeric: Santa Clara writes 191354, Orange County writes
+  // 11WF0653, and some carry a hyphen (C-69210). Require a digit so the capture cannot
+  // run away into the words that follow.
+  const trial = /Super\.?(?:ior)?\.?\s*Ct\.?\s*(?:Nos?\.?)?\s*((?=[A-Z-]*\d)[A-Z0-9-]{5,})/i.exec(text);
+  if (trial) keys.push(`sc:${trial[1].replace(/\W/g, '').toUpperCase()}`);
+  // A fresh hit carries its docket as a field; a stored row only has it written into notes,
+  // where the prefix varies ("H050103M", "No. D060327", "Docket Nos. C012228", "Crim. 3993").
+  // Read a short window and take the first docket-shaped token in it.
+  const raw = docket ?? /hồ sơ\s*(.{0,40})/i.exec(text)?.[1];
+  const one = /[A-Z]{0,3}\d{3,}[A-Z]?/i.exec(raw ?? '')?.[0];
+  if (one) keys.push(`d:${one.toUpperCase().replace(/([A-Z]*\d+)[A-Z]$/, '$1')}`);
+  return keys;
+}
+
+/**
  * A queue row reading "People v. Nguyen (2024)" is untriageable, and the sweep produces
  * many of them. The search snippet already carries the caption and often the opening
  * finding, so mine it for the three things that let a human choose: who the defendant
@@ -97,6 +124,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // not re-add a case that was already judged unusable.
     const existing = await listCrimeCases(marketId);
     const seen = new Set(existing.flatMap((c) => [c.source_url, c.title].filter(Boolean) as string[]));
+    // Second key, on the underlying prosecution rather than the document. Read back out of
+    // notes, where the sweep already records the docket and the caption line.
+    const seenCases = new Set(existing.flatMap((c) => caseKeys(`${c.notes ?? ''} ${c.title ?? ''}`)));
 
     const found: { title: string; url: string; court: string; date: string; notes: string }[] = [];
     outer: for (const court of courts) {
@@ -147,6 +177,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             if (/^in re\b/i.test(title)) continue;
             const link = r.absolute_url ? `https://www.courtlistener.com${r.absolute_url}` : '';
             if (!title || !link || seen.has(link) || seen.has(title)) continue;
+            // Same prosecution under a different document? Skip before spending a research
+            // cycle on it. Checked against the sweep's own finds too, since the duplicate
+            // pair usually arrives in one page of results.
+            // Match on EITHER identifier. One record of a pair often prints the trial number
+            // while the other only prints the docket, so requiring a single preferred key
+            // splits the pair apart — that is how the same rejected case was researched twice.
+            const keys = caseKeys(snip, r.docketNumber);
+            if (keys.some((k) => seenCases.has(k))) continue;
+            for (const k of keys) seenCases.add(k);
             seen.add(link);
             const meta = readSnippet(r.opinions?.[0]?.snippet ?? '');
             const label = meta.defendant
