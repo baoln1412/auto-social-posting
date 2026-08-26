@@ -19,10 +19,13 @@ ROOT=/Users/nguyenbaole/auto-social-posting
 LOG="$ROOT/data/crime.log"
 LOCK="$ROOT/data/crime.lock"
 
-# Cases to attempt per daily batch. At roughly 13 minutes per written series and 4 per
-# rejection, 8 lands somewhere under two hours.
+# Series to DELIVER per day, not cases to attempt. Rejection is a normal outcome, so the
+# loop keeps going until this many are actually written.
 TARGET="${CRIME_SERIES_PER_RUN:-8}"
-# Keep the queue comfortably ahead of one batch so discovery is never the bottleneck.
+# Bounds, so a queue full of unusable cases cannot run all day. Measured: ~13 min to
+# write, ~4 to reject; at the observed 1-in-3 rate, 8 written costs roughly three hours.
+MAX_ATTEMPTS="${CRIME_MAX_ATTEMPTS:-$(( TARGET * 4 ))}"
+MAX_SECONDS="${CRIME_MAX_SECONDS:-18000}"   # 5h: must be finished well within the morning
 DISCOVER_TO=$(( TARGET * 2 ))
 
 # Single-run lock. Generous stale threshold: a full batch legitimately runs for hours.
@@ -71,13 +74,39 @@ if [ "$QUEUED" -eq 0 ]; then
   exit 0
 fi
 
+written_count() {
+  curl -s "http://localhost:3000/api/crime/cases?marketId=$PAGE_ID&status=written" \
+    | python3 -c "import json,sys; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo 0
+}
+
+# Baseline, so the counter measures THIS run rather than everything ever written.
+BASELINE=$(written_count)
+START_TS=$(date +%s)
 WRITTEN=0
 ATTEMPTED=0
-for i in $(seq 1 "$TARGET"); do
-  [ "$(queued_count)" -eq 0 ] && { echo "[run-crime] queue exhausted after $ATTEMPTED case(s)" >> "$LOG"; break; }
+
+while [ "$WRITTEN" -lt "$TARGET" ]; do
+  ELAPSED=$(( $(date +%s) - START_TS ))
+  if [ "$ATTEMPTED" -ge "$MAX_ATTEMPTS" ]; then
+    echo "[run-crime] attempt cap reached ($MAX_ATTEMPTS), stopping with $WRITTEN/$TARGET written" >> "$LOG"; break
+  fi
+  if [ "$ELAPSED" -ge "$MAX_SECONDS" ]; then
+    echo "[run-crime] time cap reached ($(( ELAPSED / 60 ))m), stopping with $WRITTEN/$TARGET written" >> "$LOG"; break
+  fi
+
+  # Rejections consume the queue as fast as successes do, so refill mid-batch.
+  if [ "$(queued_count)" -eq 0 ]; then
+    ADDED=$(curl -s -X POST http://localhost:3000/api/crime/discover \
+      -H 'Content-Type: application/json' \
+      -d "{\"marketId\":\"$PAGE_ID\",\"limit\":$DISCOVER_TO}" \
+      | python3 -c "import json,sys; print(json.load(sys.stdin).get('added',0))" 2>/dev/null || echo 0)
+    echo "[run-crime] queue empty mid-batch, discovery added $ADDED" >> "$LOG"
+    [ "$(queued_count)" -eq 0 ] && { echo "[run-crime] no candidates left, stopping with $WRITTEN/$TARGET written" >> "$LOG"; break; }
+  fi
+
   ATTEMPTED=$(( ATTEMPTED + 1 ))
   echo "" >> "$LOG"
-  echo "──── case $i/$TARGET · $(date '+%H:%M:%S') ────" >> "$LOG"
+  echo "──── attempt $ATTEMPTED · written $WRITTEN/$TARGET · $(date '+%H:%M:%S') ────" >> "$LOG"
 
   claude -p "Run the /crime-series skill for exactly ONE case.
 
@@ -95,9 +124,8 @@ never is. Do not touch any other queued case." \
     --permission-mode bypassPermissions \
     >> "$LOG" 2>&1
 
-  WRITTEN=$(curl -s "http://localhost:3000/api/crime/cases?marketId=$PAGE_ID&status=written" \
-    | python3 -c "import json,sys; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo "$WRITTEN")
+  WRITTEN=$(( $(written_count) - BASELINE ))
 done
 
 echo "" >> "$LOG"
-echo "════ [run-crime] $(date '+%Y-%m-%d %H:%M:%S') batch done · attempted $ATTEMPTED · written total $WRITTEN ════" >> "$LOG"
+echo "════ [run-crime] $(date '+%Y-%m-%d %H:%M:%S') batch done · $WRITTEN/$TARGET series written from $ATTEMPTED attempt(s) ════" >> "$LOG"
