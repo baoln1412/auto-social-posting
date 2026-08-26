@@ -69,6 +69,20 @@ người; muốn thấy công lý được thực thi.
 
 ## 2. NGUỒN TƯ LIỆU (FACT-CHECKING BẮT BUỘC)
 
+**Phân biệt nguồn BẮT BUỘC và nguồn LÀM DÀY.** Đây là chỗ dễ từ chối oan một vụ án tốt.
+
+- **BẮT BUỘC, thiếu thì từ chối vụ án:** hồ sơ tư pháp cho biết diễn biến, tội danh, và
+  **kết cục pháp lý cuối cùng**. Bản án bị **tuyên hủy để xử lại** mà không tra được kết quả
+  sau đó thì KHÔNG viết được KỲ III, vì kỳ cuối đòi hỏi phán quyết sau cùng. Ưu tiên vụ có
+  bản án **được giữ nguyên**.
+- **LÀM DÀY, thiếu thì viết ngắn hơn chứ KHÔNG từ chối:** báo địa phương Mỹ và báo tiếng
+  Việt tại Mỹ. Vắng nguồn này thì mất phần không khí hiện trường và phản ứng cộng đồng, bài
+  mỏng hơn và có thể chỉ đủ hai kỳ, nhưng nếu hồ sơ tòa đã dựng được diễn biến và kết cục
+  thì **vẫn viết được**. Vụ án thập niên 1980 và 1990 gần như không còn báo trên mạng; đó là
+  chuyện bình thường, không phải lý do loại bỏ.
+  - Tên đầy đủ của bị cáo thường **đã có sẵn trong tiêu đề vụ kiện của bản án**. Dùng cách
+    viết trong bản án; chỉ cần tới báo tiếng Việt khi bản án không nêu.
+
 | Nhóm nguồn | Nguồn cụ thể | Dữ liệu khai thác |
 |---|---|---|
 | Hồ sơ tư pháp Mỹ | Bộ Tư pháp Hoa Kỳ, Cục Điều tra Liên bang, Justia, CourtListener | Cáo trạng, lời khai tại tòa, tội danh, bản án |

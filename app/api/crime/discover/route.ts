@@ -100,7 +100,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // petitions and habeas rulings mention murder but contain no investigation or
         // trial narrative. The first scheduled run rejected exactly such a case, correctly,
         // after spending a full research cycle on it.
-        const q = encodeURIComponent(`caseName:${surname} murder jury verdict`);
+        // "affirmed" matters as much as the other two filters. A published opinion that
+        // REVERSES leaves the story with no ending, and KỲ III requires a final judgment:
+        // the second scheduled run rejected a strong case for exactly this reason, after a
+        // full research cycle. In this court the split is 11 affirmed to 8 reversed, so the
+        // term is worth its weight.
+        const q = encodeURIComponent(`caseName:${surname} murder jury affirmed`);
         const url = `https://www.courtlistener.com/api/rest/v4/search/?q=${q}&type=o&court=${court}`;
         try {
           const res = await fetch(url, { headers: { 'User-Agent': 'auto-social-posting/1.0' } });
