@@ -84,19 +84,107 @@ written_count() {
     | python3 -c "import json,sys; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo 0
 }
 
+# Cases run concurrently. Measured on the run that produced the first full day of eight
+# series: a write costs ~15.5 min and a rejection ~3.5, and 77 of that batch's 95 minutes was
+# writes waiting on each other. Each case is already its own claude process and every database
+# write goes through the API, which serialises, so sequencing bought nothing but wall clock.
+CONCURRENCY="${CRIME_CONCURRENCY:-3}"
+
+# A subshell has no job table, so a pool capped on $(jobs -r) silently never engages - it
+# reads 0 every time and launches everything at once. Track the PIDs here instead.
+pids=()
+prune_workers() {
+  local alive=() p
+  for p in $pids; do kill -0 "$p" 2>/dev/null && alive+=("$p"); done
+  pids=("${alive[@]}")
+}
+
+# The PARENT claims a case before handing it to a worker. Letting each worker pick "the oldest
+# queued case" itself - which is what the sequential prompt said - has all of them pick the
+# same one, because none has patched it to 'researching' by the time the others read the queue.
+claim_case() {
+  curl -s "http://localhost:3000/api/crime/cases?marketId=$PAGE_ID&status=queued" 2>/dev/null \
+    | python3 -c "
+import json, sys, urllib.request
+cases = (json.load(sys.stdin).get('cases') or [])
+if not cases: raise SystemExit
+c = sorted(cases, key=lambda x: x.get('created_at') or '')[0]
+urllib.request.urlopen(urllib.request.Request(
+    'http://localhost:3000/api/crime/cases', method='PATCH',
+    data=json.dumps({'id': c['id'], 'status': 'researching'}).encode(),
+    headers={'Content-Type': 'application/json'}), timeout=30).read()
+print(c['id'])
+" 2>/dev/null
+}
+
+# One case, start to finish. Output goes to its own file and is appended in one piece, so three
+# concurrent workers cannot interleave their reports into an unreadable log.
+run_case() {
+  local cid="$1" n="$2" started out
+  started=$(date '+%H:%M:%S')
+  out="$ROOT/data/.crime-$cid.out"
+
+  claude -p "Run the /crime-series skill for exactly ONE case: id $cid.
+
+That case has already been claimed for you and is at status 'researching'. Do not read the
+queue and do not touch any other case.
+
+Research and write the full series per CRIME_SOP.md, POST it to /api/crime/series, then PATCH
+case $cid to 'written' with the returned seriesId.
+
+If the record cannot support the series, PATCH case $cid to 'rejected' and say why. Rejecting
+is a correct outcome and costs little; inventing facts to satisfy the schedule is not, and
+never is." \
+    --model claude-sonnet-5 \
+    --effort medium \
+    --permission-mode bypassPermissions \
+    > "$out" 2>&1
+
+  # A worker killed mid-research leaves its case stuck at 'researching', where nothing will
+  # ever pick it up again. Hand it back so a later run can try it.
+  if curl -s "http://localhost:3000/api/crime/cases?marketId=$PAGE_ID&status=researching" 2>/dev/null \
+       | grep -q "$cid"; then
+    curl -s -X PATCH http://localhost:3000/api/crime/cases -H 'Content-Type: application/json' \
+      -d "{\"id\":\"$cid\",\"status\":\"queued\"}" > /dev/null 2>&1
+    echo "[run-crime] case $cid ended still 'researching', returned to the queue" >> "$out"
+  fi
+
+  {
+    echo ""
+    echo "──── case $n · $cid · $started → $(date '+%H:%M:%S') ────"
+    cat "$out"
+  } >> "$LOG"
+  rm -f "$out"
+}
+
 # Baseline, so the counter measures THIS run rather than everything ever written.
 BASELINE=$(written_count)
 START_TS=$(date +%s)
 WRITTEN=0
 ATTEMPTED=0
+STOP=''
 
-while [ "$WRITTEN" -lt "$TARGET" ]; do
+while : ; do
+  prune_workers
+  WRITTEN=$(( $(written_count) - BASELINE ))
+  [ "$WRITTEN" -ge "$TARGET" ] && break
+
   ELAPSED=$(( $(date +%s) - START_TS ))
   if [ "$ATTEMPTED" -ge "$MAX_ATTEMPTS" ]; then
-    echo "[run-crime] attempt cap reached ($MAX_ATTEMPTS), stopping with $WRITTEN/$TARGET written" >> "$LOG"; break
+    STOP="attempt cap reached ($MAX_ATTEMPTS)"
+  elif [ "$ELAPSED" -ge "$MAX_SECONDS" ]; then
+    STOP="time cap reached ($(( ELAPSED / 60 ))m)"
   fi
-  if [ "$ELAPSED" -ge "$MAX_SECONDS" ]; then
-    echo "[run-crime] time cap reached ($(( ELAPSED / 60 ))m), stopping with $WRITTEN/$TARGET written" >> "$LOG"; break
+  if [ -n "$STOP" ]; then
+    echo "[run-crime] $STOP, waiting on ${#pids} still running" >> "$LOG"; break
+  fi
+
+  # Never put more in flight than we still need, so a run cannot overshoot its target when
+  # every worker happens to succeed.
+  ROOM=$(( TARGET - WRITTEN - ${#pids} ))
+  [ "$ROOM" -gt "$CONCURRENCY" ] && ROOM=$CONCURRENCY
+  if [ "${#pids}" -ge "$CONCURRENCY" ] || [ "$ROOM" -le 0 ]; then
+    sleep 15; continue
   fi
 
   # Rejections consume the queue as fast as successes do, so refill mid-batch.
@@ -106,31 +194,30 @@ while [ "$WRITTEN" -lt "$TARGET" ]; do
       -d "{\"marketId\":\"$PAGE_ID\",\"limit\":$DISCOVER_TO}" \
       | python3 -c "import json,sys; print(json.load(sys.stdin).get('added',0))" 2>/dev/null || echo 0)
     echo "[run-crime] queue empty mid-batch, discovery added $ADDED" >> "$LOG"
-    [ "$(queued_count)" -eq 0 ] && { echo "[run-crime] no candidates left, stopping with $WRITTEN/$TARGET written" >> "$LOG"; break; }
+    if [ "$(queued_count)" -eq 0 ]; then
+      # Workers still running may yet finish; only give up once nothing is in flight.
+      if [ "${#pids}" -eq 0 ]; then
+        echo "[run-crime] no candidates left, stopping with $WRITTEN/$TARGET written" >> "$LOG"; break
+      fi
+      sleep 15; continue
+    fi
+  fi
+
+  CID=$(claim_case)
+  if [ -z "$CID" ]; then
+    [ "${#pids}" -eq 0 ] && { echo "[run-crime] could not claim a case, stopping with $WRITTEN/$TARGET written" >> "$LOG"; break; }
+    sleep 15; continue
   fi
 
   ATTEMPTED=$(( ATTEMPTED + 1 ))
-  echo "" >> "$LOG"
-  echo "──── attempt $ATTEMPTED · written $WRITTEN/$TARGET · $(date '+%H:%M:%S') ────" >> "$LOG"
-
-  claude -p "Run the /crime-series skill for exactly ONE case.
-
-Take the oldest case with status 'queued' from
-GET http://localhost:3000/api/crime/cases?marketId=$PAGE_ID&status=queued
-
-PATCH it to 'researching', then research and write the full series per CRIME_SOP.md and
-POST it to /api/crime/series. PATCH the case to 'written' with the returned seriesId.
-
-If the record cannot support the series, PATCH the case to 'rejected' and say why. Rejecting
-is a correct outcome and costs little; inventing facts to satisfy the schedule is not, and
-never is. Do not touch any other queued case." \
-    --model claude-sonnet-5 \
-    --effort medium \
-    --permission-mode bypassPermissions \
-    >> "$LOG" 2>&1
-
-  WRITTEN=$(( $(written_count) - BASELINE ))
+  echo "[run-crime] $(date '+%H:%M:%S') case $ATTEMPTED claimed ($CID) · written $WRITTEN/$TARGET · ${#pids} running" >> "$LOG"
+  run_case "$CID" "$ATTEMPTED" &
+  pids+=($!)
 done
 
+# Let whatever is still in flight finish and report, rather than orphaning it mid-write.
+wait
+WRITTEN=$(( $(written_count) - BASELINE ))
+
 echo "" >> "$LOG"
-echo "════ [run-crime] $(date '+%Y-%m-%d %H:%M:%S') batch done · $WRITTEN/$TARGET series written from $ATTEMPTED attempt(s) ════" >> "$LOG"
+echo "════ [run-crime] $(date '+%Y-%m-%d %H:%M:%S') batch done · $WRITTEN/$TARGET series written from $ATTEMPTED attempt(s), ${CONCURRENCY}-way ════" >> "$LOG"
