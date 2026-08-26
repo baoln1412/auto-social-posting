@@ -203,6 +203,19 @@ sắp diễn ra trong bài này.
 `comment_1` + `comment_2` + `comment_3` (§7) · `summary` (nội bộ, chứa mọi ghi chú biên
 tập và cảnh báo tư liệu) · `image_prompt` (tiếng Anh, §9).
 
+### 8a. Ba trường nhận diện vụ án (gửi kèm khi POST, cấp bộ chứ không phải cấp kỳ)
+
+`victimName` · `suspectName` · `stateName` — gửi ở cấp cao nhất của body POST
+`/api/crime/series`, dùng chung cho cả ba kỳ.
+
+- **Ghi TÊN THẬT như hồ sơ ghi**, không quy đổi theo §3a: đây là dữ liệu nhận diện cho
+  người biên tập, không phải câu văn đăng lên mạng xã hội.
+- Nhiều nạn nhân hoặc nhiều nghi phạm → ghi người đầu tiên rồi thêm `và N người khác`.
+- **Hồ sơ không nêu tên → để TRỐNG.** Bản án thường không nêu tên nạn nhân, và đó là
+  chuyện bình thường. Tuyệt đối không suy đoán, không lấy tên từ vụ khác.
+- `stateName` ghi tên bang bằng tiếng Việt thông dụng nếu có (`California`, `Texas`,
+  `Washington`), kèm quận/thành phố nếu hồ sơ nêu rõ: `Quận Cam, California`.
+
 ## 9. PROMPT ẢNH MINH HỌA (tỷ lệ 4:5)
 
 Ảnh tư liệu báo chí 35mm, chân thực, tương phản cao. **Chỉ dựng bối cảnh:** hiện trường

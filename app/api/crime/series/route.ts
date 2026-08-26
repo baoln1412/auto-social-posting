@@ -42,11 +42,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const parsed = await parseJsonBody(request);
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-    const { marketId, seriesTitle, parts } = (parsed.data ?? {}) as {
-      marketId?: string;
-      seriesTitle?: string;
-      parts?: PartInput[];
-    };
+    const { marketId, seriesTitle, parts, victimName, suspectName, stateName } =
+      (parsed.data ?? {}) as {
+        marketId?: string;
+        seriesTitle?: string;
+        parts?: PartInput[];
+        // Who the case is about. Series-level: written onto every part so a part row
+        // stays self-describing, and so the list can show it without a second query.
+        victimName?: string;
+        suspectName?: string;
+        stateName?: string;
+      };
     if (!marketId) return NextResponse.json({ error: 'marketId is required' }, { status: 400 });
     if (!seriesTitle?.trim()) return NextResponse.json({ error: 'seriesTitle is required' }, { status: 400 });
     if (!Array.isArray(parts) || parts.length === 0) {
@@ -73,6 +79,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         series_id: seriesId,
         part_no: p.part_no,
         series_title: seriesTitle.trim(),
+        victim_name: victimName?.trim() || undefined,
+        suspect_name: suspectName?.trim() || undefined,
+        state_name: stateName?.trim() || undefined,
         emoji_title: p.emoji_title.trim(),
         body_text: p.body_text.trim(),
         hashtags: p.hashtags ?? '',
@@ -114,7 +123,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { rows } = await getGold({ marketId, limit: 500, offset: 0 });
 
     type OutPart = { id: string; articleUrl: string; partNo: number; emojiTitle: string; bodyText: string; hashtags: string; comment1: string; comment2: string; comment3: string; imagePrompt: string; status: string; words: number };
-    type OutSeries = { seriesId: string; seriesTitle: string; generatedAt: string; parts: OutPart[] };
+    type OutSeries = { seriesId: string; seriesTitle: string; generatedAt: string; victimName: string; suspectName: string; stateName: string; parts: OutPart[] };
     const bySeries = new Map<string, OutSeries>();
     for (const r of rows) {
       if (!r.series_id) continue;
@@ -122,6 +131,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         seriesId: r.series_id,
         seriesTitle: r.series_title ?? r.emoji_title ?? '',
         generatedAt: r.generated_at ?? '',
+        // Written onto every part, so whichever part is read first supplies them. Older
+        // series predate these columns and legitimately have none.
+        victimName: r.victim_name ?? '',
+        suspectName: r.suspect_name ?? '',
+        stateName: r.state_name ?? '',
         parts: [],
       };
       g.parts.push({

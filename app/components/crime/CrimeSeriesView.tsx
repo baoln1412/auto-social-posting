@@ -25,6 +25,9 @@ interface Series {
   seriesId: string;
   seriesTitle: string;
   generatedAt: string;
+  victimName?: string;
+  suspectName?: string;
+  stateName?: string;
   parts: Part[];
 }
 
@@ -49,9 +52,11 @@ function CopyBtn({ text, label }: { text: string; label: string }) {
   );
 }
 
-function PartCard({ part, total }: { part: Part; total: number }) {
+// `done` is read from the part rather than held here: the series checkbox marks every part
+// at once, and local state would leave each kỳ still showing "Nháp" until a full reload.
+function PartCard({ part, total, onToggle }: { part: Part; total: number; onToggle: (next: boolean) => void }) {
   const [open, setOpen] = useState(false);
-  const [done, setDone] = useState(part.status === 'published');
+  const done = part.status === 'published';
   // ≥3,000 words is the SOP floor for a kỳ; surface it rather than making the
   // editor count, since under-length is the failure this format actually has.
   const short = part.words < 3000;
@@ -72,18 +77,7 @@ function PartCard({ part, total }: { part: Part; total: number }) {
         </span>
         <button
           disabled={!part.articleUrl}
-          onClick={async () => {
-            if (!part.articleUrl) return; // never PATCH a blank key — it matches siblings
-            const next = !done;
-            setDone(next);
-            try {
-              await fetch('/api/posts/status', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ articleUrl: part.articleUrl, status: next ? 'published' : 'draft' }),
-              });
-            } catch { setDone(!next); toast('Không đổi được trạng thái bài này.'); }
-          }}
+          onClick={() => onToggle(!done)}
           className={`shrink-0 text-xs px-2 py-1 rounded-md border transition-colors ${
             done ? 'bg-success/10 text-success border-success/25' : 'text-muted-foreground border-border hover:bg-accent'
           }`}
@@ -262,6 +256,47 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
+  /**
+   * Mark parts published or back to draft. The rows are updated here first so the checkbox
+   * and every kỳ move together, then reverted as a set if the server disagrees — a partial
+   * failure that left three rows disagreeing with one checkbox would be worse than none.
+   *
+   * A part with no articleUrl is skipped: setGoldStatus updates WHERE article_url = ?, so a
+   * blank key would flip every sibling in the market.
+   */
+  const setParts = useCallback(async (seriesId: string, partIds: string[], next: boolean) => {
+    const status = next ? 'published' : 'draft';
+    const targets = series
+      .find((s) => s.seriesId === seriesId)?.parts
+      .filter((p) => partIds.includes(p.id) && p.articleUrl) ?? [];
+    if (targets.length === 0) return;
+
+    const apply = (st: string) => setSeries((prev) => prev.map((s) => s.seriesId !== seriesId ? s : {
+      ...s,
+      parts: s.parts.map((p) => (targets.some((t) => t.id === p.id) ? { ...p, status: st } : p)),
+    }));
+    const before = targets.map((t) => t.status ?? 'draft');
+    apply(status);
+
+    try {
+      const res = await Promise.all(targets.map((p) => fetch('/api/posts/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleUrl: p.articleUrl, status }),
+      })));
+      if (res.some((r) => !r.ok)) throw new Error();
+    } catch {
+      setSeries((prev) => prev.map((s) => s.seriesId !== seriesId ? s : {
+        ...s,
+        parts: s.parts.map((p) => {
+          const i = targets.findIndex((t) => t.id === p.id);
+          return i === -1 ? p : { ...p, status: before[i] };
+        }),
+      }));
+      toast('Không đổi được trạng thái, đã hoàn tác.');
+    }
+  }, [series]);
+
   return (
     <div className="flex flex-col gap-5 max-w-4xl">
       <div>
@@ -288,17 +323,52 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
           </p>
         </div>
       ) : (
-        series.map((s) => (
+        series.map((s) => {
+          const meta = [
+            ['Nạn nhân', s.victimName],
+            ['Nghi phạm', s.suspectName],
+            ['Bang', s.stateName],
+          ].filter(([, v]) => v?.trim()) as [string, string][];
+          const allDone = s.parts.length > 0 && s.parts.every((p) => p.status === 'published');
+          return (
           <Card key={s.seriesId} className="card-warm">
             <CardContent className="p-4 space-y-3">
+              {/* Above the headline: a shelf of "🩸 XẢ SÚNG QUÁN CÀ PHÊ…" titles is hard to
+                  tell apart, and the names are what an editor scans for. */}
+              {meta.length > 0 && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  {meta.map(([label, value]) => (
+                    <span key={label} className="text-xs">
+                      <span className="uppercase tracking-wider text-muted-foreground">{label} </span>
+                      <span className="font-medium text-foreground">{value}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="flex items-start justify-between gap-3">
                 <h3 className="text-base font-semibold text-foreground flex-1">{s.seriesTitle}</h3>
                 <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
                   {s.parts.length}/3 kỳ
                 </span>
+                <label className="flex items-center gap-1.5 shrink-0 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={allDone}
+                    onChange={(e) => setParts(s.seriesId, s.parts.map((p) => p.id), e.target.checked)}
+                    className="h-4 w-4 accent-[hsl(var(--success))] cursor-pointer"
+                  />
+                  <span className={`text-xs ${allDone ? 'text-success' : 'text-muted-foreground'}`}>Xong</span>
+                </label>
               </div>
               <div className="flex flex-col gap-2">
-                {s.parts.map((p) => <PartCard key={p.id} part={p} total={Math.max(s.parts.length, 3)} />)}
+                {s.parts.map((p) => (
+                  <PartCard
+                    key={p.id}
+                    part={p}
+                    total={Math.max(s.parts.length, 3)}
+                    onToggle={(next) => setParts(s.seriesId, [p.id], next)}
+                  />
+                ))}
                 {s.parts.length < 3 && (
                   <p className="text-xs text-muted-foreground">
                     Thiếu {KY.slice(s.parts.length, 3).join(', ')} — bộ chưa hoàn chỉnh.
@@ -307,7 +377,8 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
               </div>
             </CardContent>
           </Card>
-        ))
+          );
+        })
       )}
     </div>
   );

@@ -90,6 +90,9 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
       series_id       TEXT,
       part_no         INTEGER,
       series_title    TEXT,
+      victim_name     TEXT,
+      suspect_name    TEXT,
+      state_name      TEXT,
       image_prompt    TEXT,
       platform_drafts TEXT,
       language        TEXT,
@@ -108,6 +111,12 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS series_id TEXT;
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS part_no INTEGER;
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS series_title TEXT;
+    -- Who the case is about, above the headline. A shelf of "🩸 XẢ SÚNG QUÁN CÀ PHÊ…"
+    -- titles is hard to tell apart at a glance; the names and the state are what an
+    -- editor actually scans for. Series-level, so every part of a set carries the same one.
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS victim_name TEXT;
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS suspect_name TEXT;
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS state_name TEXT;
 
     -- Case queue for the crime vertical. Crime series are case-led, not feed-led:
     -- nothing crawls them, so the scheduled run needs a list to draw down.
@@ -428,6 +437,9 @@ export interface GoldInput {
   series_id?: string;
   part_no?: number;
   series_title?: string;
+  victim_name?: string;
+  suspect_name?: string;
+  state_name?: string;
   image_prompt?: string;
   platform_drafts?: Record<string, string>;
   language?: string;
@@ -453,8 +465,8 @@ export async function insertGold(rows: GoldInput[]): Promise<number> {
     if (num(dup[0]?.c) > 0) continue;
     await run(
       `INSERT INTO gold_content
-        (id, silver_id, market_id, article_url, article_title, source_name, location, image_url, image_urls, emoji_title, body_text, summary, hook, hashtags, comment_1, comment_2, comment_3, series_id, part_no, series_title, image_prompt, platform_drafts, language, topics, status, is_done, pub_date, generated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', false, ?, ?)`,
+        (id, silver_id, market_id, article_url, article_title, source_name, location, image_url, image_urls, emoji_title, body_text, summary, hook, hashtags, comment_1, comment_2, comment_3, series_id, part_no, series_title, victim_name, suspect_name, state_name, image_prompt, platform_drafts, language, topics, status, is_done, pub_date, generated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', false, ?, ?)`,
       [
         randomUUID(), r.silver_id, r.market_id, r.article_url ?? null, r.article_title ?? null,
         r.source_name ?? '', r.location ?? null, r.image_url ?? null,
@@ -462,6 +474,7 @@ export async function insertGold(rows: GoldInput[]): Promise<number> {
         r.emoji_title, r.body_text,
         r.summary ?? '', r.hook ?? '', r.hashtags ?? '', r.comment_1 ?? '', r.comment_2 ?? '', r.comment_3 ?? '',
         r.series_id ?? null, r.part_no ?? null, r.series_title ?? null,
+        r.victim_name ?? null, r.suspect_name ?? null, r.state_name ?? null,
         r.image_prompt ?? '',
         JSON.stringify(r.platform_drafts ?? {}), r.language ?? 'vi',
         JSON.stringify(r.topics ?? []),
@@ -549,6 +562,7 @@ export async function setGoldImages(id: string, imageUrl: string, insetUrl: stri
 const EDITABLE_GOLD_FIELDS = [
   'emoji_title', 'body_text', 'summary', 'hook', 'hashtags',
   'comment_1', 'comment_2', 'comment_3', 'series_title', 'image_prompt',
+  'victim_name', 'suspect_name', 'state_name',
 ] as const;
 export type EditableGoldField = (typeof EDITABLE_GOLD_FIELDS)[number];
 
