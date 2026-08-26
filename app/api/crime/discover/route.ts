@@ -30,12 +30,24 @@ export const maxDuration = 120;
 const SURNAMES = ['Nguyen', 'Tran', 'Le', 'Pham', 'Huynh', 'Vo', 'Vu', 'Dang', 'Bui', 'Do', 'Ho', 'Ngo', 'Duong', 'Ly'];
 // Courts where the Vietnamese-American communities in the brief actually are.
 const COURTS = ['calctapp', 'cal', 'texapp', 'washctapp'];
+// Pages to follow per surname/court. 5 x 20 covers the full result set for every surname
+// tested, without hammering a free API.
+const MAX_PAGES = 5;
 
 interface Hit {
   caseName?: string; dateFiled?: string; absolute_url?: string; court?: string;
   docketNumber?: string;
   opinions?: { snippet?: string }[];
 }
+
+// Opinions that review a prior proceeding rather than try a case: they mention murder but
+// contain no investigation and no trial. The first scheduled run burned a research cycle
+// on one of these.
+const PROCEDURAL = /1170\.95|1172\.6|habeas|resentenc|petition for writ|coram nobis/i;
+// A conviction that was reversed leaves the story with no ending, and KỲ III needs a final
+// judgment. Reversals are skipped unless the same text also records an affirmance.
+const REVERSED = /revers|vacat|remand/i;
+const AFFIRMED = /affirm/i;
 
 /**
  * A queue row reading "People v. Nguyen (2024)" is untriageable, and the sweep produces
@@ -105,14 +117,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // the second scheduled run rejected a strong case for exactly this reason, after a
         // full research cycle. In this court the split is 11 affirmed to 8 reversed, so the
         // term is worth its weight.
-        const q = encodeURIComponent(`caseName:${surname} murder jury affirmed`);
-        const url = `https://www.courtlistener.com/api/rest/v4/search/?q=${q}&type=o&court=${court}`;
+        // Query broadly, filter in code. Putting "jury affirmed" in the query itself cut
+        // California Court of Appeal results from 13 to 11 by demanding exact terms that a
+        // given opinion may simply word differently, and a narrow query never reaches a
+        // second page. Broad + code filter mines more of the archive and judges each hit on
+        // what its snippet actually says.
+        const q = encodeURIComponent(`caseName:${surname} murder`);
+        let url: string | null =
+          `https://www.courtlistener.com/api/rest/v4/search/?q=${q}&type=o&court=${court}`;
+        let page = 0;
         try {
-          const res = await fetch(url, { headers: { 'User-Agent': 'auto-social-posting/1.0' } });
-          if (!res.ok) continue;
-          const data = (await res.json()) as { results?: Hit[] };
+          // Follow the cursor. "caseName:Nguyen" alone returns 55 across pages of 20, so
+          // stopping at page one leaves most of the archive unread.
+          while (url && page < MAX_PAGES && found.length < limit) {
+          page += 1;
+          const res: Response = await fetch(url, { headers: { 'User-Agent': 'auto-social-posting/1.0' } });
+          if (!res.ok) break;
+          const data = (await res.json()) as { results?: Hit[]; next?: string | null };
+          url = data.next ?? null;
           for (const r of data.results ?? []) {
             if (found.length >= limit) break;
+            const snip = r.opinions?.[0]?.snippet ?? '';
+            // Skip reviews of prior proceedings, and reversals with no recorded affirmance.
+            if (PROCEDURAL.test(snip)) continue;
+            if (REVERSED.test(snip) && !AFFIRMED.test(snip)) continue;
             const title = (r.caseName ?? '').trim();
             // "In re X" is habeas or juvenile: a review of a prior proceeding, never a
             // trial record. Belt-and-braces on top of the query.
@@ -136,6 +164,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               date: r.dateFiled ?? '',
               notes: bits.join(' · ') || 'Chưa đọc được trích yếu, cần mở bản án để xác minh.',
             });
+          }
           }
         } catch {
           // One court/surname failing must not abort the sweep.

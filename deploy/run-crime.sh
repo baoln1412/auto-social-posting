@@ -28,17 +28,22 @@ MAX_ATTEMPTS="${CRIME_MAX_ATTEMPTS:-$(( TARGET * 4 ))}"
 MAX_SECONDS="${CRIME_MAX_SECONDS:-18000}"   # 5h: must be finished well within the morning
 DISCOVER_TO=$(( TARGET * 2 ))
 
-# Single-run lock. Generous stale threshold: a full batch legitimately runs for hours.
+# Single-run lock, holding the owner's PID so liveness can be checked rather than guessed.
+# Age alone is not enough: a run killed before its EXIT trap fires leaves a lock that blocks
+# every later run for hours, which is exactly what happened once and silently cost a
+# scheduled batch. A lock whose process is gone is stale no matter how fresh it looks.
 if [ -e "$LOCK" ]; then
+  OWNER=$(cat "$LOCK" 2>/dev/null)
   AGE=$(( $(date +%s) - $(stat -f %m "$LOCK") ))
-  if [ "$AGE" -lt 21600 ]; then
-    echo "[run-crime] another run in progress (lock ${AGE}s old), skipping." >> "$LOG"
+  if [ -n "$OWNER" ] && kill -0 "$OWNER" 2>/dev/null; then
+    echo "[run-crime] run $OWNER still alive (lock ${AGE}s old), skipping." >> "$LOG"
     exit 0
   fi
-  echo "[run-crime] stale lock (${AGE}s), taking over." >> "$LOG"
+  echo "[run-crime] lock owner ${OWNER:-unknown} is gone (${AGE}s old), taking over." >> "$LOG"
+  rm -f "$LOCK"
 fi
-trap 'rm -f "$LOCK"' EXIT
-touch "$LOCK"
+trap 'rm -f "$LOCK"' EXIT INT TERM HUP
+echo $$ > "$LOCK"
 
 echo "" >> "$LOG"
 echo "════ [run-crime] $(date '+%Y-%m-%d %H:%M:%S') daily batch, target $TARGET ════" >> "$LOG"
