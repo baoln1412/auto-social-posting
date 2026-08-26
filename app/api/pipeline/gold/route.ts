@@ -78,7 +78,7 @@ function bodyMismatched(item: GoldItem, df: Map<string, number>, n: number): boo
  */
 const TEXT_FIELDS = [
   'emoji_title', 'body_text', 'summary', 'hook', 'hashtags',
-  'comment_1', 'comment_2', 'comment_3', 'image_prompt', 'language',
+  'comment_1', 'comment_2', 'comment_3', 'series_id', 'part_no', 'series_title', 'image_prompt', 'language',
 ] as const;
 
 function badShape(i: GoldItem): string | null {
@@ -117,6 +117,9 @@ interface GoldItem {
   comment_1?: string;
   comment_2?: string;
   comment_3?: string;
+  series_id?: string;
+  part_no?: number;
+  series_title?: string;
   image_prompt?: string;
   platform_drafts?: Record<string, string>;
   language?: string;
@@ -178,6 +181,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         comment_1: i.comment_1,
         comment_2: i.comment_2,
         comment_3: i.comment_3,
+        series_id: i.series_id,
+        part_no: i.part_no,
+        series_title: i.series_title,
         image_prompt: i.image_prompt,
         platform_drafts: i.platform_drafts,
         language: i.language,
