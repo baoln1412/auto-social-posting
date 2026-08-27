@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Copy, FileText, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Copy, FileText, Loader2, Plus, Trash2, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -240,21 +240,44 @@ function CaseQueue({ pageId }: { pageId: string }) {
 export default function CrimeSeriesView({ pageId }: { pageId: string }) {
   const [series, setSeries] = useState<Series[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<'series' | 'queue'>('series');
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [states, setStates] = useState<string[]>([]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [state, setState] = useState('');
 
+  // Filtering and paging happen in SQL, not here: a series carries three bodies of 3,000+
+  // words, and at eight a day fetching the whole market to show the newest few reaches tens
+  // of megabytes within a month.
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/crime/series?marketId=${pageId}`);
+      const qs = new URLSearchParams({ marketId: pageId, page: String(page) });
+      if (from) qs.set('from', from);
+      if (to) qs.set('to', to);
+      if (state) qs.set('state', state);
+      const res = await fetch(`/api/crime/series?${qs}`);
       const d = await res.json();
       setSeries(d.series ?? []);
+      setPages(d.pages ?? 1);
+      setTotal(d.total ?? 0);
+      setStates(d.states ?? []);
     } catch {
       toast('Không tải được danh sách kỳ án.');
     } finally {
       setLoading(false);
     }
-  }, [pageId]);
+  }, [pageId, page, from, to, state]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Changing a filter while on page 5 would otherwise ask for a page the new result set may
+  // not have, and the list would come back empty for no visible reason.
+  const filterBy = (fn: () => void) => { fn(); setPage(1); };
+  const filtered = Boolean(from || to || state);
 
   /**
    * Mark parts published or back to draft. The rows are updated here first so the checkbox
@@ -308,7 +331,62 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
         </p>
       </div>
 
-      <CaseQueue pageId={pageId} />
+      {/* Deliberately not components/ui/tabs.tsx: that file is written in Tailwind v4 variant
+          syntax (data-horizontal:, group-data-horizontal/tabs:) while this project is on v3,
+          so its classes do not exist and the strip renders unstyled and side-on. Nothing else
+          imports it. Two tabs do not justify porting a primitive. */}
+      <div className="inline-flex w-fit items-center gap-1 rounded-lg bg-muted p-[3px]">
+        {([['series', 'Kỳ án'], ['queue', 'Hàng đợi vụ án']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+              tab === id ? 'bg-background text-foreground shadow-sm' : 'text-foreground/60 hover:text-foreground'
+            }`}
+          >
+            {label}
+            {id === 'series' && total > 0 && <span className="ml-1.5 tabular-nums opacity-60">{total}</span>}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'queue' ? (
+        <CaseQueue pageId={pageId} />
+      ) : (
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Từ ngày</span>
+              <Input type="date" value={from} max={to || undefined} className="h-9 w-40"
+                onChange={(e) => filterBy(() => setFrom(e.target.value))} />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Đến ngày</span>
+              <Input type="date" value={to} min={from || undefined} className="h-9 w-40"
+                onChange={(e) => filterBy(() => setTo(e.target.value))} />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Bang</span>
+              {/* Options come from the whole market, not the current page — otherwise picking
+                  one state would hide every other option. */}
+              <select
+                value={state}
+                onChange={(e) => filterBy(() => setState(e.target.value))}
+                className="h-9 w-52 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Tất cả</option>
+                {states.map((st) => <option key={st} value={st}>{st}</option>)}
+              </select>
+            </label>
+            {filtered && (
+              <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-xs"
+                onClick={() => filterBy(() => { setFrom(''); setTo(''); setState(''); })}>
+                <X size={13} />Xoá lọc
+              </Button>
+            )}
+          </div>
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-10 justify-center">
@@ -317,9 +395,13 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
       ) : series.length === 0 ? (
         <div className="text-center py-16 rounded-xl border border-dashed border-border bg-card">
           <FileText size={22} className="mx-auto text-muted-foreground mb-2" />
-          <p className="text-lg font-normal text-foreground mb-1">Chưa có kỳ án nào</p>
+          <p className="text-lg font-normal text-foreground mb-1">
+            {filtered ? 'Không có kỳ án nào khớp bộ lọc' : 'Chưa có kỳ án nào'}
+          </p>
           <p className="text-sm text-muted-foreground">
-            Chạy skill <code className="text-xs">crime-series</code> kèm link vụ án để tạo bộ đầu tiên.
+            {filtered
+              ? 'Thử nới rộng khoảng ngày hoặc bỏ lọc bang.'
+              : <>Chạy skill <code className="text-xs">crime-series</code> kèm link vụ án để tạo bộ đầu tiên.</>}
           </p>
         </div>
       ) : (
@@ -379,6 +461,26 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
           </Card>
           );
         })
+      )}
+
+          {pages > 1 && (
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <span className="text-xs text-muted-foreground tabular-nums">
+                Trang {page}/{pages} · {total} bộ
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="h-8 gap-1 text-xs"
+                  disabled={page <= 1 || loading} onClick={() => setPage((n) => n - 1)}>
+                  <ChevronLeft size={13} />Trước
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 gap-1 text-xs"
+                  disabled={page >= pages || loading} onClick={() => setPage((n) => n + 1)}>
+                  Sau<ChevronRight size={13} />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

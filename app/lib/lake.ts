@@ -636,6 +636,84 @@ export async function getGold(f: GoldFilter): Promise<{ rows: Record<string, any
   return { rows, total, sources };
 }
 
+export interface CrimeSeriesFilter {
+  marketId: string;
+  /** Inclusive date bounds on when the series was generated, as YYYY-MM-DD. */
+  from?: string;
+  to?: string;
+  state?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * One page of crime series, filtered and counted in SQL.
+ *
+ * Not getGold + group-in-the-route, which is how this started: getGold paginates ROWS, so a
+ * page boundary would cut a three-part set in half, and every series carries three bodies of
+ * 3,000+ words. At eight series a day the whole-market fetch reaches tens of megabytes within
+ * a month, and the client was downloading all of it to show the newest few.
+ *
+ * So: pick the page's series ids from grouped metadata first, then read the bodies for only
+ * those ids.
+ */
+export async function getCrimeSeriesPage(
+  f: CrimeSeriesFilter,
+): Promise<{ series: Record<string, any>[][]; total: number; states: string[] }> {
+  const clauses = ['market_id = ?', "series_id IS NOT NULL", "series_id <> ''"];
+  const params: any[] = [f.marketId];
+  if (f.from) { clauses.push('generated_at >= ?'); params.push(`${f.from}T00:00:00.000Z`); }
+  if (f.to) { clauses.push('generated_at <= ?'); params.push(`${f.to}T23:59:59.999Z`); }
+  if (f.state && f.state !== 'All') { clauses.push('state_name = ?'); params.push(f.state); }
+  const where = `WHERE ${clauses.join(' AND ')}`;
+
+  // A set shares one generated_at, so MAX collapses the group without changing the ordering.
+  const groups = await all(
+    `SELECT series_id, MAX(generated_at) AS generated_at
+       FROM gold_content ${where}
+      GROUP BY series_id
+      ORDER BY generated_at DESC
+      LIMIT ? OFFSET ?`,
+    [...params, f.limit ?? 8, f.offset ?? 0],
+  );
+  const totalRows = await all(
+    `SELECT COUNT(DISTINCT series_id) AS c FROM gold_content ${where}`,
+    params,
+  );
+
+  // The state list is for the filter control, so it must span the whole market rather than
+  // the current page - otherwise filtering to one state hides every other option.
+  const stateRows = await all(
+    `SELECT DISTINCT state_name FROM gold_content
+      WHERE market_id = ? AND state_name IS NOT NULL AND state_name <> ''
+      ORDER BY state_name`,
+    [f.marketId],
+  );
+
+  const ids = groups.map((g) => g.series_id as string);
+  let series: Record<string, any>[][] = [];
+  if (ids.length > 0) {
+    const rows = await all(
+      `SELECT * FROM gold_content WHERE series_id IN (${ids.map(() => '?').join(',')})
+        ORDER BY part_no`,
+      ids,
+    );
+    const by = new Map<string, Record<string, any>[]>();
+    for (const r of rows) {
+      if (!by.has(r.series_id)) by.set(r.series_id, []);
+      by.get(r.series_id)!.push(r);
+    }
+    // Keep the page in the order the group query established, not the row order.
+    series = ids.map((id) => by.get(id) ?? []).filter((p) => p.length > 0);
+  }
+
+  return {
+    series,
+    total: num(totalRows[0]?.c),
+    states: stateRows.map((r) => r.state_name as string).filter(Boolean),
+  };
+}
+
 /** Toggle / set the status of a gold item by article_url (used by the site). */
 export async function setGoldStatus(articleUrl: string, status: string, isDone: boolean): Promise<void> {
   await run('UPDATE gold_content SET status = ?, is_done = ? WHERE article_url = ?', [status, isDone, articleUrl]);

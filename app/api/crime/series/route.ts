@@ -17,7 +17,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { insertGold, getGold, type GoldInput } from '@/app/lib/lake';
+import { insertGold, getCrimeSeriesPage, type GoldInput } from '@/app/lib/lake';
 import { parseJsonBody } from '@/app/lib/jsonBody';
 
 export const dynamic = 'force-dynamic';
@@ -114,13 +114,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 }
 
+// Not exported: a route module may only export handlers and Next's own config keys.
+const PAGE_SIZE = 8;
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const marketId = new URL(request.url).searchParams.get('marketId');
+    const sp = new URL(request.url).searchParams;
+    const marketId = sp.get('marketId');
     if (!marketId) return NextResponse.json({ error: 'marketId is required' }, { status: 400 });
 
-    // getGold has no series filter; the crime market is small enough to group here.
-    const { rows } = await getGold({ marketId, limit: 500, offset: 0 });
+    const page = Math.max(1, parseInt(sp.get('page') ?? '1', 10) || 1);
+    const { series: groups, total, states } = await getCrimeSeriesPage({
+      marketId,
+      from: sp.get('from') || undefined,
+      to: sp.get('to') || undefined,
+      state: sp.get('state') || undefined,
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+    });
+    const rows = groups.flat();
 
     type OutPart = { id: string; articleUrl: string; partNo: number; emojiTitle: string; bodyText: string; hashtags: string; comment1: string; comment2: string; comment3: string; imagePrompt: string; status: string; words: number };
     type OutSeries = { seriesId: string; seriesTitle: string; generatedAt: string; victimName: string; suspectName: string; stateName: string; parts: OutPart[] };
@@ -159,7 +171,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .map((s) => ({ ...s, parts: s.parts.sort((a, b) => a.partNo - b.partNo) }))
       .sort((a, b) => (b.generatedAt ?? '').localeCompare(a.generatedAt ?? ''));
 
-    return NextResponse.json({ series, count: series.length });
+    return NextResponse.json({
+      series,
+      count: series.length,
+      total,
+      page,
+      pageSize: PAGE_SIZE,
+      pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+      states,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to load series' },
