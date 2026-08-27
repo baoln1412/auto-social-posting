@@ -256,8 +256,12 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
     setLoading(true);
     try {
       const qs = new URLSearchParams({ marketId: pageId, page: String(page) });
-      if (from) qs.set('from', from);
-      if (to) qs.set('to', to);
+      // Send instants, not calendar dates. generated_at is UTC, and the 06:00 batch writes at
+      // 23:00 UTC the day before, so a date compared as a UTC day filed every morning's series
+      // under the previous date. `new Date('YYYY-MM-DDTHH:mm:ss')` with no offset is parsed as
+      // LOCAL time, so this pins the boundary to whatever timezone the viewer is in.
+      if (from) qs.set('from', new Date(`${from}T00:00:00`).toISOString());
+      if (to) qs.set('to', new Date(`${to}T23:59:59.999`).toISOString());
       if (state) qs.set('state', state);
       const res = await fetch(`/api/crime/series?${qs}`);
       const d = await res.json();
@@ -430,7 +434,10 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
               <div className="flex items-start justify-between gap-3">
                 <h3 className="text-base font-semibold text-foreground flex-1">{s.seriesTitle}</h3>
                 <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-                  {s.parts.length}/3 kỳ
+                  {/* Rendered in the viewer's timezone, same boundary the filter uses — a
+                      series the filter puts on the 27th must not read as the 26th here. */}
+                  {new Date(s.generatedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                  {' · '}{s.parts.length}/3 kỳ
                 </span>
                 <label className="flex items-center gap-1.5 shrink-0 cursor-pointer select-none">
                   <input

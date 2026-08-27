@@ -638,7 +638,15 @@ export async function getGold(f: GoldFilter): Promise<{ rows: Record<string, any
 
 export interface CrimeSeriesFilter {
   marketId: string;
-  /** Inclusive date bounds on when the series was generated, as YYYY-MM-DD. */
+  /**
+   * Inclusive bounds on generated_at, as full ISO instants — NOT calendar dates.
+   *
+   * generated_at is stored in UTC, and a calendar day here is not a calendar day there: the
+   * 06:00 Vietnam batch writes at 23:00 UTC the day before, so treating a picked date as a
+   * UTC day filed every morning's eight series under the previous date. The caller converts
+   * its own local midnight to an instant, so the boundary follows the viewer's timezone
+   * instead of the server's.
+   */
   from?: string;
   to?: string;
   state?: string;
@@ -662,8 +670,8 @@ export async function getCrimeSeriesPage(
 ): Promise<{ series: Record<string, any>[][]; total: number; states: string[] }> {
   const clauses = ['market_id = ?', "series_id IS NOT NULL", "series_id <> ''"];
   const params: any[] = [f.marketId];
-  if (f.from) { clauses.push('generated_at >= ?'); params.push(`${f.from}T00:00:00.000Z`); }
-  if (f.to) { clauses.push('generated_at <= ?'); params.push(`${f.to}T23:59:59.999Z`); }
+  if (f.from) { clauses.push('generated_at >= ?'); params.push(f.from); }
+  if (f.to) { clauses.push('generated_at <= ?'); params.push(f.to); }
   if (f.state && f.state !== 'All') { clauses.push('state_name = ?'); params.push(f.state); }
   const where = `WHERE ${clauses.join(' AND ')}`;
 
