@@ -26,13 +26,44 @@ import { parseJsonBody } from '@/app/lib/jsonBody';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
-// Common Vietnamese surnames, as spelled in US court records.
-const SURNAMES = ['Nguyen', 'Tran', 'Le', 'Pham', 'Huynh', 'Vo', 'Vu', 'Dang', 'Bui', 'Do', 'Ho', 'Ngo', 'Duong', 'Ly'];
+// Asian surnames as spelled in US court records, not Vietnamese only.
+//
+// Surname is a proxy for ethnicity and an imperfect one. Lee, Park, Kim and Chan are also
+// common non-Asian American surnames, so the sweep will surface cases outside the brief;
+// the research step checks who the defendant actually is and rejects the rest. Casting wide
+// and filtering late beats a narrow list that never surfaces a Hmong or Cambodian case.
+const SURNAMES = [
+  // Vietnamese
+  'Nguyen', 'Tran', 'Le', 'Pham', 'Huynh', 'Vo', 'Vu', 'Dang', 'Bui', 'Do', 'Ho', 'Ngo', 'Duong', 'Ly',
+  // Chinese
+  'Chen', 'Wang', 'Zhang', 'Liu', 'Lin', 'Huang', 'Wu', 'Chan', 'Cheung', 'Lam', 'Wong', 'Chin', 'Chow', 'Yee',
+  // Korean
+  'Kim', 'Park', 'Lee', 'Choi', 'Jung', 'Kang', 'Cho', 'Yoon', 'Shin',
+  // Filipino
+  'Bautista', 'Ramos', 'Aquino', 'Mendoza', 'Villanueva',
+  // Hmong and Lao, concentrated in Sacramento, Fresno and the Twin Cities
+  'Vang', 'Xiong', 'Yang', 'Thao', 'Lor', 'Her',
+  // Cambodian
+  'Sok', 'Chea', 'Meas',
+  // Japanese
+  'Tanaka', 'Yamamoto', 'Nakamura',
+  // South Asian
+  'Patel', 'Singh', 'Shah', 'Kumar',
+];
 // Courts where the Vietnamese-American communities in the brief actually are.
 const COURTS = ['calctapp', 'cal', 'texapp', 'washctapp'];
 // Pages to follow per surname/court. 5 x 20 covers the full result set for every surname
 // tested, without hammering a free API.
 const MAX_PAGES = 5;
+// Only opinions filed from here on. This biases the pool toward recent CRIMES, which is what
+// actually matters: pre-2005 crimes were covered in print that was never digitised, and 10 of
+// the 12 series that found no photograph were pre-2005.
+//
+// It is a bias, not a guarantee, and cannot be more than that. An appeal is decided years
+// after the offence, so a 2024 opinion is routinely a 1995 shooting - that exact case is in
+// the lake. The crime date is only knowable from the opinion text, so the hard cutoff lives
+// in the SOP where the writer can read it.
+const FILED_AFTER = process.env.CRIME_FILED_AFTER || '2015-01-01';
 
 interface Hit {
   caseName?: string; dateFiled?: string; absolute_url?: string; court?: string;
@@ -87,6 +118,119 @@ function caseKeys(text: string, docket?: string): string[] {
 }
 
 /**
+ * Prosecutor press rooms, as a second way in.
+ *
+ * CourtListener only holds appellate opinions, and an appeal is decided years after the
+ * offence - so every case it surfaces skews old, and pre-2005 crimes were reported in print
+ * that was never digitised. Measured on the first backfill: 10 of the 12 series that found no
+ * photograph were pre-2005 crimes.
+ *
+ * A conviction or sentencing release names a RECENT crime that already has a final outcome,
+ * which is the combination §2 needs for KỲ III and the image search needs for coverage.
+ *
+ * The release itself carries no usable photograph - every image on a checked LA County DA
+ * conviction release was a logo or a social icon. It is a lead: it gives the name, county and
+ * charge, and recent cases are covered by outlets that are still online, which is where the
+ * booking photo lives.
+ *
+ * Only offices that answer a plain server-side fetch are listed. Orange County, Alameda and
+ * Santa Clara all sit behind bot protection that returns 403 to any headers, so scraping them
+ * from here is not possible; they would need a browser.
+ */
+const DA_SOURCES = [
+  { name: 'Biện lý Hạt Los Angeles', index: 'https://da.lacounty.gov/media/news', link: '/media/news/' },
+];
+const OUTCOME = /\bconvict|sentenc|pleaded guilty|pled guilty|found guilty|jury (?:found|convicted)/i;
+const DA_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml',
+  // Load-bearing, and it looks like a formality. Let fetch negotiate compression and this CDN
+  // answers 200 with a 6 KB stub containing no links at all; ask for identity and the same URL
+  // returns the real 59 KB page with 30 releases. A 200 with no matches reads exactly like
+  // "nothing published today", so the sweep silently found nothing until this was traced.
+  'Accept-Encoding': 'identity',
+};
+
+const strip = (html: string) =>
+  html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ').trim();
+
+/**
+ * Candidates from prosecutor releases. Requires a recorded outcome, a surname from the list,
+ * and a crime year at or after `minYear` — a release about a 1990s cold case is the very
+ * thing this source exists to avoid.
+ */
+async function sweepDA(minYear: number, surnames: string[], limit: number, seen: Set<string>, blocked: string[]) {
+  const found: { title: string; url: string; court: string; date: string; notes: string }[] = [];
+  const thisYear = new Date().getFullYear();
+
+  for (const src of DA_SOURCES) {
+    if (found.length >= limit) break;
+
+    // Nearly all the filtering happens on the INDEX, from the link text alone: it reads
+    // "August 24, 2026: Man Convicted of 2023 Murder of …", which carries the outcome and the
+    // offence year together. Fetching every release to learn the same thing tripped the site's
+    // bot protection after about five requests and returned "Pardon Our Interruption" for the
+    // rest, so the sweep must arrive at a shortlist before it starts opening pages.
+    let candidates: { href: string; text: string; year: number }[] = [];
+    try {
+      const res = await fetch(src.index, { headers: DA_HEADERS, signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) { blocked.push(`${src.name}: http ${res.status}`); continue; }
+      const html = await res.text();
+      // The site answers 200 with a challenge page rather than an error, so a block is
+      // indistinguishable from a quiet news day unless it is checked for and reported.
+      if (/Pardon Our Interruption/i.test(html) || html.length < 15_000) {
+        blocked.push(`${src.name}: chặn tự động (bot protection)`);
+        continue;
+      }
+      const byHref = new Map<string, { href: string; text: string; year: number }>();
+      for (const m of html.matchAll(/<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+        const href = m[1].startsWith('http') ? m[1] : new URL(m[1], src.index).href;
+        const text = strip(m[2]);
+        if (!href.includes(src.link) || text.length < 25 || seen.has(href)) continue;
+        if (!OUTCOME.test(text)) continue;
+        // The offence year, not the release year. Ignore any year at or after the current one,
+        // which is when the release was published rather than when the crime happened.
+        const years = [...text.matchAll(/\b(19\d\d|20\d\d)\b/g)].map((n) => Number(n[1])).filter((y) => y < thisYear);
+        // NOT the minimum year in the text: every page on this site mentions 2000 somewhere,
+        // so a min-year test rejected all thirty releases while looking like a quiet day.
+        const year = years.length ? Math.max(...years) : 0;
+        if (year && year < minYear) continue;
+        if (!byHref.has(href)) byHref.set(href, { href, text, year });
+      }
+      candidates = [...byHref.values()].slice(0, 8);
+    } catch { continue; }
+
+    // Only the shortlist gets opened, one at a time with a pause, to confirm the surname.
+    for (const c of candidates) {
+      if (found.length >= limit) break;
+      let who = surnames.find((s) => new RegExp(`\\b${s}\\b`).test(c.text));
+      if (!who) {
+        try {
+          await new Promise((r) => setTimeout(r, 1200));
+          const res = await fetch(c.href, { headers: DA_HEADERS, signal: AbortSignal.timeout(15_000) });
+          if (!res.ok) continue;
+          const body = strip(await res.text()).slice(0, 6000);
+          if (/Pardon Our Interruption/i.test(body)) break;  // rate-limited; stop, do not hammer
+          who = surnames.find((s) => new RegExp(`\\b${s}\\b`).test(body));
+        } catch { continue; }
+      }
+      if (!who) continue;
+      seen.add(c.href);
+      found.push({
+        title: c.text.replace(/^\w+ \d{1,2}, \d{4}:\s*/, '').slice(0, 110),
+        url: c.href,
+        court: 'da',
+        date: c.year ? `${c.year}-01-01` : '',
+        notes: `${src.name} · họ ${who} · án đã tuyên${c.year ? ` · gây án ${c.year}` : ''} · ${c.text.slice(0, 130)}`,
+      });
+    }
+  }
+  return found;
+}
+
+/**
  * A queue row reading "People v. Nguyen (2024)" is untriageable, and the sweep produces
  * many of them. The search snippet already carries the caption and often the opening
  * finding, so mine it for the three things that let a human choose: who the defendant
@@ -122,13 +266,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const parsed = await parseJsonBody(request);
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
-    const body = (parsed.data ?? {}) as { marketId?: string; limit?: number; surnames?: string[]; courts?: string[] };
+    const body = (parsed.data ?? {}) as {
+      marketId?: string; limit?: number; surnames?: string[]; courts?: string[];
+      source?: string; minYear?: number;
+    };
     const { marketId } = body;
     if (!marketId) return NextResponse.json({ error: 'marketId is required' }, { status: 400 });
 
     const limit = Math.min(Math.max(body.limit ?? 10, 1), 50);
     const surnames = body.surnames?.length ? body.surnames : SURNAMES;
     const courts = body.courts?.length ? body.courts : COURTS;
+    // 'both' by default: prosecutor releases supply recent, photographable cases, the courts
+    // supply volume. Neither alone fills a daily batch.
+    const source = (body.source ?? 'both') as 'courts' | 'da' | 'both';
+    const minYear = Number(body.minYear ?? process.env.CRIME_MIN_CRIME_YEAR ?? 2010);
 
     // Dedup against everything already queued, written or rejected, so a repeat run does
     // not re-add a case that was already judged unusable.
@@ -139,7 +290,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const seenCases = new Set(existing.flatMap((c) => caseKeys(`${c.notes ?? ''} ${c.title ?? ''}`)));
 
     const found: { title: string; url: string; court: string; date: string; notes: string }[] = [];
+    const daBlocked: string[] = [];
+
+    // Prosecutor releases first: they are the recent, photographable cases, so they should
+    // reach the queue ahead of whatever the court sweep turns up.
+    if (source !== 'courts') {
+      found.push(...await sweepDA(minYear, surnames, limit, seen, daBlocked));
+    }
+
     outer: for (const court of courts) {
+      if (source === 'da') break;
       for (const surname of surnames) {
         if (found.length >= limit) break outer;
         // Two filters, both learned the hard way.
@@ -164,7 +324,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // what its snippet actually says.
         const q = encodeURIComponent(`caseName:${surname} murder`);
         let url: string | null =
-          `https://www.courtlistener.com/api/rest/v4/search/?q=${q}&type=o&court=${court}`;
+          `https://www.courtlistener.com/api/rest/v4/search/?q=${q}&type=o&court=${court}`
+          + `&filed_after=${encodeURIComponent(FILED_AFTER)}`;
         let page = 0;
         try {
           // Follow the cursor. "caseName:Nguyen" alone returns 55 across pages of 20, so
@@ -231,7 +392,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    return NextResponse.json({ ok: true, added: found.length, cases: found });
+    // daBlocked is surfaced rather than swallowed: a prosecutor site answering with a
+    // challenge page looks exactly like a day with no convictions announced.
+    return NextResponse.json({ ok: true, added: found.length, cases: found, daBlocked });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Discovery failed' }, { status: 500 });
   }

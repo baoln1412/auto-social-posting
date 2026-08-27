@@ -11,8 +11,28 @@
 **Tuyến cốt lõi:** trọng án hình sự · kỳ án trinh thám · đấu trí pháp y · thanh trừng thế
 giới ngầm · lật lại hồ sơ nguội · đại án lịch sử tại Mỹ.
 
-**Đẩy mạnh tương tác:** các vụ án liên quan kiều bào/người Mỹ gốc Việt tại California
-(Little Saigon, Quận Cam), Texas (Houston, Dallas), Washington (Seattle).
+**Đẩy mạnh tương tác:** các vụ án liên quan **cộng đồng gốc Á tại Mỹ** — gốc Việt, gốc Hoa,
+gốc Hàn, gốc Phi (Philippines), gốc Nhật, Hmong/Lào, gốc Campuchia, gốc Nam Á — tại
+California (Little Saigon, Quận Cam, San Jose, Los Angeles), Texas (Houston, Dallas),
+Washington (Seattle), Minnesota (Twin Cities), Sacramento và Fresno.
+
+Vụ án gốc Việt vẫn được ưu tiên khi có, nhưng **không còn là điều kiện bắt buộc**. Họ trong
+hồ sơ tòa chỉ là dấu hiệu ban đầu và có sai số — `Lee`, `Park`, `Kim`, `Chan` cũng là họ phổ
+biến của người không gốc Á. **Đọc bản án để xác nhận bị cáo/nạn nhân thực sự thuộc cộng đồng
+gốc Á trước khi viết**; không phải thì từ chối vụ án.
+
+### 0a. MỐC THỜI GIAN: vụ án phải xảy ra từ năm 2010 trở đi
+
+**Vụ án có thời điểm gây án TRƯỚC 2010 → từ chối**, dù hồ sơ tòa có đầy đủ đến đâu.
+
+Lý do là đo được, không phải sở thích: báo địa phương Mỹ trước khoảng 2005 chỉ có bản in,
+chưa số hoá. Trong 12 bộ bài không tìm được tấm ảnh nào, **10 bộ là vụ án trước 2005**. Không
+ảnh nghĩa là không có ảnh nghi phạm, không ảnh hiện trường, và mất luôn phần không khí mà
+báo chí đương thời mang lại.
+
+**Đọc năm GÂY ÁN trong bản án, đừng đọc năm ra bản án.** Kháng cáo được xử nhiều năm — có khi
+vài chục năm — sau khi án xảy ra: một bản án năm 2024 hoàn toàn có thể là vụ nổ súng năm 1995,
+và trong kho đã có đúng một vụ như vậy. Năm ra bản án KHÔNG dùng để xét mốc này.
 
 **Độc giả:** người Việt trong nước quan tâm đời sống hình sự hải ngoại; kiều bào tại Mỹ,
 25 đến 65 tuổi trở lên. Họ thích tư liệu xác thực hơn hư cấu giật gân; đánh giá cao đấu trí
@@ -249,6 +269,11 @@ Sau khi POST bộ bài và nhận `seriesId`, gọi tiếp:
   khai), rồi mới tới ảnh báo chí.
 - **KHÔNG lấy ảnh trẻ em, ảnh thi thể, ảnh hiện trường có máu**, kể cả khi đã che mặt.
 - Không tìm được ảnh nào thì **bỏ qua bước này** — không có ảnh vẫn tốt hơn ảnh sai vụ.
+  Bộ bài khi đó tự động rơi về `image_prompt` (§9): thẻ hiển thị prompt minh hoạ thay cho
+  ảnh thật. **KHÔNG hạ chuẩn để lấp chỗ trống** — không lấy ảnh vụ khác, không lấy ảnh minh
+  hoạ của báo, không lấy ảnh chân dung chụp thời nay của người đã ra tù.
+- Mốc 2010 ở §0a khiến bước này dễ hơn hẳn: vụ càng gần đây thì báo địa phương càng còn bài
+  trên mạng kèm ảnh hồ sơ cảnh sát.
 
 Máy chủ tự động làm mờ mọi khuôn mặt phát hiện được rồi mới lưu, và **chỉ lưu bản đã che**;
 ảnh gốc bị xoá ngay, ảnh nào che không thành công thì bị loại bỏ hoàn toàn. Số mặt đã che

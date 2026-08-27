@@ -457,6 +457,19 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
               </div>
               {/* Only ever the censored copy: the route deletes the original after blurring
                   and drops any image it could not censor, so there is no uncensored URL. */}
+              {/* No real photograph found — most pre-2010 cases have none online. Fall back to
+                  the illustration prompt kỳ I already carries, so the card still offers
+                  something to work with rather than a blank. */}
+              {(s.images?.length ?? 0) === 0 && s.parts[0]?.imagePrompt && (
+                <div className="flex items-start gap-2 rounded-md border border-dashed border-border bg-muted/20 p-2">
+                  <span className="shrink-0 rounded bg-background px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Chưa có ảnh
+                  </span>
+                  <p className="flex-1 line-clamp-2 text-[11px] text-muted-foreground">{s.parts[0].imagePrompt}</p>
+                  <CopyBtn text={s.parts[0].imagePrompt!} label="Chép prompt" />
+                </div>
+              )}
+
               {(s.images?.length ?? 0) > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {s.images!.map((img) => (
