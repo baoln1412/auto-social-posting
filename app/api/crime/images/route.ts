@@ -46,6 +46,38 @@ type Role = (typeof ROLES)[number];
 const role = (r?: string): Role =>
   (ROLES as readonly string[]).includes((r ?? '').trim()) ? ((r as string).trim() as Role) : 'khac';
 
+/**
+ * DELETE /api/crime/images?seriesId=…[&url=…]
+ *   Detach one image, or all of them when `url` is omitted.
+ *
+ * A wrong photograph on a real case has to be removable, and picking the wrong one is a
+ * question of when rather than whether: a search can surface a different defendant of the
+ * same name, and a caption can be misread. Without this the only remedy was editing the
+ * database by hand.
+ *
+ * The censored file is left in data/uploads rather than unlinked — the same image may be
+ * attached to another series, and an orphan is inert; deleting a file another card is
+ * showing is not.
+ */
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  try {
+    const sp = new URL(request.url).searchParams;
+    const seriesId = sp.get('seriesId');
+    if (!seriesId) return NextResponse.json({ error: 'seriesId is required' }, { status: 400 });
+    const url = sp.get('url');
+
+    const existing = await getCrimeSeriesImages(seriesId);
+    const kept = url ? existing.filter((i) => (i as { url?: string }).url !== url) : [];
+    const parts = await setCrimeSeriesImages(seriesId, kept);
+    return NextResponse.json({ ok: true, removed: existing.length - kept.length, remaining: kept.length, parts });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to detach images' },
+      { status: 500 },
+    );
+  }
+}
+
 /** Reject anything that is not a plain remote http(s) image before we fetch it. */
 function usable(raw: string): URL | null {
   try {

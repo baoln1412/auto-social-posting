@@ -38,10 +38,24 @@ MODEL = Path(__file__).resolve().parent / 'assets' / 'yunet.onnx'
 # Running 3x/0.2 on a 250px portrait produced four spurious boxes - one of them 60% of
 # the frame at negative coordinates - because there is no real detail to recover.
 PASSES = ((1.0, 0.30, 0), (2.0, 0.25, 600), (3.0, 0.20, 900))
-PAD = 0.18          # a tight box leaves hairline, jaw and ears, which still identify
+# YuNet returns the FACIAL REGION - eyes, nose, mouth - not the head. Forehead, hair,
+# ears and chin all fall outside it, and a person is still recognisable from those. An
+# 18% pad measured on real booking photos left a band across the eyes and nothing else,
+# so the box is grown to roughly head-sized, hardest upward where the hair is.
+PAD_X = 0.35
+PAD_TOP = 0.55
+PAD_BOTTOM = 0.30
 MAX_SIDE = 4000     # keep a large upscale from exhausting memory
-MAX_AREA = 0.45     # a "face" bigger than this share of the frame is junk, not a close-up
-PIXEL_DIVISOR = 12  # blocks per face; smaller number = coarser
+# A face genuinely CAN fill most of a frame - that is what a mugshot is. This started at
+# 0.45 to reject junk, and on a tight booking photo it threw away the correct 62%-of-frame
+# detection and kept two fragments, leaving the man identifiable. Junk boxes are handled
+# where they actually come from: clamping to the frame, and not upscaling small images.
+MAX_AREA = 0.92
+# Blocks ACROSS THE FACE, not a divisor of its pixel width. Dividing by a constant made
+# the strength depend on how big the face happened to be: a 600px booking-photo face
+# became 50 blocks wide and stayed perfectly recognisable, while a small face in the same
+# batch was destroyed. A fixed count censors a close-up and a distant face equally.
+BLOCKS = 9
 
 
 def _detect(img, scale, conf):
@@ -98,16 +112,18 @@ def censor(src, dst):
                     if max(H, W) >= min_side
                     for b in _detect(img, scale, conf)])
     for x, y, w, h in boxes:
-        dx, dy = int(w * PAD), int(h * PAD)
-        x0, y0 = max(0, x - dx), max(0, y - dy)
-        x1, y1 = min(W, x + w + dx), min(H, y + h + dy)
+        x0 = max(0, x - int(w * PAD_X))
+        x1 = min(W, x + w + int(w * PAD_X))
+        y0 = max(0, y - int(h * PAD_TOP))
+        y1 = min(H, y + h + int(h * PAD_BOTTOM))
         roi = img[y0:y1, x0:x1]
         if roi.size == 0:
             continue
         # Downscale then nearest-upscale discards the pixels outright. A Gaussian of
         # the wrong radius can be partially undone by sharpening; this cannot.
-        small = cv2.resize(roi, (max(1, (x1 - x0) // PIXEL_DIVISOR), max(1, (y1 - y0) // PIXEL_DIVISOR)),
-                           interpolation=cv2.INTER_LINEAR)
+        bw = max(1, min(BLOCKS, x1 - x0))
+        bh = max(1, min(BLOCKS, y1 - y0))
+        small = cv2.resize(roi, (bw, bh), interpolation=cv2.INTER_AREA)
         img[y0:y1, x0:x1] = cv2.resize(small, (x1 - x0, y1 - y0), interpolation=cv2.INTER_NEAREST)
     return boxes if cv2.imwrite(str(dst), img) else None
 
