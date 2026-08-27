@@ -722,6 +722,18 @@ export async function getCrimeSeriesPage(
   };
 }
 
+/**
+ * Attach censored source images to every part of a crime series.
+ *
+ * Series-level, like the victim/suspect/state fields: the images belong to the case, not to
+ * one instalment, and writing them onto each row keeps a part self-describing.
+ */
+export async function setCrimeSeriesImages(seriesId: string, images: unknown[]): Promise<number> {
+  await run('UPDATE gold_content SET image_urls = ? WHERE series_id = ?', [JSON.stringify(images), seriesId]);
+  const rows = await all('SELECT COUNT(*) AS c FROM gold_content WHERE series_id = ?', [seriesId]);
+  return num(rows[0]?.c);
+}
+
 /** Toggle / set the status of a gold item by article_url (used by the site). */
 export async function setGoldStatus(articleUrl: string, status: string, isDone: boolean): Promise<void> {
   await run('UPDATE gold_content SET status = ?, is_done = ? WHERE article_url = ?', [status, isDone, articleUrl]);

@@ -135,7 +135,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const rows = groups.flat();
 
     type OutPart = { id: string; articleUrl: string; partNo: number; emojiTitle: string; bodyText: string; hashtags: string; comment1: string; comment2: string; comment3: string; imagePrompt: string; status: string; words: number };
-    type OutSeries = { seriesId: string; seriesTitle: string; generatedAt: string; victimName: string; suspectName: string; stateName: string; parts: OutPart[] };
+    type OutImage = { url: string; credit: string; source: string; faces: number };
+    type OutSeries = { seriesId: string; seriesTitle: string; generatedAt: string; victimName: string; suspectName: string; stateName: string; images: OutImage[]; parts: OutPart[] };
     const bySeries = new Map<string, OutSeries>();
     for (const r of rows) {
       if (!r.series_id) continue;
@@ -148,6 +149,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         victimName: r.victim_name ?? '',
         suspectName: r.suspect_name ?? '',
         stateName: r.state_name ?? '',
+        // Censored source photos, stored as JSON on every part. A row written before this
+        // existed, or by the immigration path, holds a plain URL array — ignore those
+        // rather than render half an object.
+        images: (() => {
+          try {
+            const v = JSON.parse(r.image_urls || '[]');
+            return Array.isArray(v) ? v.filter((i) => i && typeof i === 'object' && typeof i.url === 'string') : [];
+          } catch { return []; }
+        })(),
         parts: [],
       };
       g.parts.push({

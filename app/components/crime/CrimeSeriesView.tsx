@@ -21,6 +21,7 @@ interface Part {
   status?: string;
   words: number;
 }
+interface CaseImage { url: string; credit?: string; source?: string; faces?: number }
 interface Series {
   seriesId: string;
   seriesTitle: string;
@@ -28,6 +29,7 @@ interface Series {
   victimName?: string;
   suspectName?: string;
   stateName?: string;
+  images?: CaseImage[];
   parts: Part[];
 }
 
@@ -449,6 +451,27 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
                   <span className={`text-xs ${allDone ? 'text-success' : 'text-muted-foreground'}`}>Xong</span>
                 </label>
               </div>
+              {/* Only ever the censored copy: the route deletes the original after blurring
+                  and drops any image it could not censor, so there is no uncensored URL. */}
+              {(s.images?.length ?? 0) > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {s.images!.map((img) => (
+                    <figure key={img.url} className="shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt="" className="h-28 w-auto rounded-md border border-border object-cover" />
+                      <figcaption className="mt-1 max-w-[12rem] truncate text-[10px] text-muted-foreground">
+                        {img.credit || (img.source ? new URL(img.source).hostname.replace(/^www\./, '') : '')}
+                        {typeof img.faces === 'number' && (
+                          <span className={img.faces > 0 ? 'text-success' : 'text-warning'}>
+                            {' · '}{img.faces > 0 ? `che ${img.faces} mặt` : 'không thấy mặt'}
+                          </span>
+                        )}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
+
               <div className="flex flex-col gap-2">
                 {s.parts.map((p) => (
                   <PartCard

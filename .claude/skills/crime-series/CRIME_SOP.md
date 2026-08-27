@@ -223,6 +223,30 @@ bên ngoài, xe cảnh sát, phòng xử án, hồ sơ vụ án. **KHÔNG dựng
 thi thể, không máu, không chân dung người có thật.** Trường này là ngoại lệ duy nhất được
 viết bằng tiếng Anh, vì đó là đầu vào cho công cụ tạo ảnh.
 
+Quy tắc "không chân dung người có thật" ở trên **chỉ áp dụng cho ảnh do AI tạo** (một bức
+ảnh dựng ra mà trông như bằng chứng thì chính là bịa đặt). Ảnh tư liệu THẬT lấy từ báo chí
+đi theo §9a, và bắt buộc phải che mặt.
+
+### 9a. Ảnh tư liệu thật của vụ án (che mặt bắt buộc)
+
+Trong lúc nghiên cứu, thu thập **tối đa 3 đường dẫn ảnh** từ chính các trang báo đã đọc.
+Sau khi POST bộ bài và nhận `seriesId`, gọi tiếp:
+
+`POST /api/crime/images` với `{ "seriesId": "...", "images": [{ "url": "...", "credit": "Tên báo" }] }`
+
+- **`url` phải là đường dẫn TRỰC TIẾP tới file ảnh** (kết thúc bằng `.jpg`/`.png`/`.webp`,
+  thường nằm ở thẻ `og:image` hoặc trong `<img src>`), KHÔNG phải link bài báo.
+- **`credit` ghi tên hãng tin sở hữu ảnh.** Bỏ trống thì không còn dấu vết ảnh từ đâu ra.
+- Ưu tiên ảnh hồ sơ tòa án, thông cáo của Sở Cảnh sát hoặc Biện lý (thường là hồ sơ công
+  khai), rồi mới tới ảnh báo chí.
+- **KHÔNG lấy ảnh trẻ em, ảnh thi thể, ảnh hiện trường có máu**, kể cả khi đã che mặt.
+- Không tìm được ảnh nào thì **bỏ qua bước này** — không có ảnh vẫn tốt hơn ảnh sai vụ.
+
+Máy chủ tự động làm mờ mọi khuôn mặt phát hiện được rồi mới lưu, và **chỉ lưu bản đã che**;
+ảnh gốc bị xoá ngay, ảnh nào che không thành công thì bị loại bỏ hoàn toàn. Số mặt đã che
+hiển thị trên thẻ. Lưu ý: bộ nhận diện **không bảo đảm bắt hết mặt trong ảnh đám đông** —
+vì vậy hãy chọn ảnh chân dung, ảnh hồ sơ, ảnh hiện trường vắng người thay vì ảnh đám đông.
+
 ## 10. TỰ KIỂM trước khi xuất (SỬA nếu vi phạm)
 
 - Còn từ tiếng Anh trong `body_text`, `emoji_title`, `hashtags` hay comment, kể cả trong

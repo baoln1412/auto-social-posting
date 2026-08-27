@@ -1,7 +1,10 @@
 #!/bin/zsh
 # Keeps the Next.js server running (sole owner of the DuckDB lake + SQLite).
 # Used by com.immigration.web.plist.
-export PATH="/Users/nguyenbaole/.nvm/versions/node/v20.20.2/bin:/usr/local/bin:/usr/bin:/bin"
+# /opt/homebrew/bin carries uv, which /api/crime/images shells out to for face
+# censoring. launchd starts this with a bare PATH, so without it that route fails
+# with a bare ENOENT that says nothing about what is missing.
+export PATH="/Users/nguyenbaole/.nvm/versions/node/v20.20.2/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 cd /Users/nguyenbaole/auto-social-posting || exit 1
 
 # launchd redirects both streams straight to data/web.log, so every line landed
