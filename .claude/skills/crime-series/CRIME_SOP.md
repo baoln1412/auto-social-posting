@@ -232,10 +232,18 @@ Quy tắc "không chân dung người có thật" ở trên **chỉ áp dụng c
 Trong lúc nghiên cứu, thu thập **tối đa 3 đường dẫn ảnh** từ chính các trang báo đã đọc.
 Sau khi POST bộ bài và nhận `seriesId`, gọi tiếp:
 
-`POST /api/crime/images` với `{ "seriesId": "...", "images": [{ "url": "...", "credit": "Tên báo" }] }`
+`POST /api/crime/images` với
+`{ "seriesId": "...", "images": [{ "url": "...", "credit": "Tên báo", "role": "suspect", "article": "https://..." }] }`
 
 - **`url` phải là đường dẫn TRỰC TIẾP tới file ảnh** (kết thúc bằng `.jpg`/`.png`/`.webp`,
   thường nằm ở thẻ `og:image` hoặc trong `<img src>`), KHÔNG phải link bài báo.
+- **`article` là link bài báo chứa ảnh đó.** Chỉ mở bài báo mới kiểm được chú thích ảnh và
+  ảnh thuộc về ai; đường dẫn CDN không cho biết điều gì.
+- **`role`**: `victim` (nạn nhân) · `suspect` (nghi phạm) · `scene` (hiện trường, tòa án,
+  xe cảnh sát) · `khac`. **Chỉ gán `victim` hay `suspect` khi chú thích ảnh nói rõ đó là
+  ai.** Ảnh trong bài về vụ án KHÔNG mặc nhiên là ảnh nạn nhân — có thể là nhân chứng,
+  điều tra viên, luật sư hay người thân. Không chắc thì để `khac`.
+- Ưu tiên đủ **một ảnh nghi phạm, một ảnh nạn nhân, một ảnh hiện trường** nếu có.
 - **`credit` ghi tên hãng tin sở hữu ảnh.** Bỏ trống thì không còn dấu vết ảnh từ đâu ra.
 - Ưu tiên ảnh hồ sơ tòa án, thông cáo của Sở Cảnh sát hoặc Biện lý (thường là hồ sơ công
   khai), rồi mới tới ảnh báo chí.

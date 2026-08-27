@@ -20,7 +20,7 @@ import { promisify } from 'util';
 import { writeFile, unlink, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { setCrimeSeriesImages } from '@/app/lib/lake';
+import { setCrimeSeriesImages, getCrimeSeriesImages } from '@/app/lib/lake';
 import { parseJsonBody } from '@/app/lib/jsonBody';
 
 const run = promisify(execFile);
@@ -36,8 +36,15 @@ const MAX_BYTES = 12e6;
 const MAX_IMAGES = 6;
 const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-interface Incoming { url?: string; credit?: string }
-interface Stored { url: string; credit: string; source: string; faces: number }
+interface Incoming { url?: string; credit?: string; role?: string; article?: string }
+interface Stored { url: string; credit: string; source: string; article: string; role: Role; faces: number }
+
+// What the picture shows. Anything unrecognised becomes 'khac' rather than being trusted
+// through to the UI, which renders the role as a label.
+const ROLES = ['victim', 'suspect', 'scene', 'khac'] as const;
+type Role = (typeof ROLES)[number];
+const role = (r?: string): Role =>
+  (ROLES as readonly string[]).includes((r ?? '').trim()) ? ((r as string).trim() as Role) : 'khac';
 
 /** Reject anything that is not a plain remote http(s) image before we fetch it. */
 function usable(raw: string): URL | null {
@@ -117,6 +124,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           url: `/api/image/upload?f=${id}.jpg`,
           credit: (item.credit ?? '').trim(),
           source: src.href,
+          // The page the photo was published on, kept separate from the image URL: a CDN
+          // path is not something you can open to check the caption or the licence.
+          article: (item.article ?? '').trim(),
+          role: role(item.role),
           faces,
         });
       } catch (err) {
@@ -134,7 +145,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    const parts = stored.length > 0 ? await setCrimeSeriesImages(seriesId, stored) : 0;
+    // Merge with what the series already holds rather than replacing it, so attaching a
+    // scene photo later does not silently drop the suspect photo attached earlier.
+    const existing = await getCrimeSeriesImages(seriesId);
+    const seen = new Set(existing.map((i) => i.source));
+    const merged = [...existing, ...stored.filter((s) => !seen.has(s.source))];
+    const parts = stored.length > 0 ? await setCrimeSeriesImages(seriesId, merged) : 0;
     return NextResponse.json({ ok: true, stored: stored.length, parts, images: stored, skipped });
   } catch (err) {
     return NextResponse.json(

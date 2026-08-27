@@ -21,7 +21,11 @@ interface Part {
   status?: string;
   words: number;
 }
-interface CaseImage { url: string; credit?: string; source?: string; faces?: number }
+interface CaseImage { url: string; credit?: string; source?: string; article?: string; role?: string; faces?: number }
+
+const ROLE_LABEL: Record<string, string> = {
+  victim: 'Nạn nhân', suspect: 'Nghi phạm', scene: 'Hiện trường', khac: 'Khác',
+};
 interface Series {
   seriesId: string;
   seriesTitle: string;
@@ -457,10 +461,21 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {s.images!.map((img) => (
                     <figure key={img.url} className="shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img.url} alt="" className="h-28 w-auto rounded-md border border-border object-cover" />
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.url} alt="" className="h-28 w-auto rounded-md border border-border object-cover" />
+                        {img.role && img.role !== 'khac' && (
+                          <span className="absolute left-1 top-1 rounded bg-background/85 px-1 text-[9px] font-medium uppercase tracking-wide text-foreground">
+                            {ROLE_LABEL[img.role]}
+                          </span>
+                        )}
+                      </div>
                       <figcaption className="mt-1 max-w-[12rem] truncate text-[10px] text-muted-foreground">
-                        {img.credit || (img.source ? new URL(img.source).hostname.replace(/^www\./, '') : '')}
+                        {/* The article, not the CDN path: only the article shows the caption
+                            and who owns the photo. */}
+                        {img.article
+                          ? <a href={img.article} target="_blank" rel="noreferrer" className="hover:underline">{img.credit || new URL(img.article).hostname.replace(/^www\./, '')}</a>
+                          : (img.credit || (img.source ? new URL(img.source).hostname.replace(/^www\./, '') : ''))}
                         {typeof img.faces === 'number' && (
                           <span className={img.faces > 0 ? 'text-success' : 'text-warning'}>
                             {' · '}{img.faces > 0 ? `che ${img.faces} mặt` : 'không thấy mặt'}

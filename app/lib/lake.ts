@@ -728,6 +728,20 @@ export async function getCrimeSeriesPage(
  * Series-level, like the victim/suspect/state fields: the images belong to the case, not to
  * one instalment, and writing them onto each row keeps a part self-describing.
  */
+/** What a series already carries, so a later attach adds rather than replaces. */
+export async function getCrimeSeriesImages(seriesId: string): Promise<{ source: string }[]> {
+  const rows = await all(
+    "SELECT image_urls FROM gold_content WHERE series_id = ? AND image_urls IS NOT NULL AND image_urls <> '' LIMIT 1",
+    [seriesId],
+  );
+  try {
+    const v = JSON.parse(rows[0]?.image_urls || '[]');
+    return Array.isArray(v) ? v.filter((i) => i && typeof i === 'object' && typeof i.url === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function setCrimeSeriesImages(seriesId: string, images: unknown[]): Promise<number> {
   await run('UPDATE gold_content SET image_urls = ? WHERE series_id = ?', [JSON.stringify(images), seriesId]);
   const rows = await all('SELECT COUNT(*) AS c FROM gold_content WHERE series_id = ?', [seriesId]);
