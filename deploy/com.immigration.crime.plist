@@ -20,12 +20,13 @@
     <string>8</string>
   </dict>
 
-  <!-- Once a day at 06:00, so the batch is finished and waiting at the start of the day
-       rather than arriving in pieces through it. -->
+  <!-- Once a day at 04:00. Was 06:00; moved earlier so a batch that runs long is still
+       finished before the working day rather than arriving through it. At the measured
+       3-way rate a full eight takes about an hour, so this lands around 05:00. -->
   <key>StartCalendarInterval</key>
   <dict>
     <key>Hour</key>
-    <integer>6</integer>
+    <integer>4</integer>
     <key>Minute</key>
     <integer>0</integer>
   </dict>

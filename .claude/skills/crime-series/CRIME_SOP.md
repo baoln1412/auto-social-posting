@@ -282,6 +282,29 @@ vì vậy hãy chọn ảnh chân dung, ảnh hồ sơ, ảnh hiện trường v
 
 ## 10. TỰ KIỂM trước khi xuất (SỬA nếu vi phạm)
 
+**CÁCH LÀM BẮT BUỘC — chạy script, đừng tự dò bằng tay:**
+
+1. Soạn TRỌN payload POST vào một file, ví dụ `/tmp/series.json`.
+2. `python3 deploy/check-series.py /tmp/series.json`
+3. Sửa **đúng những gì script liệt kê**, rồi chạy lại cho tới khi in `OK`.
+4. POST chính file đó lên `/api/crime/series`.
+
+Đo được, đây là chỗ tốn token nhất của cả quy trình: một bộ bài tốn khoảng 32.700 token đầu
+ra qua 72 lượt gọi, trong đó 4 lần Write (26.600), 17 lần Edit (11.700) và 38 lần Bash
+(9.200) — phần lớn là tự kiểm từng tiêu chí một rồi viết lại cả kỳ để sửa. Nội dung thật chỉ
+khoảng 13.000 token. Script trả về **toàn bộ lỗi trong một lần chạy**, nên chỉ cần một vòng
+sửa.
+
+Script kiểm: số từ từng kỳ, độ dài tiêu đề đại án và tiêu đề kỳ, VIẾT HOA, `🩸`, gạch ngang
+dài, bảng quy đổi §3a (cả tiêu đề), hai dòng đầu thân bài, đủ 3 comment, ghi chú biên tập
+lọt vào thân bài, và ba trường §8a.
+
+Script **KHÔNG** kiểm được và vẫn phải tự đọc: đúng sự thật, đúng nguồn, mở/kết bài hai nhịp
+(§5), ba trục nội dung (§6), và tiếng Anh còn sót (chữ Việt không dấu như *bang, chung,
+trong, danh* không phân biệt được với tiếng Anh bằng máy).
+
+Danh sách đầy đủ để tự đọc:
+
 - Còn từ tiếng Anh trong `body_text`, `emoji_title`, `hashtags` hay comment, kể cả trong
   ngoặc đơn → DỊCH HẾT (§1). Ngoại lệ duy nhất: `image_prompt`.
 - Còn dấu gạch ngang dài `—` → THAY bằng dấu câu khác.
