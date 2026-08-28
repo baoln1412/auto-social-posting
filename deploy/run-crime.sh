@@ -124,6 +124,24 @@ run_case() {
   started=$(date '+%H:%M:%S')
   out="$ROOT/data/.crime-$cid.out"
 
+  # Checked HERE, in shell, rather than left to the model. Measured cost of leaving it to the
+  # model: one run this morning hit the app mid-restart (com.immigration.web was being
+  # bounced for unrelated work) and spent ~20 turns route-hunting, reading source, and
+  # starting its OWN `npm run dev` on the same port instead of just waiting - turns that,
+  # under prompt-caching, each re-bill the whole growing conversation, not just their own
+  # output. A retry loop in bash costs zero LLM tokens and cannot go on that kind of detour.
+  local tries=0
+  until curl -s -o /dev/null -w '' --max-time 5 "http://localhost:3000/api/pages" 2>/dev/null; do
+    tries=$(( tries + 1 ))
+    if [ "$tries" -ge 12 ]; then
+      curl -s -X PATCH http://localhost:3000/api/crime/cases -H 'Content-Type: application/json' \
+        -d "{\"id\":\"$cid\",\"status\":\"queued\"}" > /dev/null 2>&1
+      echo "[run-crime] app unreachable after 60s, returned case $cid to the queue without spending a turn" >> "$LOG"
+      return
+    fi
+    sleep 5
+  done
+
   claude -p "Run the /crime-series skill for exactly ONE case: id $cid.
 
 That case has already been claimed for you and is at status 'researching'. Do not read the
