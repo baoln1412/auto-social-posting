@@ -156,6 +156,10 @@ run_case() {
 That case has already been claimed for you and is at status 'researching'. Do not read the
 queue and do not touch any other case.
 
+Before trying to fetch the opinion text from ANY source, POST to /api/crime/research-budget
+with {\"id\": \"$cid\"} and read CRIME_SOP.md §2a in full — it enforces a hard cap on how many
+alternate sources you may try, and \`allowed: false\` means stop, not find one more.
+
 Research and write the full series per CRIME_SOP.md, POST it to /api/crime/series, then PATCH
 case $cid to 'written' with the returned seriesId.
 

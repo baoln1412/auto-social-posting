@@ -13,11 +13,12 @@
 
   <key>EnvironmentVariables</key>
   <dict>
-    <!-- Cases attempted per daily batch. Measured: ~13 min to write one, ~4 min to reject
-         one, so 8 finishes well before mid-morning. Each case is its own claude
-         invocation, so raising this costs time, not output quality. -->
+    <!-- Series delivered per daily batch, not cases attempted (run-crime.sh applies its own
+         MAX_ATTEMPTS ceiling on top). Was 8; the user judged 4 posts/day enough. Each case is
+         its own claude invocation, so lowering this saves real cost, not just wall clock -
+         both TARGET*2 attempt ceiling and TARGET*2 discovery-fill size scale down with it. -->
     <key>CRIME_SERIES_PER_RUN</key>
-    <string>8</string>
+    <string>4</string>
   </dict>
 
   <!-- Once a day at 04:00. Was 06:00; moved earlier so a batch that runs long is still

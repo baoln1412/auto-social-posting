@@ -128,9 +128,20 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
       notes       TEXT,
       status      TEXT DEFAULT 'queued',
       series_id   TEXT,
+      -- Opinion-sourcing attempts spent on THIS case, enforced server-side rather than
+      -- left to the writer's own judgement. Measured cause: an unsupervised research pass
+      -- that ran out of real mirrors (CourtListener/Justia/FindLaw/Leagle/Casetext) did not
+      -- stop - it invented 35 further fetches against Reddit, Medium, SSRN, a law-school
+      -- library homepage and a guessed REST endpoint, for 2.17M tokens and no result on a
+      -- case later confirmed genuinely inaccessible. A prompt asking a model to count its
+      -- own attempts and stop is exactly the kind of self-policing this project has already
+      -- had to backstop with code once (check-series.py, for the SOP's own word-count and
+      -- wording rules) - so this is a hard counter the API itself enforces.
+      research_attempts INTEGER DEFAULT 0,
       created_at  TEXT,
       updated_at  TEXT
     );
+    ALTER TABLE crime_cases ADD COLUMN IF NOT EXISTS research_attempts INTEGER DEFAULT 0;
     ALTER TABLE bronze_news        ADD COLUMN IF NOT EXISTS image_urls TEXT;
     ALTER TABLE silver_immigration ADD COLUMN IF NOT EXISTS image_urls TEXT;
     ALTER TABLE gold_content       ADD COLUMN IF NOT EXISTS image_urls TEXT;
@@ -784,8 +795,20 @@ export async function deleteGold(ids: string[]): Promise<number> {
 // ── Crime case queue ──────────────────────────────────────────────────────
 export interface CrimeCase {
   id: string; market_id: string; title: string; source_url?: string;
-  notes?: string; status: string; series_id?: string;
+  notes?: string; status: string; series_id?: string; research_attempts?: number;
   created_at?: string; updated_at?: string;
+}
+
+/**
+ * Spend one opinion-sourcing attempt against the case's hard budget. Returns the count
+ * AFTER this attempt and whether another is still allowed - the caller (the crime-series
+ * writer) must stop trying alternate sources once `allowed` is false, not negotiate with it.
+ */
+export async function spendResearchAttempt(id: string, max: number): Promise<{ attempts: number; allowed: boolean }> {
+  await run('UPDATE crime_cases SET research_attempts = research_attempts + 1 WHERE id = ?', [id]);
+  const rows = await all('SELECT research_attempts AS n FROM crime_cases WHERE id = ?', [id]);
+  const attempts = num(rows[0]?.n);
+  return { attempts, allowed: attempts <= max };
 }
 
 export async function addCrimeCase(r: { market_id: string; title: string; source_url?: string; notes?: string }): Promise<string> {

@@ -89,6 +89,28 @@ người; muốn thấy công lý được thực thi.
 
 ## 2. NGUỒN TƯ LIỆU (FACT-CHECKING BẮT BUỘC)
 
+### 2a. Ngân sách tìm bản án — BẮT BUỘC gọi API, không tự đếm
+
+**Chỉ có 5 nguồn hợp lệ cho văn bản bản án:** CourtListener (link gốc), Justia
+(`law.justia.com`), FindLaw (`caselaw.findlaw.com`), Leagle, Casetext. Hết 5 nguồn này mà
+không đọc được thì vụ án **không có hồ sơ tư pháp truy cập được** — không phải lý do để tìm
+thêm nguồn khác.
+
+Trước **MỖI LẦN** thử fetch/search một trong 5 nguồn trên, gọi:
+
+`POST /api/crime/research-budget` với `{ "id": "<case id>" }`
+
+Response trả về `allowed: true|false` và một `message`. **`allowed: false` nghĩa là DỪNG
+NGAY** — không tìm bản án qua nguồn nào nữa, xử lý như hồ sơ tư pháp không truy cập được
+(áp dụng quy tắc "không có nguồn" bên dưới). Quy tắc này đo được bằng thực nghiệm: một lượt
+nghiên cứu không giám sát, sau khi hết 5 nguồn thật, đã **không dừng lại** — tự bịa thêm 35
+lượt fetch vào Reddit, Medium, SSRN, trang chủ thư viện luật, một API đoán mò — tốn 2,17
+triệu token, vụ án sau đó xác nhận không truy cập được ở bất kỳ đâu. Tự đếm trong đầu không
+đủ tin cậy; đây là lý do ngân sách này nằm ở server, không phải ở lời nhắc.
+
+**Không áp dụng cho tìm báo chí/hình ảnh** — chỉ áp dụng cho việc tìm VĂN BẢN BẢN ÁN. Tìm
+báo địa phương, ảnh hồ sơ cảnh sát vẫn tự do như bình thường (§2, §9a).
+
 **Phân biệt nguồn BẮT BUỘC và nguồn LÀM DÀY.** Đây là chỗ dễ từ chối oan một vụ án tốt.
 
 - **BẮT BUỘC, thiếu thì từ chối vụ án:** hồ sơ tư pháp cho biết diễn biến, tội danh, và
