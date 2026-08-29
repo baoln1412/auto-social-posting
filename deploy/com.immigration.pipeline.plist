@@ -9,9 +9,14 @@
     <string>/bin/zsh</string>
     <string>/Users/nguyenbaole/auto-social-posting/deploy/run-pipeline.sh</string>
   </array>
-  <!-- Every 4 hours (14400s). On a Pro plan use 21600 (6h) to stay under 5 runs/day. -->
+  <!-- Every 8 hours (28800s), 3 runs/day. Was 14400 (4h, 6 runs/day) - halved because the
+       crawl already re-pulls the last 24h every run (Step 1), so a longer gap between
+       firings drops no article, only raises worst-case freshness latency from ~4h to ~8h.
+       Measured: one firing fans out to 7 background market agents and costs ~38M cache-read
+       tokens on its own; at 6 runs/day that was the single largest consumer in the project,
+       for immigration news that does not change six times a day. -->
   <key>StartInterval</key>
-  <integer>14400</integer>
+  <integer>28800</integer>
   <key>RunAtLoad</key>
   <false/>
 </dict>

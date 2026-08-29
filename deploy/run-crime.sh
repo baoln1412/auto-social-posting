@@ -19,12 +19,17 @@ ROOT=/Users/nguyenbaole/auto-social-posting
 LOG="$ROOT/data/crime.log"
 LOCK="$ROOT/data/crime.lock"
 
-# Series to DELIVER per day, not cases to attempt. Rejection is a normal outcome, so the
-# loop keeps going until this many are actually written.
+# Series to DELIVER per day, not a promise. Rejection is a normal, tolerated outcome, but
+# "keep going until TARGET is hit" made every rejected case a pure ADD to the day's cost
+# rather than something absorbed within a fixed budget - the design was unbounded in
+# practice even though a ceiling existed, because the ceiling was generous enough to almost
+# never bind. Measured worst day (2026-08-28): a 15-attempt dry spell against a 4x ceiling
+# of 32 meant the run very nearly used its whole budget chasing the last 2 of 8. This is
+# now 2x: it will not always reach TARGET on a bad day, and that is the intended trade -
+# accept fewer written series in exchange for a bounded cost, rather than grinding for a
+# fixed count regardless of what the queue holds that day.
 TARGET="${CRIME_SERIES_PER_RUN:-8}"
-# Bounds, so a queue full of unusable cases cannot run all day. Measured: ~13 min to
-# write, ~4 to reject; at the observed 1-in-3 rate, 8 written costs roughly three hours.
-MAX_ATTEMPTS="${CRIME_MAX_ATTEMPTS:-$(( TARGET * 4 ))}"
+MAX_ATTEMPTS="${CRIME_MAX_ATTEMPTS:-$(( TARGET * 2 ))}"
 MAX_SECONDS="${CRIME_MAX_SECONDS:-18000}"   # 5h: must be finished well within the morning
 DISCOVER_TO=$(( TARGET * 2 ))
 
@@ -84,11 +89,15 @@ written_count() {
     | python3 -c "import json,sys; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo 0
 }
 
-# Cases run concurrently. Measured on the run that produced the first full day of eight
-# series: a write costs ~15.5 min and a rejection ~3.5, and 77 of that batch's 95 minutes was
-# writes waiting on each other. Each case is already its own claude process and every database
-# write goes through the API, which serialises, so sequencing bought nothing but wall clock.
-CONCURRENCY="${CRIME_CONCURRENCY:-3}"
+# Sequential by default. Concurrency was added to cut WALL CLOCK - three cases at once take
+# a 95-minute batch down to about 35 - but wall clock is not the constraint this job has:
+# nothing waits on it, it runs at 4AM. The actual constraint is Anthropic's rolling usage
+# window, which is a RATE, not a total - and running three cases at once does not reduce the
+# total tokens spent, it concentrates the same total into a third of the time. That is
+# exactly what a rate window penalises: it was part of what pushed one usage window to 89%.
+# Left available for a manual "catch me up now" run from the UI, where a human IS waiting -
+# set CRIME_CONCURRENCY=3 for that case specifically, not as the scheduled default.
+CONCURRENCY="${CRIME_CONCURRENCY:-1}"
 
 # A subshell has no job table, so a pool capped on $(jobs -r) silently never engages - it
 # reads 0 every time and launches everything at once. Track the PIDs here instead.
