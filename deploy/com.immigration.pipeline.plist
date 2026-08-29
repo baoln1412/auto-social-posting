@@ -9,14 +9,21 @@
     <string>/bin/zsh</string>
     <string>/Users/nguyenbaole/auto-social-posting/deploy/run-pipeline.sh</string>
   </array>
-  <!-- Every 8 hours (28800s), 3 runs/day. Was 14400 (4h, 6 runs/day) - halved because the
-       crawl already re-pulls the last 24h every run (Step 1), so a longer gap between
-       firings drops no article, only raises worst-case freshness latency from ~4h to ~8h.
-       Measured: one firing fans out to 7 background market agents and costs ~38M cache-read
-       tokens on its own; at 6 runs/day that was the single largest consumer in the project,
-       for immigration news that does not change six times a day. -->
-  <key>StartInterval</key>
-  <integer>28800</integer>
+  <!-- 3 runs/day, fixed at 06:00 / 12:00 / 18:00 - not StartInterval, which fires every N
+       seconds from whenever the job last loaded and drifts across all 24 hours, including
+       the middle of the night when nobody is reading fresh posts anyway. Pinned to waking
+       hours instead, and evenly spaced so no two firings are close enough to overlap.
+       Was 14400 (4h, 6 runs/day, unpinned) - halved and pinned together: the crawl already
+       re-pulls the last 24h every run (Step 1), so a longer gap between firings drops no
+       article, only raises worst-case freshness latency to ~6h within this window. Measured:
+       one firing fans out to 7 background market agents and costs ~38M cache-read tokens on
+       its own; at 6/day, unpinned, this was the single largest consumer in the project. -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
   <key>RunAtLoad</key>
   <false/>
 </dict>
