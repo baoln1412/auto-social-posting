@@ -56,6 +56,17 @@ card art), `video` (reel structure), `analytics` (reading page numbers).
 Use them to shape the **prompt** inside the pipeline. Do not let one author a post directly:
 the pipeline writes to the lake and the compliance gate above sits in that path.
 
+**`/de-slop` before any English prose ships — but NOT on the Vietnamese posts.** Its tell catalog
+is English by construction (`delve`, `tapestry`, em-dashes, Title Case headings, Wh-question
+openers), so running it against VI content grades the wrong language and would "fix" prose it
+cannot read. It applies to what gets written *about* this project: SOP files, this file, briefs,
+commit bodies, and anything posted in English. VI post quality is the pipeline's own generation
+prompt plus the compliance gate above, not this skill.
+
+Reach for it by name. It is a global skill, so it is available in every session here, but nothing
+makes it fire on its own — a rewrite is something a session will just do inline, and then the
+skill never gets a turn.
+
 **The rest of the pack does not apply here** and reaching for it wastes a turn — `cold-email`,
 `prospecting`, `revops`, `sales-enablement`, `paywalls`, `pricing`, `offers`, `signup`,
 `onboarding`, `churn-prevention`, `referrals`, `free-tools`, `lead-magnets`, `aso`, `cro`,
