@@ -80,6 +80,36 @@ pointers and you get nothing. `social-media-context-sms` also wants to write
 `.agents/social-media-context-sms.md` describing voice and audience — that would be a second,
 competing source of truth against this file and the pipeline's own prompts. Don't run it.
 
+## The console remembers what git cannot
+
+Two commands, and they are the only two. The console is a record, not a workbench — you do not have
+to open it.
+
+**Before building a feature, fixing a bug, or adding a workflow:**
+
+    desoul context --project auto-social-posting
+
+It lists the researched repos routed to this project with no decision taken yet, and the skills
+available here that have never once fired. Neither is visible from inside a session: Claude Code
+loads skill *descriptions*, not whether anything ever used them, and the catalog is not in this repo
+at all. 53 skills sit in `.claude/skills/` and the catalog has routed repos here that nobody has
+looked at.
+
+**When the session produces a decision, an unbuilt want, or an idea belonging to no project:**
+
+    desoul note --project auto-social-posting --kind decision \
+      --what "..." --why "..." --how "..." --changes "..."
+
+`--kind want` needs what+why; `--kind idea` needs what. `--project inbox` is the home for an idea
+that belongs to no project yet. `--how` and `--changes` also read stdin, so a long sketch does not
+have to survive shell quoting.
+
+**A routine edit writes nothing.** Git already records what changed; a note that restates a commit
+is a second changelog that will drift from the first. Write only what git cannot see: why, what was
+decided and rejected, what is wanted but unbuilt.
+
+It fails loudly if the console is unreachable. A note that vanishes quietly is worse than no note.
+
 ## Session hygiene (this project runs hot — 50% of cross-project volume, 206× cache amplification)
 
 - **grep before Read, always.** Checking a field in reel metadata, pipeline state, or a
