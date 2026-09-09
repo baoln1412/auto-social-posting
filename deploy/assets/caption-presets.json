@@ -1,0 +1,25 @@
+{
+  "classic": { "label": "101 Classic" },
+  "tinnong": {
+    "label": "Tin nóng",
+    "size": 76,
+    "outline": { "w": 9 },
+    "highlight": { "color": "#FF4A1C" }
+  },
+  "karaoke": {
+    "label": "Karaoke",
+    "highlight": { "mode": "block", "color": "#111111", "bg": "#FFDD00" }
+  },
+  "toigian": {
+    "label": "Tối giản",
+    "outline": { "w": 0 },
+    "shadow": { "dy": 4 },
+    "highlight": { "mode": "none" }
+  },
+  "dam": {
+    "label": "Đậm",
+    "size": 92,
+    "case": "upper",
+    "wordsPerCue": 3
+  }
+}
