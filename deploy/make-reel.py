@@ -435,7 +435,10 @@ def project_key(post):
     not pay for TTS and whisper again. When `narration` is absent, prepare() synthesises
     it from emojiTitle+facebookText (see narration()) - the key has to hash what prepare()
     will actually speak, or two different auto-narrated posts collide on the same key."""
-    parts = [(post.get("narration") or narration(post) or "").strip()]
+    # VOICE belongs in the key even though it is environment, not post: the English channel
+    # runs the same script with REEL_LANG=en, and without this the two share one v.mp3 -
+    # an English post would play back in Vietnamese.
+    parts = [VOICE, (post.get("narration") or narration(post) or "").strip()]
     for m in get_media(post):   # same url/imageUrl fallback prepare() uses to fetch media
         parts.append(f"{m['kind']}:{m['url']}")
     # \x1f (unit separator) can't appear in narration text or a URL, unlike a space or
@@ -472,7 +475,13 @@ def prepare(post, work_dir):
             # A hit is only real if every file it points at is still on disk - a partially
             # deleted work dir, or a project.json truncated by an interrupted prepare, must
             # fall through to a full rebuild rather than hand back a project ffmpeg can't use.
+            # The count check is load-bearing: only media that FETCHED lands in
+            # proj["media"], so a transient 403 on the article photo stores an empty list
+            # and `all()` over it is vacuously true - the failure would be cached forever
+            # and every later render would exit 0 with no background at all. Pre-split code
+            # retried the fetch on every run; a short count must still fall through.
             hit = (proj.get("key") == project_key(post)
+                   and len(proj["media"]) == len(get_media(post))
                    and os.path.exists(os.path.join(work_dir, proj["audio"]))
                    and all(os.path.exists(os.path.join(work_dir, m["path"])) for m in proj["media"]))
         except Exception:

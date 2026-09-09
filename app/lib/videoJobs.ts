@@ -76,13 +76,19 @@ export function startRenderJob(payload: {
   // stdout carries the ::step: markers AND must be drained regardless - an unread pipe
   // stalls the child at 64KB, which would look exactly like a hung render.
   let buf = '';
+  // Bounded tail of the non-marker stdout, kept for the error message — this is where
+  // ffmpeg's reason for failing actually arrives.
+  let tail = '';
   child.stdout.on('data', (d) => {
     buf += d.toString();
     const lines = buf.split('\n');
     buf = lines.pop() ?? '';
     for (const line of lines) {
       const m = /^::step:([a-z]+):(.+)$/.exec(line.trim());
-      if (!m) continue;
+      if (!m) {
+        tail = (tail + line + '\n').slice(-2000);
+        continue;
+      }
       const [, name, state] = m;
       const job = jobs.get(id);
       if (!job) continue;
@@ -106,8 +112,11 @@ export function startRenderJob(payload: {
       if (payload.postId) setGoldVideo(payload.postId, file, payload.narration).catch(() => {});
     } else {
       const prev = jobs.get(id);
-      jobs.set(id, { ...prev, id, status: 'error',
-                     error: stderr.trim().slice(-500) || `exit ${code}` });
+      // make-reel.py print()s ffmpeg's error tail, so its diagnostics arrive on STDOUT;
+      // stderr alone leaves every caption/compose failure showing a bare `exit 1` while
+      // the 1800 characters explaining it were read and thrown away.
+      const why = (stderr.trim() || tail.trim()).slice(-500);
+      jobs.set(id, { ...prev, id, status: 'error', error: why || `exit ${code}` });
     }
   });
   child.on('error', (err) => {

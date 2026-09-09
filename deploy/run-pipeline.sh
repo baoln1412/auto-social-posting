@@ -32,3 +32,10 @@ claude -p "Run the /immigration-pipeline skill to completion. Do every step." \
   --permission-mode bypassPermissions \
   --exclude-dynamic-system-prompt-sections \
   >> /Users/nguyenbaole/auto-social-posting/data/pipeline.log 2>&1
+
+# Reel render caches. Each holds a voice mp3 plus fetched media, keyed by content, and
+# nothing ever removed them - every narration edit orphans one and data/reels was already
+# at 402 MB. All of it is regenerable, so age it out rather than tracking ownership. The
+# finished mp4s in data/reels itself are NOT touched: gold_content.video_url points at them.
+find /Users/nguyenbaole/auto-social-posting/data/reels/work -mindepth 1 -maxdepth 1 \
+  -type d -mtime +14 -exec rm -rf {} + 2>/dev/null || true

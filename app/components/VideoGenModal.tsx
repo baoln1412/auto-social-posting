@@ -64,6 +64,15 @@ const CHECKLIST_LINES = [
 export default function VideoGenModal({ open, onClose, post, vg, onShowChecklistInChat }: Props) {
   const [mediaExpanded, setMediaExpanded] = useState(false);
 
+  // What the sliders READ when the style carries no explicit override. Picking a preset
+  // stores only { preset }, so without folding the preset's own values in here "Đậm" would
+  // show 64/5 while rendering 92/3 — and one nudge of the slider would write 65, shrinking
+  // the captions by a third. Same merge order as caption_style.py: defaults, then preset.
+  const viewBase: Record<string, unknown> = {
+    ...DEFAULT_VIEW,
+    ...(PRESETS[String(vg.style.preset ?? 'classic')] ?? {}),
+  };
+
   // Render finished → drawer auto-closes; the result surfaces in the post list instead.
   // Gated on the running→done transition (not just "is done"), so reopening the
   // drawer later to re-check a *previously* finished job doesn't instantly close it.
@@ -180,19 +189,19 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
                   <label key={k} className="flex items-center gap-3 text-xs">
                     <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
                     <input type="range" min={min} max={max} step={stepv} className="flex-1"
-                      value={Number(vg.style[k] ?? DEFAULT_VIEW[k])}
+                      value={Number(vg.style[k] ?? viewBase[k])}
                       onChange={(e) => vg.setStyle({ ...vg.style, [k]: Number(e.target.value) })} />
                     <span className="w-12 text-right font-mono">
                       {k === 'pos'
-                        ? `${Math.round(Number(vg.style[k] ?? DEFAULT_VIEW[k]) * 100)}%`
-                        : String(vg.style[k] ?? DEFAULT_VIEW[k])}
+                        ? `${Math.round(Number(vg.style[k] ?? viewBase[k]) * 100)}%`
+                        : String(vg.style[k] ?? viewBase[k])}
                     </span>
                   </label>
                 ))}
 
                 <label className="flex items-center gap-2 text-xs cursor-pointer w-fit">
                   <input type="checkbox" className="w-4 h-4 accent-primary"
-                    checked={vg.style.case === 'upper'}
+                    checked={(vg.style.case ?? viewBase.case) === 'upper'}
                     onChange={(e) => vg.setStyle({ ...vg.style, case: e.target.checked ? 'upper' : 'none' })} />
                   IN HOA toàn bộ
                 </label>
