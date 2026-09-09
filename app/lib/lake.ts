@@ -170,6 +170,10 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS video_url TEXT;
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS narration TEXT;
     ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS fb_draft TEXT;
+    -- Caption style for the reel renderer, stored as a JSON string (preset + overrides).
+    -- Per post rather than per market: two posts in one market legitimately want
+    -- different treatments (a quiet policy explainer vs a breaking-news clip).
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS caption_style TEXT;
 
     CREATE TABLE IF NOT EXISTS audit_runs (
       id           TEXT PRIMARY KEY,
@@ -644,7 +648,7 @@ export async function setGoldVideo(id: string, videoUrl: string, narration: stri
 const EDITABLE_GOLD_FIELDS = [
   'emoji_title', 'body_text', 'summary', 'hook', 'hashtags',
   'comment_1', 'comment_2', 'comment_3', 'series_title', 'image_prompt',
-  'victim_name', 'suspect_name', 'state_name', 'fb_draft',
+  'victim_name', 'suspect_name', 'state_name', 'fb_draft', 'caption_style',
 ] as const;
 export type EditableGoldField = (typeof EDITABLE_GOLD_FIELDS)[number];
 

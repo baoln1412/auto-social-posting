@@ -69,6 +69,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         imagePrompt: row.image_prompt ?? undefined,
         videoUrl: row.video_url ?? undefined,
         narration: row.narration ?? undefined,
+        captionStyle: row.caption_style ?? undefined,
         fbDraft: row.fb_draft ?? undefined,
         topics: (() => { try { return JSON.parse(row.topics ?? '[]'); } catch { return []; } })(),
         platformDrafts,

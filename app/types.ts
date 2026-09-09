@@ -50,6 +50,8 @@ export interface PostDraft {
   narration?: string;
   /** Facebook Draft box content, once the user has saved an edit. */
   fbDraft?: string;
+  /** Reel caption style as a JSON string (preset + overrides). See deploy/caption_style.py. */
+  captionStyle?: string;
   platformDrafts?: Record<string, string>;
   fetchTime?: string;
   isNew?: boolean;
