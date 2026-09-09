@@ -33,7 +33,7 @@ source decided first (which track/sound, and is it actually royalty-free), not j
 yellow keyword highlight this comment used to list here shipped a while back (title_segments()
 + render_title()) and this note just never got updated. Core proven, $0 local.
 """
-import sys, os, re, json, asyncio, subprocess, array, urllib.request, difflib, unicodedata, shutil
+import sys, os, re, json, asyncio, subprocess, array, urllib.request, difflib, unicodedata, shutil, atexit
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -538,6 +538,11 @@ def render_from_project(proj, work_dir, out, st, include_layout=True):
             if os.path.exists(p):
                 os.remove(p)
 
+    # The explicit cleanup() calls below cover the paths we anticipated; this covers the
+    # ones we didn't. The work_dir is persistent now, so anything left behind stays behind
+    # forever. Idempotent, so the explicit calls remain the fast path.
+    atexit.register(cleanup)
+
     if include_layout:
         th = render_title(title_png, title_segments(post.get("emojiTitle", "")), 50, TITLE_W, 4)
     step("captions")
@@ -831,6 +836,10 @@ def main():
         if validate:
             return
     if not res:
+        # ffmpeg may have written a partial file before failing; the work_dir is persistent,
+        # so an un-removed one accumulates per failed render.
+        if os.path.exists(content):
+            os.remove(content)
         print("content build failed"); sys.exit(1)
     dur, hook_end = res
     if no_intro:
