@@ -517,8 +517,12 @@ def demo():
     assert img.mode == "RGBA" and img.size == (W, caption_style.band_height(st)), img.size
 
     def _has(im, rgb, tol=12):
-        return any(abs(p[0]-rgb[0]) <= tol and abs(p[1]-rgb[1]) <= tol and abs(p[2]-rgb[2]) <= tol
-                   for p in im.getdata() if p[3] > 200)
+        data = im.tobytes()
+        for i in range(0, len(data), 4):
+            r, g, b, a = data[i], data[i+1], data[i+2], data[i+3]
+            if a > 200 and abs(r-rgb[0]) <= tol and abs(g-rgb[1]) <= tol and abs(b-rgb[2]) <= tol:
+                return True
+        return False
 
     # Classic: the spoken word is brand yellow, the rest white, outlined black.
     assert _has(img, (255, 221, 0)), "active word should be #FFDD00 under the classic preset"
