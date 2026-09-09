@@ -367,6 +367,7 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
     step("tts")
     dur, hook_end = asyncio.run(tts(nar, mp3))
     if dur <= 0:
+        step("tts", "failed")
         return None
     step("tts", "done")
     st = caption_style.resolve(st if isinstance(st, dict) else None)
@@ -418,6 +419,7 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
     step("captions")
     caps_mov = os.path.join(tmp, "caps.mov")
     if not render_caption_track(caps_mov, cues, dur, st):
+        step("captions", "failed")
         return None
     step("captions", "done")
 
@@ -487,6 +489,7 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
     step("compose")
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
+        step("compose", "failed")
         print(r.stderr[-1800:]); return None
     step("compose", "done")
     return dur, hook_end
@@ -576,6 +579,7 @@ def demo():
     assert fmt_step("media", "2/5") == "::step:media:2/5"
     assert fmt_step("tts") == "::step:tts:start"
     assert fmt_step("intro", "skipped") == "::step:intro:skipped"
+    assert fmt_step("captions", "failed") == "::step:captions:failed"
 
     print("make-reel.py self-check ok")
 
@@ -613,6 +617,7 @@ def main():
         step("intro")
         print("  splicing intro after hook…")
         if not splice_intro(content, dur, hook_end, out):
+            step("intro", "failed")
             print("splice failed"); sys.exit(1)
         step("intro", "done")
     print("OUT:", out)
