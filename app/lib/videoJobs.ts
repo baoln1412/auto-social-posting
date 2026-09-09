@@ -46,6 +46,7 @@ export function startRenderJob(payload: {
   media?: { url: string; kind: 'image' | 'video' }[];
   includeIntro?: boolean;
   includeLayout?: boolean;
+  style?: string;
   postId?: string;
 }): string {
   mkdirSync(OUT_DIR, { recursive: true });
@@ -67,6 +68,7 @@ export function startRenderJob(payload: {
   const args = [SCRIPT, '--json', inFile, outFile];
   if (payload.includeIntro === false) args.push('--no-intro');
   if (payload.includeLayout === false) args.push('--no-layout');
+  if (payload.style) args.push('--style', payload.style);
   const child = spawn(PYTHON, args, { cwd: ROOT, env });
   let stderr = '';
   child.stderr.on('data', (d) => { stderr += d.toString(); });

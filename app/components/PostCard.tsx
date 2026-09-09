@@ -189,8 +189,9 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoPreviewOpen, setVideoPreviewOpen] = useState(false);
   // Owned here (not inside the drawer) so a render job keeps polling — and the
-  // script/media survive — even while the drawer is closed.
-  const vg = useVideoGen(post, pageName);
+  // script/media survive — even while the drawer is closed. videoOpen is passed
+  // through so the hook's preview effect only fires while the drawer is open.
+  const vg = useVideoGen(post, pageName, videoOpen);
 
   // AI Fix
   const [aiPrompt, setAiPrompt] = useState('');

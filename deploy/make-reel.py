@@ -449,6 +449,17 @@ def take_flag(argv, name):
     return rest, len(rest) != len(argv)
 
 
+def take_opt(argv, name):
+    """Pull a value-taking flag and the argument after it out of argv wherever it
+    sits, so the positional args keep their places. Returns (rest, value) - value
+    is None if the flag wasn't present."""
+    if name not in argv:
+        return argv, None
+    i = argv.index(name)
+    rest = argv[:i] + argv[i + 2:]
+    return rest, argv[i + 1] if i + 1 < len(argv) else None
+
+
 def prepare(post, work_dir):
     """Expensive, style-independent half: voice, word timings, media on disk, waveform.
     Returns the project dict and writes it to work_dir/project.json."""
@@ -711,6 +722,12 @@ def demo():
     assert take_flag(["x", "--validate", "m", "3"], "--validate") == (["x", "m", "3"], True)
     assert take_flag(["x", "m", "3", "--validate"], "--validate") == (["x", "m", "3"], True)
 
+    # --style must come out of argv (flag AND value) wherever it sits, or the
+    # positional market/index shift the same way a dropped --validate would.
+    assert take_opt(["x", "m", "3"], "--style") == (["x", "m", "3"], None)
+    assert take_opt(["x", "--style", "{}", "m", "3"], "--style") == (["x", "m", "3"], "{}")
+    assert take_opt(["x", "m", "3", "--style", "{}"], "--style") == (["x", "m", "3"], "{}")
+
     # --- caption style ---------------------------------------------------------
     st = caption_style.resolve(None)
     words = [("MỘT", 0.0, 0.3), ("HAI", 0.3, 0.6)]
@@ -806,6 +823,14 @@ def main():
     sys.argv[:], no_layout = take_flag(sys.argv, "--no-layout")
     sys.argv[:], only_prepare = take_flag(sys.argv, "--prepare")
     sys.argv[:], only_render = take_flag(sys.argv, "--render")
+    sys.argv[:], style_arg = take_opt(sys.argv, "--style")
+    st_json = None
+    if style_arg is not None:
+        try:
+            st_json = json.loads(style_arg)
+        except json.JSONDecodeError as e:
+            print(f"--style value is not valid JSON: {e}")
+            sys.exit(1)
     if sys.argv[1] == "--demo":
         demo(); return
     if sys.argv[1] == "--preview-frame":
@@ -848,10 +873,10 @@ def main():
             proj = json.load(f)
         # same live-title override as the build_content shim (see there for why)
         proj = {**proj, "emojiTitle": post.get("emojiTitle", "")}
-        res = render_from_project(proj, tmp, content, None, include_layout=not no_layout)
+        res = render_from_project(proj, tmp, content, st_json, include_layout=not no_layout)
     else:
         res = build_content(tmp, post, content, validate_to=(out + ".mp3") if validate else None,
-                             include_layout=not no_layout)
+                             include_layout=not no_layout, st=st_json)
         if validate:
             return
     if not res:

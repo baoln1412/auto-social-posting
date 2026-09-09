@@ -19,9 +19,11 @@ let mediaSeq = 0;
  * Owns all Video Generation state for one post — script, media, render job.
  * Instantiated once per PostCard (not per drawer-open), so closing/reopening the
  * drawer never loses progress, and a render job keeps polling in the background
- * even while the drawer is closed.
+ * even while the drawer is closed. `drawerOpen` gates the preview effect only —
+ * without it, every already-rendered post on the page would spawn a preview
+ * process the moment it loads, since script seeds from post.narration.
  */
-export function useVideoGen(post: PostDraft, channelName?: string) {
+export function useVideoGen(post: PostDraft, channelName?: string, drawerOpen = false) {
   // A previously finished render is persisted on the post (videoUrl/narration —
   // see lake.ts::setGoldVideo), so a page refresh should show it as already done
   // instead of resetting to a blank script and losing track of the rendered file.
@@ -31,6 +33,16 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
   const [media, setMedia] = useState<VgMedia[]>([]);
   const [includeIntro, setIncludeIntro] = useState(true);
   const [includeLayout, setIncludeLayout] = useState(true);
+
+  const [style, setStyle] = useState<Record<string, unknown>>(() => {
+    try { return post.captionStyle ? JSON.parse(post.captionStyle) : { preset: 'classic' }; }
+    catch { return { preset: 'classic' }; }
+  });
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Always holds the latest previewUrl so the unmount-only cleanup effect below
+  // doesn't close over a stale (null) value from its first render.
+  const previewUrlRef = useRef<string | null>(null);
+  previewUrlRef.current = previewUrl;
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<VgJobStatus>(post.videoUrl ? 'done' : 'idle');
@@ -104,6 +116,51 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
     });
   }, []);
 
+  // Preview deliberately runs BEFORE any TTS, so it cannot use prepared media. Plate
+  // precedence: media the user just uploaded -> the post's own article image -> none.
+  const plate = media.find((m) => m.kind === 'image' && m.url)?.url
+    ?? post.article.imageUrl ?? null;
+
+  useEffect(() => {
+    // Gated on drawerOpen: this hook is instantiated once per PostCard (see the
+    // header comment), and script seeds from post.narration — without the gate, a
+    // page showing 20 already-rendered posts spawns 20 preview processes on load.
+    if (!drawerOpen || !script.trim()) return;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/video/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: script.trim().split(/\s+/).slice(0, 12).join(' '), style, plate }),
+        });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        setPreviewUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(blob); });
+      } catch { /* preview is advisory; failing it must never block a render */ }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [drawerOpen, script, style, plate]);
+
+  // Unmount-only: the effect above already revokes the URL it replaces, but a card
+  // that unmounts mid-session (e.g. filtered out of a long list) still holds the
+  // last one — this hook lives on every card, so that would leak per card.
+  useEffect(() => () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }, []);
+
+  const saveStyle = useCallback(async () => {
+    try {
+      const res = await fetch('/api/posts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: post.id, fields: { caption_style: JSON.stringify(style) } }),
+      });
+      if (!res.ok) alert('Không lưu được kiểu phụ đề');
+    } catch (err) {
+      alert(`Lỗi mạng: ${err}`);
+    }
+  }, [post.id, style]);
+
   const render = useCallback(async () => {
     setJobStatus('running');
     setJobError('');
@@ -118,7 +175,7 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
       const res = await fetch('/api/video/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emojiTitle: post.emojiTitle || post.article.title, narration: script, media: media_, includeIntro, includeLayout, postId: post.id }),
+        body: JSON.stringify({ emojiTitle: post.emojiTitle || post.article.title, narration: script, media: media_, includeIntro, includeLayout, style, postId: post.id }),
       });
       const data = await res.json();
       if (!res.ok || !data.jobId) {
@@ -131,7 +188,7 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
       setJobStatus('error');
       setJobError(String(err));
     }
-  }, [media, post.id, post.article.imageUrl, post.article.imageUrls, post.emojiTitle, post.article.title, script, includeIntro, includeLayout]);
+  }, [media, post.id, post.article.imageUrl, post.article.imageUrls, post.emojiTitle, post.article.title, script, includeIntro, includeLayout, style]);
 
   // Poll job status while running — independent of whether the drawer is open.
   useEffect(() => {
@@ -168,6 +225,7 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
     script, setScript, loading, approved, setApproved, media,
     addFiles, removeMedia, moveMedia, generate, render, resetJob,
     jobStatus, jobFile, jobError, jobStep, jobPct, jobDone, includeIntro, setIncludeIntro, includeLayout, setIncludeLayout,
+    style, setStyle, previewUrl, saveStyle,
   };
 }
 
