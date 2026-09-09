@@ -19,7 +19,7 @@ def _mask(font, ch):
     return img.tobytes()
 
 def check(name):
-    path = caption_style.font_path(name)
+    path = os.path.join(caption_style.FONT_DIR, f"{name}.ttf")
     if not os.path.exists(path):
         return [f"{name}: file not found at {path}"]
     font = ImageFont.truetype(path, 72)
