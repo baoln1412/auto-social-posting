@@ -384,6 +384,9 @@ def project_key(post):
         parts.append(f"{m.get('kind')}:{m.get('url')}")
     if not post.get("media"):
         parts.append(str((post.get("article") or {}).get("imageUrl") or ""))
+    # \x1f (unit separator) can't appear in narration text or a URL, unlike a space or
+    # comma - joining with one of those could let a field boundary shift produce the same
+    # hash (narration ending in "cat" + next field "1" == narration "cat1" + no next field).
     return hashlib.sha1("\x1f".join(parts).encode("utf-8")).hexdigest()
 
 def take_flag(argv, name):
@@ -414,6 +417,7 @@ def prepare(post, work_dir):
     step("tts")
     dur, hook_end = asyncio.run(tts(nar, mp3))
     if dur <= 0:
+        step("tts", "failed")
         return None
     step("tts", "done")
 
