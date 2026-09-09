@@ -378,12 +378,12 @@ import hashlib
 def project_key(post):
     """Identity of the EXPENSIVE work (voice + alignment + fetched media), so a project
     can be reused. Style is excluded on purpose: restyling is exactly the case that must
-    not pay for TTS and whisper again."""
-    parts = [(post.get("narration") or "").strip()]
-    for m in (post.get("media") or []):
-        parts.append(f"{m.get('kind')}:{m.get('url')}")
-    if not post.get("media"):
-        parts.append(str((post.get("article") or {}).get("imageUrl") or ""))
+    not pay for TTS and whisper again. When `narration` is absent, prepare() synthesises
+    it from emojiTitle+facebookText (see narration()) - the key has to hash what prepare()
+    will actually speak, or two different auto-narrated posts collide on the same key."""
+    parts = [(post.get("narration") or narration(post) or "").strip()]
+    for m in get_media(post):   # same url/imageUrl fallback prepare() uses to fetch media
+        parts.append(f"{m['kind']}:{m['url']}")
     # \x1f (unit separator) can't appear in narration text or a URL, unlike a space or
     # comma - joining with one of those could let a field boundary shift produce the same
     # hash (narration ending in "cat" + next field "1" == narration "cat1" + no next field).
@@ -401,9 +401,18 @@ def prepare(post, work_dir):
     os.makedirs(work_dir, exist_ok=True)
     proj_path = os.path.join(work_dir, "project.json")
     if os.path.exists(proj_path):
-        with open(proj_path, encoding="utf-8") as f:
-            proj = json.load(f)
-        if proj.get("key") == project_key(post):
+        try:
+            with open(proj_path, encoding="utf-8") as f:
+                proj = json.load(f)
+            # A hit is only real if every file it points at is still on disk - a partially
+            # deleted work dir, or a project.json truncated by an interrupted prepare, must
+            # fall through to a full rebuild rather than hand back a project ffmpeg can't use.
+            hit = (proj.get("key") == project_key(post)
+                   and os.path.exists(os.path.join(work_dir, proj["audio"]))
+                   and all(os.path.exists(os.path.join(work_dir, m["path"])) for m in proj["media"]))
+        except Exception:
+            hit = False
+        if hit:
             print("  project cache hit — skipping tts + alignment")
             for name in ("tts", "align", "media"):
                 step(name, "done")
@@ -442,15 +451,17 @@ def prepare(post, work_dir):
             "media": items,
             "peaks": audio_peaks(mp3),
             "emojiTitle": post.get("emojiTitle", "")}
-    with open(proj_path, "w", encoding="utf-8") as f:
+    tmp_path = proj_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(proj, f, ensure_ascii=False)
+    os.replace(tmp_path, proj_path)   # atomic - a crash mid-write must never leave a truncated project.json
     return proj
 
 
 def render_from_project(proj, work_dir, out, st, include_layout=True):
     """Cheap, style-dependent half. Everything expensive already happened in prepare();
     this reads its output and composites. Returns (dur, hook_end) or None."""
-    st = caption_style.resolve(st)
+    st = caption_style.resolve(st if isinstance(st, dict) else None)
     dur, hook_end = proj["dur"], proj["hookEnd"]
     mp3 = os.path.join(work_dir, proj["audio"])
     # Cues are rebuilt here, not cached: wordsPerCue is a STYLE knob, so the chunking has
@@ -458,6 +469,7 @@ def render_from_project(proj, work_dir, out, st, include_layout=True):
     # part that cost a whisper pass, are reused as-is.
     ww = [(s, e, w) for w, s, e in proj["words"]]
     cues = align_cues(proj["narration"], ww, dur, size=st["wordsPerCue"])
+    print(f"  voice: {dur:.1f}s, {len(cues)} cues, hook_end {hook_end:.1f}s")
     bg_items = [{"path": os.path.join(work_dir, m["path"]), "kind": m["kind"]}
                 for m in proj["media"]]
     post = {"emojiTitle": proj.get("emojiTitle", "")}     # only the title overlay needs it
@@ -478,13 +490,25 @@ def render_from_project(proj, work_dir, out, st, include_layout=True):
     if risk:
         print("  ⚠ " + risk)
 
+    # Named per-PID: prepare()'s outputs (v.mp3, bg*, project.json) are shared and idempotent,
+    # but two renders of the SAME project (e.g. the render-two-styles case this split exists
+    # for) run concurrently and must not read/write each other's half-written caption/title
+    # assets in the now-persistent work_dir.
+    pid = os.getpid()
+    title_png = os.path.join(work_dir, f"title-{pid}.png")
+    caps_mov = os.path.join(work_dir, f"caps-{pid}.mov")
+
+    def cleanup():
+        for p in (title_png, caps_mov):
+            if os.path.exists(p):
+                os.remove(p)
+
     if include_layout:
-        title_png = os.path.join(work_dir, "title.png")
         th = render_title(title_png, title_segments(post.get("emojiTitle", "")), 50, TITLE_W, 4)
     step("captions")
-    caps_mov = os.path.join(work_dir, "caps.mov")
     if not render_caption_track(caps_mov, cues, dur, st):
         step("captions", "failed")
+        cleanup()
         return None
     step("captions", "done")
 
@@ -555,8 +579,11 @@ def render_from_project(proj, work_dir, out, st, include_layout=True):
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         step("compose", "failed")
-        print(r.stderr[-1800:]); return None
+        print(r.stderr[-1800:])
+        cleanup()
+        return None
     step("compose", "done")
+    cleanup()
     return dur, hook_end
 
 
@@ -571,6 +598,9 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
         print(f"\n  VALIDATE — narration ({len(proj['narration'])} chars):\n{proj['narration']}"
               f"\n\n  audio: {validate_to}\n  Looks right? Re-run without --validate to render.")
         return None
+    # emojiTitle is style, not script - it isn't in project_key, so a title-only edit hits
+    # the cache but must still render the CURRENT title, not the one prepare() snapshotted.
+    proj = {**proj, "emojiTitle": post.get("emojiTitle", "")}
     return render_from_project(proj, tmp, content, st, include_layout)
 
 def splice_intro(content, dur, hook_end, out):
@@ -670,6 +700,9 @@ def demo():
     assert project_key(a) != project_key(d), "a media change must invalidate the cache"
     # style is deliberately NOT part of the key - restyling must reuse TTS and whisper
     assert project_key({**a, "style": {"preset": "dam"}}) == project_key(a)
+    # Auto-narration posts must not collide: prepare() synthesises narration from
+    # emojiTitle+facebookText when the field is absent, so the key has to cover them.
+    assert project_key({"emojiTitle": "A"}) != project_key({"emojiTitle": "B"})
 
     print("make-reel.py self-check ok")
 
@@ -695,7 +728,9 @@ def main():
     # Keyed by inputs, not random per run - so two posts with identical narration + media
     # share one prepare, and a second render of the SAME post (a restyle) hits the cache.
     tmp = os.path.join(ROOT, "data", "reels", "work", project_key(post))
-    content = os.path.join(tmp, "content.mp4")
+    # Per-PID: this work_dir is now shared/persistent across runs, so two concurrent
+    # renders of the same post must not race on one content.mp4.
+    content = os.path.join(tmp, f"content-{os.getpid()}.mp4")
 
     if only_prepare:
         proj = prepare(post, tmp)
@@ -710,6 +745,8 @@ def main():
             print("no prepared project at", tmp, "- run --prepare first"); sys.exit(1)
         with open(proj_path, encoding="utf-8") as f:
             proj = json.load(f)
+        # same live-title override as the build_content shim (see there for why)
+        proj = {**proj, "emojiTitle": post.get("emojiTitle", "")}
         res = render_from_project(proj, tmp, content, None, include_layout=not no_layout)
     else:
         res = build_content(tmp, post, content, validate_to=(out + ".mp3") if validate else None,
@@ -726,7 +763,10 @@ def main():
     else:
         step("intro")
         print("  splicing intro after hook…")
-        if not splice_intro(content, dur, hook_end, out):
+        ok = splice_intro(content, dur, hook_end, out)
+        if os.path.exists(content):     # splice reads content as an input, never consumes it
+            os.remove(content)
+        if not ok:
             step("intro", "failed")
             print("splice failed"); sys.exit(1)
         step("intro", "done")
