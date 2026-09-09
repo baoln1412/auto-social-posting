@@ -47,6 +47,7 @@ LANG = (os.environ.get("REEL_LANG") or "vi").lower()      # REEL_LANG=en for the
 VOICES = {"vi": "vi-VN-HoaiMyNeural", "en": "en-US-AriaNeural"}
 VOICE = os.environ.get("REEL_VOICE") or VOICES.get(LANG, VOICES["vi"])
 W, H = 1080, 1920
+PLATE_CACHE = os.path.join(ROOT, "data", "reels", "work", "plates")
 CAP_Y_DEFAULT = 780                   # kept for reference; real value comes from the style
 TITLE_X, TITLE_Y, TITLE_W = 185, 1420, 840   # title inside the blue block, right of the bar
 WHITE, YELLOW = (255, 255, 255, 255), (255, 221, 0, 255)
@@ -313,6 +314,40 @@ def fetch_image(url, dst):
         return os.path.getsize(dst) > 1000
     except Exception as e:
         print("  image fetch failed:", e); return False
+
+def resolve_plate(plate):
+    """A preview plate is either a local file or a URL. URLs are fetched once and cached -
+    the preview re-renders on every style tweak, and re-downloading the article photo each
+    time is the difference between a live preview and a slideshow. Returns a local path,
+    or None (caller falls back to the neutral plate)."""
+    if not plate:
+        return None
+    if not plate.startswith(("http://", "https://")):
+        return plate if os.path.exists(plate) else None
+    os.makedirs(PLATE_CACHE, exist_ok=True)
+    dst = os.path.join(PLATE_CACHE, hashlib.sha1(plate.encode("utf-8")).hexdigest() + ".img")
+    if os.path.exists(dst) and os.path.getsize(dst) > 1000:
+        return dst
+    return dst if fetch_image(plate, dst) else None
+
+def preview_frame(text, st, plate_path, out_png):
+    """One full-frame PNG showing the caption band as the video will draw it. Uses the
+    SAME render_cue as the real render - if this ever forks into its own drawing code,
+    the preview starts lying, which is the entire reason it is server-rendered."""
+    plate = Image.new("RGB", (W, H), (18, 18, 18))
+    plate_resolved = resolve_plate(plate_path)
+    if plate_resolved:
+        try:
+            src = Image.open(plate_resolved).convert("RGB")
+            scale = max(W / src.width, H / src.height)
+            src = src.resize((int(src.width * scale), int(src.height * scale)), Image.LANCZOS)
+            plate.paste(src, ((W - src.width) // 2, (H - src.height) // 2))
+        except Exception:
+            pass                       # unreadable plate -> keep the neutral one
+    words = [(w, 0.0, 0.0) for w in (text or "").split()][:st["wordsPerCue"]] or [("PREVIEW", 0, 0)]
+    band = render_cue(words, 0, st)
+    plate.paste(band, (0, caption_style.cap_y(st, H)), band)
+    plate.save(out_png)
 
 def fetch_video(url, dst):
     try:
@@ -684,6 +719,40 @@ def demo():
     big = caption_style.resolve({"size": 92})
     assert render_cue(words, 0, big).size[1] > img.size[1]
 
+    # --- preview frame ---------------------------------------------------------
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as td:
+        p = os.path.join(td, "prev.png")
+        preview_frame("MỘT HAI BA", caption_style.resolve(None), None, p)
+        im = Image.open(p)
+        assert im.size == (W, H), im.size
+        assert im.mode == "RGB", im.mode
+        # verify the caption band was actually drawn, not just a blank frame
+        st = caption_style.resolve(None)
+        band_y = caption_style.cap_y(st, H)
+        band_h = caption_style.band_height(st)
+        # neutral dark plate is (18, 18, 18) - band pixels must differ
+        data = im.crop((0, band_y, W, band_y + band_h)).tobytes()
+        has_text = any(
+            abs(data[i] - 18) > 20 or abs(data[i+1] - 18) > 20 or abs(data[i+2] - 18) > 20
+            for i in range(0, len(data), 3)
+        )
+        assert has_text, "caption band must contain visible text, not just the neutral plate"
+
+    # test with Vietnamese text containing stacked diacritics
+    with _tf.TemporaryDirectory() as td:
+        p = os.path.join(td, "prev_vi.png")
+        preview_frame("MỸ SIẾT CHẶT VISA H-1B TỪ THÁNG SAU", caption_style.resolve({"preset": "dam"}), None, p)
+        im = Image.open(p)
+        assert im.size == (W, H) and im.mode == "RGB", f"Vietnamese preview failed: {im.size} {im.mode}"
+
+    # test with plate URL fallback (should still work with None plate)
+    with _tf.TemporaryDirectory() as td:
+        p = os.path.join(td, "prev_no_plate.png")
+        preview_frame("TEST TEXT", caption_style.resolve(None), "https://invalid.example.com/notfound.jpg", p)
+        im = Image.open(p)
+        assert im.size == (W, H) and im.mode == "RGB", "preview with unavailable plate should still render"
+
     # --- step markers ----------------------------------------------------------
     assert fmt_step("media", "2/5") == "::step:media:2/5"
     assert fmt_step("tts") == "::step:tts:start"
@@ -715,6 +784,14 @@ def main():
     sys.argv[:], only_render = take_flag(sys.argv, "--render")
     if sys.argv[1] == "--demo":
         demo(); return
+    if sys.argv[1] == "--preview-frame":
+        if len(sys.argv) < 4:
+            print("usage: make-reel.py --preview-frame <config.json> <out.png>")
+            sys.exit(1)
+        cfg = json.load(open(sys.argv[2]))
+        preview_frame(cfg.get("text", ""), caption_style.resolve(cfg.get("style")),
+                      cfg.get("plate"), sys.argv[3])
+        return
     if sys.argv[1] == "--json":
         post = json.load(open(sys.argv[2]))
         out = sys.argv[3] if len(sys.argv) > 3 else os.path.expanduser("~/Downloads/reel-demo.mp4")
