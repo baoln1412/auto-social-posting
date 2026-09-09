@@ -7,9 +7,14 @@ MVP+: one gold post -> one 9:16 branded reel. Fully local, $0.
              pre-composited into ONE alpha clip (PIL frames -> qtrle .mov) rather than an
              ffmpeg overlay per word: measured on a 15s clip, 30 overlays render in 2.9s but
              150 take 39.7s. (PIL because this ffmpeg lacks drawtext/libass.)
-  frame    = deploy/assets/frame.png (101 CHUYỆN ÚC blue block + logo + vertical bar)
-  title    = white, left of nothing / right of the bar, inside the blue block
-  intro    = deploy/assets/intro.mp4 spliced in AFTER the hook (first sentence)
+  frame    = deploy/assets/frame.png (101 CHUYỆN ÚC blue block + logo + vertical bar) - optional,
+             see --no-layout
+  title    = inside the blue block; per-word colour via title_segments() - "**kw**" markup
+             or a colon-split title puts the headline half in brand yellow, everything else
+             white. Word-wrapped, stroked, rendered once to a PNG (render_title()). Skipped
+             along with the frame under --no-layout - captions still render either way.
+  intro    = deploy/assets/intro.mp4 spliced in AFTER the hook (first sentence) - optional,
+             see --no-intro
   render   = FFmpeg Ken Burns per image (concat if multiple) + overlay composite,
              then concat hook|intro|body
 
@@ -17,15 +22,22 @@ Usage: make-reel.py <marketId> <index> [out.mp4]
    or: make-reel.py --json <payload.json> [out.mp4]   (web UI one-click render;
    add --validate anywhere to stop after the voice: writes <out>.mp3 and prints the narration,
        so you hear the direction before paying for media fetch + the full ffmpeg render.
+       add --no-intro to skip the branded intro clip.
+       add --no-layout to skip the frame + title overlay (captions and voice still render).
        payload = {"emojiTitle", "narration" (approved script, overrides auto-lead),
                   "media": [{"url", "kind": "image"|"video"}, ...] (ordered, split
                   evenly across the reel; video clips are trimmed to their slot;
                   falls back to article.imageUrl)})
-Skipped (add later): top big-number zone, yellow keyword highlight in the title,
-background music, SFX. Core proven, $0 local.
+Skipped (add later): top big-number zone, background music, SFX - all three need a real asset
+source decided first (which track/sound, and is it actually royalty-free), not just code; the
+yellow keyword highlight this comment used to list here shipped a while back (title_segments()
++ render_title()) and this note just never got updated. Core proven, $0 local.
 """
 import sys, os, re, json, asyncio, subprocess, tempfile, urllib.request, difflib, unicodedata, shutil
 from PIL import Image, ImageDraw, ImageFont
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import caption_style
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT = os.path.join(ROOT, "public", "fonts", "BeVietnamPro-Bold.ttf")
@@ -58,13 +70,25 @@ def narration(post):
 async def tts(text, mp3):
     import edge_tts
     sents = []
-    comm = edge_tts.Communicate(text, VOICE, rate="+25%")
-    with open(mp3, "wb") as f:
-        async for ch in comm.stream():
-            if ch["type"] == "audio":
-                f.write(ch["data"])
-            elif ch["type"] == "SentenceBoundary":
-                sents.append((ch["offset"] / 1e7, ch["duration"] / 1e7))
+    # edge-tts is an unofficial, reverse-engineered API to Microsoft's service — a bare
+    # NoAudioReceived (dropped websocket, transient server hiccup) is a known, common
+    # failure mode with no retry of its own, and previously killed the whole render.
+    for attempt in range(3):
+        sents = []
+        try:
+            comm = edge_tts.Communicate(text, VOICE, rate="+25%")
+            with open(mp3, "wb") as f:
+                async for ch in comm.stream():
+                    if ch["type"] == "audio":
+                        f.write(ch["data"])
+                    elif ch["type"] == "SentenceBoundary":
+                        sents.append((ch["offset"] / 1e7, ch["duration"] / 1e7))
+            break
+        except edge_tts.exceptions.NoAudioReceived:
+            if attempt == 2:
+                raise
+            print(f"  tts: NoAudioReceived, retrying ({attempt + 1}/3)...")
+            await asyncio.sleep(2 * (attempt + 1))
     total = (sents[-1][0] + sents[-1][1]) if sents else 0.0
     hook_end = (sents[0][0] + sents[0][1]) if sents else 0.0
     return total, hook_end
@@ -142,20 +166,44 @@ def layout_words(d, words, font, box_w):
     return lines, sp
 
 
-def render_cue(words, active, fontsize=64, stroke=7):
-    """One caption frame: the whole cue in white, the word currently being spoken in yellow."""
-    img = Image.new("RGBA", (W, CAP_H), (0, 0, 0, 0))
+def render_cue(words, active, st=None):
+    """One caption frame, styled. The whole cue is drawn in the base colour and the word
+    being spoken switches to the highlight colour (or gets a filled block behind it).
+    Band height is derived from the style so a large font cannot clip."""
+    st = st or caption_style.resolve(None)
+    cap_h = caption_style.band_height(st)
+    img = Image.new("RGBA", (W, cap_h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    font = ImageFont.truetype(FONT, fontsize)
-    lines, sp = layout_words(d, [w for w, _, _ in words], font, W - 60)
-    lh = fontsize + 14
-    y = (CAP_H - lh * len(lines)) // 2
+    font = ImageFont.truetype(caption_style.font_path(st["font"]), st["size"])
+
+    base = caption_style.parse_color(st["color"])
+    hl = st["highlight"]
+    hl_col = caption_style.parse_color(hl["color"])
+    hl_bg = caption_style.parse_color(hl["bg"]) if hl.get("bg") else None
+    stroke = int(st["outline"]["w"])
+    stroke_col = caption_style.parse_color(st["outline"]["color"])
+    sh = st["shadow"]
+    sh_col = caption_style.parse_color(sh["color"])
+
+    text = [w.upper() if st["case"] == "upper" else w for w, _, _ in words]
+    lines, sp = layout_words(d, text, font, W - 60)
+    lines = lines[:st["maxLines"]]
+    lh = caption_style.line_height(st)
+    y = (cap_h - lh * len(lines)) // 2
     i = 0
     for line, lw in lines:
         x = (W - lw) / 2
         for w, wl in line:
-            d.text((x, y), w, font=font, fill=CAP_ACTIVE if i == active else CAP_BASE,
-                   stroke_width=stroke, stroke_fill=(0, 0, 0, 255))
+            is_active = (i == active)
+            if is_active and hl["mode"] == "block" and hl_bg:
+                pad = max(4, st["size"] // 8)
+                d.rounded_rectangle([x - pad, y - pad // 2, x + wl + pad, y + lh - pad // 2],
+                                    radius=pad, fill=hl_bg)
+            fill = hl_col if (is_active and hl["mode"] in ("word", "block")) else base
+            if sh["dy"] or sh["dx"]:
+                d.text((x + sh["dx"], y + sh["dy"]), w, font=font, fill=sh_col)
+            d.text((x, y), w, font=font, fill=fill,
+                   stroke_width=stroke, stroke_fill=stroke_col if stroke else None)
             x += wl + sp
             i += 1
         y += lh
@@ -293,7 +341,7 @@ def take_flag(argv, name):
     return rest, len(rest) != len(argv)
 
 
-def build_content(tmp, post, content, validate_to=None):
+def build_content(tmp, post, content, validate_to=None, include_layout=True):
     mp3 = os.path.join(tmp, "v.mp3")
     if post.get("narration"):  # approved script from the web UI overrides the auto-lead
         nar = clean(" ".join(ln.strip() for ln in post["narration"].splitlines() if ln.strip()))[:4000]
@@ -338,8 +386,9 @@ def build_content(tmp, post, content, validate_to=None):
     if risk:
         print("  ⚠ " + risk)
 
-    title_png = os.path.join(tmp, "title.png")
-    th = render_title(title_png, title_segments(post.get("emojiTitle", "")), 50, TITLE_W, 4)
+    if include_layout:
+        title_png = os.path.join(tmp, "title.png")
+        th = render_title(title_png, title_segments(post.get("emojiTitle", "")), 50, TITLE_W, 4)
     caps_mov = os.path.join(tmp, "caps.mov")
     if not render_caption_track(caps_mov, cues, dur):
         return None
@@ -358,13 +407,17 @@ def build_content(tmp, post, content, validate_to=None):
                 inputs += ["-loop", "1", "-framerate", "1", "-t", "1", "-i", it["path"]]
     else:
         inputs += ["-f", "lavfi", "-i", f"color=c=0x0a2a6b:s={W}x{H}:r=30"]
-    inputs += ["-loop", "1", "-i", title_png, "-i", caps_mov]
-    inputs += ["-loop", "1", "-i", FRAME, "-i", mp3]
-
-    title_idx = n_bg
-    cap_idx = n_bg + 1
-    frame_idx = n_bg + 2
-    audio_idx = n_bg + 3
+    if include_layout:
+        inputs += ["-loop", "1", "-i", title_png, "-i", caps_mov]
+        inputs += ["-loop", "1", "-i", FRAME, "-i", mp3]
+        title_idx = n_bg
+        cap_idx = n_bg + 1
+        frame_idx = n_bg + 2
+        audio_idx = n_bg + 3
+    else:
+        inputs += ["-i", caps_mov, "-i", mp3]
+        cap_idx = n_bg
+        audio_idx = n_bg + 1
 
     # one Ken Burns zoom per image segment (or a trimmed clip per video segment),
     # concatenated if there's more than one. Video segments' own audio is never
@@ -390,14 +443,17 @@ def build_content(tmp, post, content, validate_to=None):
     if n_bg > 1:
         parts.append("".join(f"[{lbl}]" for lbl in seg_labels) + f"concat=n={n_bg}:v=1:a=0[bg]")
 
-    # one pre-composited caption strip (see render_caption_track), then the brand frame on top,
-    # then the title inside the blue block
+    # one pre-composited caption strip (see render_caption_track), then - if the branded layout
+    # wasn't switched off - the frame on top, then the title inside its blue block.
     parts.append(f"[bg][{cap_idx}:v]overlay=0:{CAP_Y}[cap]")
-    parts.append(f"[cap][{frame_idx}:v]overlay=0:0[fr]")
-    parts.append(f"[fr][{title_idx}:v]overlay={TITLE_X}:{TITLE_Y}[v]")
+    out_label = "cap"
+    if include_layout:
+        parts.append(f"[cap][{frame_idx}:v]overlay=0:0[fr]")
+        parts.append(f"[fr][{title_idx}:v]overlay={TITLE_X}:{TITLE_Y}[v]")
+        out_label = "v"
     fc = ";".join(parts)
 
-    cmd = ["ffmpeg", "-y", *inputs, "-filter_complex", fc, "-map", "[v]", "-map", f"{audio_idx}:a",
+    cmd = ["ffmpeg", "-y", *inputs, "-filter_complex", fc, "-map", f"[{out_label}]", "-map", f"{audio_idx}:a",
            "-t", f"{dur:.2f}", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
            "-ar", "44100", "-ac", "2", "-r", "30", "-shortest", content]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -435,8 +491,8 @@ def demo():
     assert active_word(cues, 1.5) is None            # gap between cues -> blank strip
     assert active_word(cues, 2.5) == (1, 0)
     assert active_word(cues, 99) is None
-    img = render_cue(cues[0][2], 1)
-    assert img.size == (W, CAP_H) and img.mode == "RGBA"
+    img = render_cue(cues[0][2], 1, caption_style.resolve(None))
+    assert img.mode == "RGBA"
     d = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
     font = ImageFont.truetype(FONT, 64)
     lines, _ = layout_words(d, ["word"] * 12, font, W - 60)
@@ -453,11 +509,42 @@ def demo():
     assert take_flag(["x", "m", "3"], "--validate") == (["x", "m", "3"], False)
     assert take_flag(["x", "--validate", "m", "3"], "--validate") == (["x", "m", "3"], True)
     assert take_flag(["x", "m", "3", "--validate"], "--validate") == (["x", "m", "3"], True)
+
+    # --- caption style ---------------------------------------------------------
+    st = caption_style.resolve(None)
+    words = [("MỘT", 0.0, 0.3), ("HAI", 0.3, 0.6)]
+    img = render_cue(words, 0, st)
+    assert img.mode == "RGBA" and img.size == (W, caption_style.band_height(st)), img.size
+
+    def _has(im, rgb, tol=12):
+        return any(abs(p[0]-rgb[0]) <= tol and abs(p[1]-rgb[1]) <= tol and abs(p[2]-rgb[2]) <= tol
+                   for p in im.getdata() if p[3] > 200)
+
+    # Classic: the spoken word is brand yellow, the rest white, outlined black.
+    assert _has(img, (255, 221, 0)), "active word should be #FFDD00 under the classic preset"
+    assert _has(img, (255, 255, 255)), "inactive words should be white"
+    assert _has(img, (0, 0, 0)), "outline should be black"
+
+    # highlight mode 'none' means no yellow anywhere
+    plain = render_cue(words, 0, caption_style.resolve({"highlight": {"mode": "none"}}))
+    assert not _has(plain, (255, 221, 0)), "mode 'none' must not paint a highlight colour"
+
+    # casing is applied by the renderer, not by the caller
+    up = render_cue([("mot", 0.0, 0.3)], 0, caption_style.resolve({"case": "upper"}))
+    lo = render_cue([("mot", 0.0, 0.3)], 0, caption_style.resolve({"case": "none"}))
+    assert up.tobytes() != lo.tobytes(), "case: upper must change the rendering"
+
+    # a taller band is produced for a bigger font, so nothing clips
+    big = caption_style.resolve({"size": 92})
+    assert render_cue(words, 0, big).size[1] > img.size[1]
+
     print("make-reel.py self-check ok")
 
 
 def main():
     sys.argv[:], validate = take_flag(sys.argv, "--validate")
+    sys.argv[:], no_intro = take_flag(sys.argv, "--no-intro")
+    sys.argv[:], no_layout = take_flag(sys.argv, "--no-layout")
     if sys.argv[1] == "--demo":
         demo(); return
     if sys.argv[1] == "--json":
@@ -472,15 +559,20 @@ def main():
 
     tmp = tempfile.mkdtemp()
     content = os.path.join(tmp, "content.mp4")
-    res = build_content(tmp, post, content, validate_to=(out + ".mp3") if validate else None)
+    res = build_content(tmp, post, content, validate_to=(out + ".mp3") if validate else None,
+                         include_layout=not no_layout)
     if validate:
         return
     if not res:
         print("content build failed"); sys.exit(1)
     dur, hook_end = res
-    print("  splicing intro after hook…")
-    if not splice_intro(content, dur, hook_end, out):
-        print("splice failed"); sys.exit(1)
+    if no_intro:
+        print("  intro skipped (--no-intro)…")
+        shutil.move(content, out)
+    else:
+        print("  splicing intro after hook…")
+        if not splice_intro(content, dur, hook_end, out):
+            print("splice failed"); sys.exit(1)
     print("OUT:", out)
 
 if __name__ == "__main__":
