@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { ChevronDown, ChevronRight, Upload } from 'lucide-react';
 import { VideoGenState } from './useVideoGen';
+import { STEP_LABELS, STEP_ORDER } from '@/app/lib/videoSteps';
 
 interface Props {
   open: boolean;
@@ -243,12 +244,36 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
                 </Button>
 
                 {vg.jobStatus === 'running' && (
-                  <p className="text-xs rounded-md bg-warning/10 text-warning border border-warning/25 px-3 py-2">
-                    Render đang chạy ngầm — bạn có thể đóng khung này.
-                  </p>
+                  <div className="rounded-md bg-warning/10 border border-warning/25 px-3 py-2.5 space-y-1.5">
+                    {STEP_ORDER.map((s) => {
+                      const done = vg.jobDone.includes(s);
+                      const active = vg.jobStep === s && !done;
+                      return (
+                        <div key={s} className={`flex items-center gap-2 text-xs ${
+                          done ? 'text-success' : active ? 'text-foreground font-semibold' : 'text-muted-foreground/60'
+                        }`}>
+                          <span className="w-4 shrink-0">{done ? '✓' : active ? '●' : '○'}</span>
+                          <span>{STEP_LABELS[s]}</span>
+                          {active && vg.jobPct !== null && (
+                            <span className="font-mono ml-auto">{vg.jobPct}%</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <p className="text-[11px] text-muted-foreground pt-1">
+                      Render đang chạy ngầm — bạn có thể đóng khung này.
+                    </p>
+                  </div>
                 )}
                 {vg.jobStatus === 'error' && vg.jobError && (
-                  <p className="text-xs text-destructive whitespace-pre-wrap">{vg.jobError}</p>
+                  <div className="text-xs text-destructive space-y-1">
+                    {vg.jobStep && (
+                      <p className="font-semibold">
+                        Lỗi ở bước: {STEP_LABELS[vg.jobStep] ?? vg.jobStep}
+                      </p>
+                    )}
+                    <p className="whitespace-pre-wrap">{vg.jobError}</p>
+                  </div>
                 )}
               </div>
             </>

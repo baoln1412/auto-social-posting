@@ -22,6 +22,12 @@ export interface VideoJob {
   status: 'running' | 'done' | 'error';
   file?: string;
   error?: string;
+  /** Stage currently running, e.g. 'captions'. Set from make-reel.py's ::step: markers. */
+  step?: string;
+  /** 0-100 within the current stage; only 'captions' reports one. */
+  pct?: number;
+  /** Stages already finished, in completion order. */
+  done?: string[];
 }
 
 const jobs = new Map<string, VideoJob>();
@@ -64,6 +70,30 @@ export function startRenderJob(payload: {
   const child = spawn(PYTHON, args, { cwd: ROOT, env });
   let stderr = '';
   child.stderr.on('data', (d) => { stderr += d.toString(); });
+
+  // stdout carries the ::step: markers AND must be drained regardless - an unread pipe
+  // stalls the child at 64KB, which would look exactly like a hung render.
+  let buf = '';
+  child.stdout.on('data', (d) => {
+    buf += d.toString();
+    const lines = buf.split('\n');
+    buf = lines.pop() ?? '';
+    for (const line of lines) {
+      const m = /^::step:([a-z]+):(.+)$/.exec(line.trim());
+      if (!m) continue;
+      const [, name, state] = m;
+      const job = jobs.get(id);
+      if (!job) continue;
+      const done = job.done ?? [];
+      if (state === 'done' || state === 'skipped') {
+        jobs.set(id, { ...job, step: name, pct: undefined, done: done.includes(name) ? done : [...done, name] });
+      } else {
+        const pct = /^(\d+)%$/.exec(state)?.[1];
+        jobs.set(id, { ...job, step: name, pct: pct ? Number(pct) : undefined, done });
+      }
+    }
+  });
+
   child.on('close', (code) => {
     unlink(inFile, () => {});
     if (code === 0 && existsSync(outFile)) {
@@ -73,7 +103,9 @@ export function startRenderJob(payload: {
       // starting and finishing; the file itself is still there either way.
       if (payload.postId) setGoldVideo(payload.postId, file, payload.narration).catch(() => {});
     } else {
-      jobs.set(id, { id, status: 'error', error: stderr.trim().slice(-500) || `exit ${code}` });
+      const prev = jobs.get(id);
+      jobs.set(id, { ...prev, id, status: 'error',
+                     error: stderr.trim().slice(-500) || `exit ${code}` });
     }
   });
   child.on('error', (err) => {

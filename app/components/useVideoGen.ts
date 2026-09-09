@@ -36,6 +36,9 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
   const [jobStatus, setJobStatus] = useState<VgJobStatus>(post.videoUrl ? 'done' : 'idle');
   const [jobFile, setJobFile] = useState<string | null>(post.videoUrl ?? null);
   const [jobError, setJobError] = useState('');
+  const [jobStep, setJobStep] = useState<string | null>(null);
+  const [jobPct, setJobPct] = useState<number | null>(null);
+  const [jobDone, setJobDone] = useState<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const draftText = [post.emojiTitle?.trim(), post.facebookText?.trim()].filter(Boolean).join('\n\n');
@@ -137,6 +140,9 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
       try {
         const res = await fetch(`/api/video/render?jobId=${jobId}`);
         const data = await res.json();
+        setJobStep(data.step ?? null);
+        setJobPct(typeof data.pct === 'number' ? data.pct : null);
+        setJobDone(Array.isArray(data.done) ? data.done : []);
         if (data.status === 'done') {
           setJobStatus('done');
           setJobFile(data.file);
@@ -147,7 +153,7 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
       } catch {
         // transient network hiccup — next tick retries
       }
-    }, 4000);
+    }, 1500);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [jobId, jobStatus]);
 
@@ -161,7 +167,7 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
   return {
     script, setScript, loading, approved, setApproved, media,
     addFiles, removeMedia, moveMedia, generate, render, resetJob,
-    jobStatus, jobFile, jobError, includeIntro, setIncludeIntro, includeLayout, setIncludeLayout,
+    jobStatus, jobFile, jobError, jobStep, jobPct, jobDone, includeIntro, setIncludeIntro, includeLayout, setIncludeLayout,
   };
 }
 
