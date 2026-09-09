@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { PostDraft } from '../types';
+import { CaptionStyle } from '../lib/captionPresets';
 
 export interface VgMedia {
   id: string;
@@ -34,7 +35,7 @@ export function useVideoGen(post: PostDraft, channelName?: string, drawerOpen = 
   const [includeIntro, setIncludeIntro] = useState(true);
   const [includeLayout, setIncludeLayout] = useState(true);
 
-  const [style, setStyle] = useState<Record<string, unknown>>(() => {
+  const [style, setStyle] = useState<CaptionStyle>(() => {
     try { return post.captionStyle ? JSON.parse(post.captionStyle) : { preset: 'classic' }; }
     catch { return { preset: 'classic' }; }
   });

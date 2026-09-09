@@ -10,6 +10,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { ChevronDown, ChevronRight, Upload } from 'lucide-react';
 import { VideoGenState } from './useVideoGen';
 import { STEP_LABELS, STEP_ORDER } from '@/app/lib/videoSteps';
+import { PRESETS } from '@/app/lib/captionPresets';
+
+// Display-only mirror of DEFAULTS in deploy/caption_style.py, so the sliders show real
+// numbers before the user touches anything. pos is the band's CENTRE (855/1920), not its
+// old top (780/1920) - caption_style.py's DEFAULTS + comment there is the source of truth;
+// a drift here only changes the slider's starting position, never the render.
+const DEFAULT_VIEW: Record<string, number> = { size: 64, pos: 855 / 1920, wordsPerCue: 5, maxLines: 2 };
 
 interface Props {
   open: boolean;
@@ -133,6 +140,68 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
                 Huỷ approve
               </Button>
             )}
+          </div>
+
+          <Separator />
+
+          {/* ─── Caption style ─── */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground">Kiểu phụ đề</h3>
+
+            {vg.previewUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={vg.previewUrl} alt="Xem trước phụ đề"
+                className="w-full max-w-[220px] mx-auto rounded-md border border-border" />
+            )}
+
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {Object.entries(PRESETS).map(([key, p]) => (
+                <button key={key}
+                  onClick={() => vg.setStyle({ preset: key })}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap border transition-colors ${
+                    vg.style.preset === key
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-foreground border-border hover:bg-accent'
+                  }`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            <details className="text-sm">
+              <summary className="cursor-pointer text-primary font-medium">Tuỳ chỉnh</summary>
+              <div className="pt-3 space-y-3">
+                {([
+                  ['size', 'Cỡ chữ', 24, 160, 1],
+                  ['pos', 'Vị trí dọc', 0, 0.95, 0.01],
+                  ['wordsPerCue', 'Số từ mỗi dòng', 1, 12, 1],
+                  ['maxLines', 'Số dòng', 1, 4, 1],
+                ] as const).map(([k, label, min, max, stepv]) => (
+                  <label key={k} className="flex items-center gap-3 text-xs">
+                    <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+                    <input type="range" min={min} max={max} step={stepv} className="flex-1"
+                      value={Number(vg.style[k] ?? DEFAULT_VIEW[k])}
+                      onChange={(e) => vg.setStyle({ ...vg.style, [k]: Number(e.target.value) })} />
+                    <span className="w-12 text-right font-mono">
+                      {k === 'pos'
+                        ? `${Math.round(Number(vg.style[k] ?? DEFAULT_VIEW[k]) * 100)}%`
+                        : String(vg.style[k] ?? DEFAULT_VIEW[k])}
+                    </span>
+                  </label>
+                ))}
+
+                <label className="flex items-center gap-2 text-xs cursor-pointer w-fit">
+                  <input type="checkbox" className="w-4 h-4 accent-primary"
+                    checked={vg.style.case === 'upper'}
+                    onChange={(e) => vg.setStyle({ ...vg.style, case: e.target.checked ? 'upper' : 'none' })} />
+                  IN HOA toàn bộ
+                </label>
+
+                <Button variant="outline" size="sm" onClick={vg.saveStyle} className="text-xs h-7">
+                  Lưu kiểu cho bài này
+                </Button>
+              </div>
+            </details>
           </div>
 
           <Separator />
