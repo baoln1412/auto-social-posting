@@ -12,11 +12,26 @@ import { VideoGenState } from './useVideoGen';
 import { STEP_LABELS, STEP_ORDER } from '@/app/lib/videoSteps';
 import { PRESETS } from '@/app/lib/captionPresets';
 
-// Display-only mirror of DEFAULTS in deploy/caption_style.py, so the sliders show real
-// numbers before the user touches anything. pos is the band's CENTRE (855/1920), not its
-// old top (780/1920) - caption_style.py's DEFAULTS + comment there is the source of truth;
-// a drift here only changes the slider's starting position, never the render.
-const DEFAULT_VIEW: Record<string, number> = { size: 64, pos: 855 / 1920, wordsPerCue: 5, maxLines: 2 };
+// Display-only mirror of DEFAULTS in deploy/caption_style.py, so every control below shows
+// a real starting value before the user touches anything - not just the four sliders. pos is
+// the band's CENTRE (855/1920), not its old top (780/1920) - caption_style.py's DEFAULTS +
+// comment there is the source of truth; a drift here only changes a control's starting
+// value, never the render.
+const DEFAULT_VIEW: Record<string, unknown> = {
+  size: 64, pos: 855 / 1920, wordsPerCue: 5, maxLines: 2, case: 'none',
+  font: 'BeVietnamPro-Bold', color: '#FFFFFF',
+  outline: { color: '#000000', w: 7 },
+  shadow: { dx: 0, dy: 0, color: '#000000B3' },
+  highlight: { mode: 'word', color: '#FFDD00', bg: null },
+};
+
+// <input type="color"> only takes a 6-digit hex; caption_style.py allows an 8-digit
+// alpha suffix (shadow.color carries one, hence no swatch on that field at all). Truncate
+// for THIS display value only - the write handlers below never touch the stored string.
+function swatch(v: unknown, fallback: string): string {
+  const s = String(v ?? fallback);
+  return s.length === 9 ? s.slice(0, 7) : s;
+}
 
 interface Props {
   open: boolean;
@@ -72,6 +87,21 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
     ...DEFAULT_VIEW,
     ...(PRESETS[String(vg.style.preset ?? 'classic')] ?? {}),
   };
+
+  // outline/shadow/highlight are nested objects - viewBase's shallow spread already
+  // resolves defaults <- preset for them (a preset that sets only outline.w replaces
+  // the whole outline key in viewBase, but only with what it provided), so layering the
+  // explicit per-post override on top one level deep gives the same defaults <- preset <-
+  // override precedence as caption_style.py's _deep_merge, without ever dropping a sibling
+  // field (writing outline.color must not erase outline.w, and vice versa).
+  const grp = (key: 'outline' | 'shadow' | 'highlight'): Record<string, unknown> => ({
+    ...(DEFAULT_VIEW[key] as Record<string, unknown>),
+    ...(viewBase[key] as Record<string, unknown>),
+    ...((vg.style[key] as Record<string, unknown> | undefined) ?? {}),
+  });
+  const outlineView = grp('outline');
+  const shadowView = grp('shadow');
+  const highlightView = grp('highlight');
 
   // Render finished → drawer auto-closes; the result surfaces in the post list instead.
   // Gated on the running→done transition (not just "is done"), so reopening the
@@ -205,6 +235,79 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
                     onChange={(e) => vg.setStyle({ ...vg.style, case: e.target.checked ? 'upper' : 'none' })} />
                   IN HOA toàn bộ
                 </label>
+
+                <label className="flex items-center gap-3 text-xs">
+                  <span className="w-28 shrink-0 text-muted-foreground">Kiểu chữ</span>
+                  <select
+                    className="flex-1 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"
+                    value={String(vg.style.font ?? viewBase.font)}
+                    onChange={(e) => vg.setStyle({ ...vg.style, font: e.target.value })}
+                  >
+                    <option value="BeVietnamPro-Regular">Thường</option>
+                    <option value="BeVietnamPro-Medium">Vừa</option>
+                    <option value="BeVietnamPro-Bold">Đậm</option>
+                    <option value="BeVietnamPro-Black">Rất đậm</option>
+                  </select>
+                </label>
+
+                <label className="flex items-center gap-3 text-xs">
+                  <span className="w-28 shrink-0 text-muted-foreground">Màu chữ</span>
+                  <input type="color" className="h-7 w-12 rounded-md border border-border bg-card p-0.5"
+                    value={swatch(vg.style.color ?? viewBase.color, '#FFFFFF')}
+                    onChange={(e) => vg.setStyle({ ...vg.style, color: e.target.value })} />
+                </label>
+
+                <label className="flex items-center gap-3 text-xs">
+                  <span className="w-28 shrink-0 text-muted-foreground">Màu viền</span>
+                  <input type="color" className="h-7 w-12 shrink-0 rounded-md border border-border bg-card p-0.5"
+                    value={swatch(outlineView.color, '#000000')}
+                    onChange={(e) => vg.setStyle({ ...vg.style, outline: { ...outlineView, color: e.target.value } })} />
+                  <input type="range" min={0} max={12} step={1} className="flex-1"
+                    value={Number(outlineView.w ?? 7)}
+                    onChange={(e) => vg.setStyle({ ...vg.style, outline: { ...outlineView, w: Number(e.target.value) } })} />
+                  <span className="w-12 text-right font-mono">{Number(outlineView.w ?? 7)}</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs cursor-pointer w-fit">
+                  <input type="checkbox" className="w-4 h-4 accent-primary"
+                    checked={Number(shadowView.dy ?? 0) !== 0}
+                    onChange={(e) => vg.setStyle({
+                      ...vg.style,
+                      shadow: e.target.checked
+                        ? { dx: 0, dy: 6, color: '#000000B3' }
+                        : { dx: 0, dy: 0, color: '#000000B3' },
+                    })} />
+                  Đổ bóng
+                </label>
+
+                <label className="flex items-center gap-3 text-xs">
+                  <span className="w-28 shrink-0 text-muted-foreground">Kiểu nhấn</span>
+                  <select
+                    className="flex-1 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground"
+                    value={String(highlightView.mode ?? 'word')}
+                    onChange={(e) => vg.setStyle({ ...vg.style, highlight: { ...highlightView, mode: e.target.value } })}
+                  >
+                    <option value="word">Từng từ</option>
+                    <option value="block">Khối nền</option>
+                    <option value="none">Không</option>
+                  </select>
+                </label>
+
+                <label className="flex items-center gap-3 text-xs">
+                  <span className="w-28 shrink-0 text-muted-foreground">Màu nhấn</span>
+                  <input type="color" className="h-7 w-12 rounded-md border border-border bg-card p-0.5"
+                    value={swatch(highlightView.color, '#FFDD00')}
+                    onChange={(e) => vg.setStyle({ ...vg.style, highlight: { ...highlightView, color: e.target.value } })} />
+                </label>
+
+                {String(highlightView.mode ?? 'word') === 'block' && (
+                  <label className="flex items-center gap-3 text-xs">
+                    <span className="w-28 shrink-0 text-muted-foreground">Màu nền khối</span>
+                    <input type="color" className="h-7 w-12 rounded-md border border-border bg-card p-0.5"
+                      value={swatch(highlightView.bg, '#FFDD00')}
+                      onChange={(e) => vg.setStyle({ ...vg.style, highlight: { ...highlightView, bg: e.target.value } })} />
+                  </label>
+                )}
 
                 <Button variant="outline" size="sm" onClick={vg.saveStyle} className="text-xs h-7">
                   Lưu kiểu cho bài này
