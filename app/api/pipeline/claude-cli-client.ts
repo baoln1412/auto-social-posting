@@ -33,6 +33,12 @@ export async function generateViaClaudeCli(systemPrompt: string, userMessage: st
         cwd: tmpdir(),
         env: { ...process.env, PATH: CLAUDE_PATH },
         timeout: TIMEOUT_MS,
+        // stdin defaults to an open, never-written pipe, which `claude -p` waits on
+        // for 3s ("no stdin data received") before proceeding — a real, pure delay
+        // on every call. Closing it outright (Node's `< /dev/null` equivalent) skips
+        // that wait entirely, since a closed stdin reads as instant EOF instead of
+        // an open pipe with nothing coming.
+        stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
     let stdout = '';

@@ -35,18 +35,23 @@ export default function AppSidebar({
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-4 py-5">
-        <div className="flex items-center gap-2">
-          {/* The wordmark is type, not an emoji: a filled square in the anchor
-              hue reads as a mark at 20px and renders identically everywhere. */}
-          <span aria-hidden className="w-5 h-5 rounded-[5px] bg-primary shrink-0" />
-          <div>
-            <h1 className="text-base font-bold text-primary tracking-tight">
-              Auto Social
-            </h1>
-            <p className="text-[10px] text-muted-foreground font-medium tracking-wider uppercase">
-              Posting
-            </p>
-          </div>
+        <div className="flex flex-col items-center gap-1">
+          {/* The head is INSIDE the word - it stands in for the O and no font
+              contains it, so DESOUL is an image, never typed. wordmark.png is
+              the real mark (560x177, transparent); POSTING is set in type but
+              styled to match the drawn sub-words (.desoul-subword), not plain
+              text, or it reads as a different brand under the logo.
+              Font-size is measured, not guessed: at this wordmark's rendered
+              height (140px wide -> ~44px tall), cap height must land at 41% of
+              that per the skill's spec, and Baloo 2 700's measured cap-height
+              ratio (glyph ink bounds via canvas, not the font's line metrics)
+              is 0.622 of font-size - so 18.14px cap height needs a 29.2px
+              font-size. Re-measure both if wordmark.png's rendered size changes. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/wordmark.png" alt="DESOUL" className="w-full max-w-[140px] h-auto" />
+          <p className="desoul-subword uppercase" style={{ fontSize: '29.2px' }}>
+            Posting
+          </p>
         </div>
       </div>
 

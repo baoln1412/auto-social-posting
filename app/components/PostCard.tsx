@@ -199,10 +199,30 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
   const [showAiPanel, setShowAiPanel] = useState(false);
   // The Facebook draft is one self-contained block: TITLE at the top, body, then
   // hashtags at the end. (The title also stays as a separate heading above.)
+  // post.fbDraft is a prior saved edit (see EDITABLE_GOLD_FIELDS::fb_draft) — without
+  // it, a refresh silently reverted every edit back to the original generated text.
   const [editedFbDraft, setEditedFbDraft] = useState(() =>
-    [emojiTitle?.trim(), facebookText?.trim(), hashtags?.trim()].filter(Boolean).join('\n\n'),
+    post.fbDraft ?? [emojiTitle?.trim(), facebookText?.trim(), hashtags?.trim()].filter(Boolean).join('\n\n'),
   );
-  const [isFbEditing, setIsFbEditing] = useState(false);
+  const [isFbEditing, setIsFbEditing] = useState(Boolean(post.fbDraft));
+  const [fbSaveState, setFbSaveState] = useState<'' | 'saving' | 'saved'>('');
+
+  const saveFbDraft = useCallback(async () => {
+    if (!post.id) return;
+    setFbSaveState('saving');
+    try {
+      const res = await fetch('/api/posts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: post.id, fields: { fb_draft: editedFbDraft } }),
+      });
+      setFbSaveState(res.ok ? 'saved' : '');
+      if (!res.ok) toast('Save failed');
+    } catch {
+      setFbSaveState('');
+      toast('Save failed');
+    }
+  }, [post.id, editedFbDraft]);
 
   // News-card image (rendered on demand by /api/image/card — no storage).
   const [showCard, setShowCard] = useState(false);
@@ -374,11 +394,11 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
           </span>
         ))}
         <span className="opacity-50">·</span>
-        <span className="opacity-80 shrink-0">{formattedDate}</span>
+        <span className="font-mono opacity-80 shrink-0">{formattedDate}</span>
         {post.fetchTime && (
           <>
             <span className="opacity-50">·</span>
-            <span className="opacity-60 shrink-0 hidden sm:inline">
+            <span className="font-mono opacity-60 shrink-0 hidden sm:inline">
               Fetched: {new Date(post.fetchTime).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(post.fetchTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
           </>
@@ -587,11 +607,20 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
                 AI Fix
               </Button>
               <CopyButton text={editedFbDraft} />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={fbSaveState === 'saving'}
+                onClick={saveFbDraft}
+                className="text-xs h-7"
+              >
+                {fbSaveState === 'saving' ? 'Saving…' : fbSaveState === 'saved' ? 'Saved' : 'Save'}
+              </Button>
             </div>
           </div>
           <Textarea
             value={editedFbDraft}
-            onChange={(e) => { setEditedFbDraft(e.target.value); setIsFbEditing(true); }}
+            onChange={(e) => { setEditedFbDraft(e.target.value); setIsFbEditing(true); setFbSaveState(''); }}
             className="border-0 rounded-none min-h-[160px] resize-y text-sm bg-transparent focus-visible:ring-0"
           />
         </div>
@@ -605,7 +634,7 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
             {[comment1, comment2, comment3].map((c, i) =>
               c?.trim() ? (
                 <div key={i} className="flex items-start gap-2 px-4 py-2.5 border-b border-border last:border-b-0">
-                  <span className="text-xs font-semibold text-muted-foreground mt-1 shrink-0">#{i + 1}</span>
+                  <span className="font-mono text-xs font-semibold text-muted-foreground mt-1 shrink-0">#{i + 1}</span>
                   <p className="text-sm text-foreground whitespace-pre-wrap flex-1" style={{ lineHeight: 1.6 }}>{c}</p>
                   <CopyButton text={c} />
                 </div>

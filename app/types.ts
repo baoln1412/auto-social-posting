@@ -44,6 +44,12 @@ export interface PostDraft {
   /** Topic ids (subset of TOPIC_IDS) this post is tagged with — for filter chips. */
   topics?: string[];
   generatedImageUrl?: string;
+  /** Filename of a finished Video Gen reel (data/reels/<id>.mp4), once rendered. */
+  videoUrl?: string;
+  /** Approved Video Gen script — persisted alongside videoUrl so a re-render doesn't start blank. */
+  narration?: string;
+  /** Facebook Draft box content, once the user has saved an edit. */
+  fbDraft?: string;
   platformDrafts?: Record<string, string>;
   fetchTime?: string;
   isNew?: boolean;

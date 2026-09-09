@@ -20,5 +20,16 @@ exec > >(perl -MPOSIX -pe 'BEGIN{$|=1} $_ = strftime("%Y-%m-%d %H:%M:%S ", local
 # (2026-08-01 — a JSON-parse fix looked broken because the build predated it).
 if [ ! -f .next/BUILD_ID ] || [ -n "$(find app next.config.js package.json -newer .next/BUILD_ID -print -quit 2>/dev/null)" ]; then
   npm run build
+  # The build's own exit code isn't enough — it has still exited 0 while leaving .next
+  # without a BUILD_ID (interrupted mid-write, e.g. a kickstart landing mid-build), and
+  # this script used to fall straight through to `npm run start` regardless, serving a
+  # server that 500s on whichever routes' compiled chunks never got written (2026-09-06 —
+  # ai/refine, hit by the AI Fix button, was missing along with the fallback error page
+  # itself). Fail loud here instead: an incomplete build must never look identical to
+  # 'nothing changed, serving what was already fine'.
+  if [ ! -f .next/BUILD_ID ]; then
+    echo "[start-web] build did not produce .next/BUILD_ID — refusing to serve a broken build." >&2
+    exit 1
+  fi
 fi
 exec npm run start

@@ -45,7 +45,7 @@ export default function AppLayout({
           property — a transform-based drawer is the upgrade if this ever janks,
           but it fires once per click, not per scroll frame. */}
       <aside
-        className="shrink-0 transition-[width] duration-200 ease-in-out motion-reduce:transition-none overflow-hidden border-r border-border"
+        className="shrink-0 transition-[width] duration-200 ease-in-out motion-reduce:transition-none overflow-hidden border-r-[2.5px] border-foreground shadow-[4px_0_0_hsl(var(--foreground))]"
         style={{ width: sidebarOpen ? '16rem' : '0rem' }}
       >
         <div className="w-64 h-screen sticky top-0 overflow-y-auto bg-sidebar">

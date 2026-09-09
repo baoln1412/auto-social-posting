@@ -4,7 +4,7 @@ import { FeedbackHost } from './components/feedback';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Auto Social Posting',
+  title: 'Desoul Posting',
   description: 'AI-powered content management and social media publishing platform',
 };
 

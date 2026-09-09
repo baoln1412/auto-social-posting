@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400..700;1,400..700&family=Source+Code+Pro:wght@400;500;600&family=Baloo+2:wght@500;600;700;800&display=swap');
 
 @layer base {
   *,
@@ -18,7 +18,7 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
@@ -31,28 +31,32 @@
   ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
   * { scrollbar-width: thin; scrollbar-color: #d6d3d1 transparent; }
 
-  /* ── Warm Bright Theme (HSL) ─────────────────────────────────── */
+  /* ── Desoul Theme (HSL) ──────────────────────────────────────────
+     Tokens from the /desoul-brand skill's brand.json (the portable copy of
+     ai-learning-path/brand.json + research-console/static/style.css), not
+     hand-picked. `hsl` field used directly - it's the same colour as `hex`,
+     pre-converted for this file's hsl(var(--x)) format. */
   :root {
-    --background: 40 100% 99%;
-    --foreground: 20 14% 9%;
+    --background: 43 30% 95%;  /* brand.paper - the PAGE, not the card */
+    --foreground: 43 13% 11%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 20 14% 9%;
+    --card: 45 100% 99%;  /* brand.card - raised surface */
+    --card-foreground: 43 13% 11%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 20 14% 9%;
+    --popover: 45 100% 99%;
+    --popover-foreground: 43 13% 11%;
 
-    --primary: 25 95% 53%;
+    --primary: 152 39% 30%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 20% 96%;
-    --secondary-foreground: 20 14% 9%;
+    --secondary: 45 32% 93%;  /* brand.faint - recessed surface, table stripe */
+    --secondary-foreground: 43 13% 11%;
 
-    --muted: 30 20% 96%;
-    --muted-foreground: 25 6% 45%;
+    --muted: 45 32% 93%;
+    --muted-foreground: 45 10% 33%;
 
-    --accent: 30 20% 96%;
-    --accent-foreground: 20 14% 9%;
+    --accent: 45 32% 93%;
+    --accent-foreground: 43 13% 11%;
 
     /* Status colours. One token per role — soft surfaces come from the /10 and
        /20 opacity modifiers (same pattern the sidebar already uses for primary),
@@ -76,26 +80,26 @@
     --brand-facebook: 214 89% 52%;
     --brand-instagram: 340 75% 54%;
 
-    --border: 20 5% 90%;
-    --input: 20 5% 90%;
-    --ring: 25 95% 53%;
+    --border: 42 25% 87%;  /* brand.line */
+    --input: 42 25% 87%;
+    --ring: 152 39% 30%;
 
-    --radius: 0.75rem;
+    --radius: 10px;  /* brand.line.radius */
 
-    --chart-1: 25 95% 53%;
+    --chart-1: 152 39% 30%;
     --chart-2: 142 71% 45%;
     --chart-3: 45 93% 47%;
     --chart-4: 349 89% 60%;
     --chart-5: 221 83% 53%;
 
-    --sidebar-background: 30 50% 97%;
-    --sidebar-foreground: 20 14% 9%;
-    --sidebar-primary: 25 95% 53%;
+    --sidebar-background: 43 30% 95%;  /* same paper as the page - no separate sidebar surface in the brand */
+    --sidebar-foreground: 43 13% 11%;
+    --sidebar-primary: 152 39% 30%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 25 95% 90%;
-    --sidebar-accent-foreground: 25 95% 35%;
-    --sidebar-border: 20 5% 90%;
-    --sidebar-ring: 25 95% 53%;
+    --sidebar-accent: 133 23% 92%;  /* brand.accent-soft - accent background, selected row */
+    --sidebar-accent-foreground: 152 39% 30%;
+    --sidebar-border: 42 25% 87%;
+    --sidebar-ring: 152 39% 30%;
   }
 }
 
@@ -124,16 +128,68 @@
 }
 
 @layer components {
+  /* desoul-brand skill, wordmark rule 3: the sub-word under wordmark.png is set in
+     type, but styled to match the drawn lockups (logo-console.png/logo-production.png),
+     not as plain body text - cream fill, pen stroke, hard offset shadow. paint-order
+     is load-bearing: without it the stroke centres on the glyph edge and eats half the
+     letterform at small sizes. Values are the skill's measured spec, not eyeballed -
+     font-size is set per-instance (it depends on the wordmark's rendered size: cap
+     height must land at 41% of the wordmark's height, measured off both shipped
+     lockups), everything else here is constant across every product's sub-word. */
+  .desoul-subword {
+    font-family: "Baloo 2", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: #FFFEFB;
+    -webkit-text-stroke: 2.5px #211F19;
+    paint-order: stroke fill;
+    text-shadow: 3px 3px 0 #211F19;
+  }
+
+  /* THE LINE - brand.json `line`: bw 2.5px, pop "4px 4px 0", one pen colour
+     (== --foreground here; the two were independently measured equal). Every
+     outlined element gets both, never one alone - "the two do not layer" with
+     a soft shadow, so this REPLACES elevation, it doesn't add to it. Hover
+     lifts (shadow grows, element shifts away from its shadow); active presses
+     the element down INTO its shadow, like a real button. Applied directly to
+     the shared primitives (Button/Input/Badge/.card-warm) so it's one edit,
+     not one per usage site. */
+  .pen-line {
+    border: 2.5px solid hsl(var(--foreground));
+    box-shadow: 4px 4px 0 hsl(var(--foreground));
+    transition: box-shadow 150ms ease, transform 150ms ease;
+  }
+  .pen-line:hover {
+    box-shadow: 5px 5px 0 hsl(var(--foreground));
+    transform: translate(-1px, -1px);
+  }
+  .pen-line:active {
+    box-shadow: 2px 2px 0 hsl(var(--foreground));
+    transform: translate(2px, 2px);
+  }
+  /* Same border + shadow, no hover-lift/press - for things that aren't clicked
+     (inputs, badges). A text field or a status chip shouldn't feel pressable. */
+  .pen-line-static {
+    border: 2.5px solid hsl(var(--foreground));
+    box-shadow: 4px 4px 0 hsl(var(--foreground));
+  }
+  /* brand.json line.pop-sm - small elements (badges/chips) get the thinner offset,
+     not the full 4px pop meant for card-sized things. Border width doesn't scale. */
+  .pen-line-sm {
+    border: 2.5px solid hsl(var(--foreground));
+    box-shadow: 3px 3px 0 hsl(var(--foreground));
+  }
+
   .card-warm {
     background-color: hsl(var(--card));
     border-radius: var(--radius);
-    border: 1px solid hsl(var(--border));
-    box-shadow: 0 1px 3px rgba(120, 113, 108, 0.08), 0 1px 2px rgba(120, 113, 108, 0.04);
-    transition: box-shadow 150ms ease, border-color 150ms ease;
+    border: 2.5px solid hsl(var(--foreground));
+    box-shadow: 4px 4px 0 hsl(var(--foreground));
+    transition: box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease;
   }
   .card-warm:hover {
-    box-shadow: 0 4px 12px rgba(120, 113, 108, 0.12), 0 2px 4px rgba(120, 113, 108, 0.06);
-    border-color: hsl(20 5% 83%);
+    box-shadow: 5px 5px 0 hsl(var(--foreground));
+    transform: translate(-1px, -1px);
   }
 
   /* ── AI Chat Window ───────────────────────────────────────────────── */
@@ -145,17 +201,17 @@
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(22 90% 45%) 100%);
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(152 45% 22%) 100%);
     color: hsl(var(--primary-foreground));
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 16px rgba(234, 88, 12, 0.35);
+    box-shadow: 4px 4px 0 hsl(var(--foreground));
     transition: transform 150ms ease, box-shadow 150ms ease;
   }
-  .chat-fab:hover { transform: scale(1.07); box-shadow: 0 6px 22px rgba(234, 88, 12, 0.45); }
+  .chat-fab:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 hsl(var(--foreground)); }
   .chat-fab-badge {
     position: absolute;
     top: -4px;
@@ -179,8 +235,8 @@
     background: rgba(255, 255, 255, 0.88);
     backdrop-filter: blur(20px) saturate(1.6);
     -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border: 1px solid rgba(234, 88, 12, 0.18);
-    box-shadow: 0 24px 60px rgba(120, 100, 80, 0.2), 0 2px 8px rgba(120, 100, 80, 0.08);
+    border: 2.5px solid hsl(var(--foreground));
+    box-shadow: 6px 6px 0 hsl(var(--foreground));
     display: flex;
     flex-direction: column;
     animation: chat-slide-up 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -195,7 +251,7 @@
     justify-content: space-between;
     padding: 14px 16px;
     border-bottom: 1px solid hsl(var(--border));
-    background: linear-gradient(135deg, hsl(25 95% 53% / 0.08) 0%, transparent 100%);
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.08) 0%, transparent 100%);
     border-radius: 20px 20px 0 0;
   }
   .chat-header-info { display: flex; align-items: center; gap: 10px; }
@@ -235,7 +291,7 @@
   .chat-msg--user { flex-direction: row-reverse; }
   .chat-avatar {
     width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(22 90% 45%) 100%);
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(152 45% 22%) 100%);
     color: white;
     display: flex; align-items: center; justify-content: center;
   }
@@ -254,7 +310,7 @@
     border-radius: 4px 16px 16px 16px;
   }
   .chat-msg--user .chat-msg-text {
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(22 90% 40%) 100%);
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(152 45% 18%) 100%);
     color: white;
     border-radius: 16px 4px 16px 16px;
   }
@@ -303,16 +359,21 @@
     display: flex; align-items: flex-end; gap: 8px;
   }
   .chat-suggest-btn {
-    width: 32px; height: 32px; border-radius: 8px; border: 1px solid hsl(var(--border));
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 2.5px solid hsl(var(--foreground));
+    box-shadow: 3px 3px 0 hsl(var(--foreground));
     background: hsl(var(--card)); color: hsl(var(--muted-foreground));
     cursor: pointer; display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: background 120ms;
+    flex-shrink: 0; transition: background 120ms, box-shadow 150ms ease, transform 150ms ease;
   }
-  .chat-suggest-btn:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+  .chat-suggest-btn:hover { background: hsl(var(--muted)); color: hsl(var(--foreground));
+    box-shadow: 4px 4px 0 hsl(var(--foreground)); transform: translate(-1px, -1px); }
+  .chat-suggest-btn:active { box-shadow: 1px 1px 0 hsl(var(--foreground)); transform: translate(2px, 2px); }
   .chat-textarea {
     flex: 1;
     resize: none;
-    border: 1px solid hsl(var(--border));
+    border: 2.5px solid hsl(var(--foreground));
+    box-shadow: 3px 3px 0 hsl(var(--foreground));
     border-radius: 12px;
     padding: 8px 12px;
     font-size: 13px;
@@ -320,22 +381,23 @@
     background: hsl(var(--card));
     color: hsl(var(--foreground));
     outline: none;
-    transition: border 120ms;
     line-height: 1.4;
     max-height: 100px;
     overflow-y: auto;
   }
-  .chat-textarea:focus { border-color: hsl(var(--primary)); }
   .chat-textarea::placeholder { color: hsl(var(--muted-foreground)); }
   .chat-send-btn {
-    width: 34px; height: 34px; border-radius: 10px; border: none;
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(22 90% 45%) 100%);
+    width: 34px; height: 34px; border-radius: 10px;
+    border: 2.5px solid hsl(var(--foreground));
+    box-shadow: 3px 3px 0 hsl(var(--foreground));
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(152 45% 22%) 100%);
     color: white; cursor: pointer; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    transition: opacity 150ms, transform 100ms;
+    transition: opacity 150ms, box-shadow 150ms ease, transform 150ms ease;
   }
+  .chat-send-btn:not(:disabled):hover { box-shadow: 4px 4px 0 hsl(var(--foreground)); transform: translate(-1px, -1px); }
+  .chat-send-btn:not(:disabled):active { box-shadow: 1px 1px 0 hsl(var(--foreground)); transform: translate(2px, 2px); }
   .chat-send-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-  .chat-send-btn:not(:disabled):hover { transform: scale(1.05); }
   .chat-spinner { animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 }

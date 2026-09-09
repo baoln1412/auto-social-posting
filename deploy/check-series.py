@@ -65,6 +65,18 @@ def check(payload):
     if st and st != st.upper():
         p.append('§4  tiêu đề đại án phải VIẾT HOA toàn bộ')
 
+    # §3a's table says "applies to narration AND to titles" - the overall series title
+    # is a title too, and was missing from this check entirely until a run through
+    # fix-series.py caught a violation here that this script had never once flagged.
+    for term in BANNED:
+        for m in re.finditer(re.escape(term), st, re.I):
+            ctx = st[max(0, m.start() - 45):m.end() + 45]
+            if LEGAL_PHRASE.search(ctx):
+                continue
+            p.append(f'§3a tiêu đề đại án: "{term}" chưa quy đổi — …{ctx.strip()[:90]}…')
+    for m in GIET_NARRATIVE.finditer(st):
+        p.append(f'§3a tiêu đề đại án: "{m.group(0)}" là lời tường thuật, phải quy đổi')
+
     if len(parts) != 3:
         p.append(f'§8  có {len(parts)} kỳ, cần đúng 3')
 

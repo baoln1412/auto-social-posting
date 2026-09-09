@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { startRenderJob, getJob } from '../../../lib/videoJobs';
 
 export async function POST(req: NextRequest) {
-  const { emojiTitle, narration, media } = await req.json();
+  const { emojiTitle, narration, media, includeIntro, includeLayout, postId } = await req.json();
   if (!narration || !String(narration).trim()) {
     return NextResponse.json({ error: 'narration script is required' }, { status: 400 });
   }
-  const jobId = startRenderJob({ emojiTitle: emojiTitle ?? '', narration, media: Array.isArray(media) ? media : [] });
+  const jobId = startRenderJob({
+    emojiTitle: emojiTitle ?? '',
+    narration,
+    media: Array.isArray(media) ? media : [],
+    includeIntro: includeIntro !== false,
+    includeLayout: includeLayout !== false,
+    postId: typeof postId === 'string' ? postId : undefined,
+  });
   return NextResponse.json({ jobId });
 }
 

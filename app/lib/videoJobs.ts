@@ -8,6 +8,7 @@ import { spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import { writeFileSync, unlink, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
+import { setGoldVideo } from './lake';
 
 const ROOT = process.cwd();
 const OUT_DIR = join(ROOT, 'data', 'reels');
@@ -37,6 +38,9 @@ export function startRenderJob(payload: {
   emojiTitle: string;
   narration: string;
   media?: { url: string; kind: 'image' | 'video' }[];
+  includeIntro?: boolean;
+  includeLayout?: boolean;
+  postId?: string;
 }): string {
   mkdirSync(OUT_DIR, { recursive: true });
   const id = randomUUID();
@@ -54,13 +58,20 @@ export function startRenderJob(payload: {
 
   // make-reel.py shells out to ffmpeg by bare name — needs /opt/homebrew/bin on PATH too.
   const env = { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH ?? ''}` };
-  const child = spawn(PYTHON, [SCRIPT, '--json', inFile, outFile], { cwd: ROOT, env });
+  const args = [SCRIPT, '--json', inFile, outFile];
+  if (payload.includeIntro === false) args.push('--no-intro');
+  if (payload.includeLayout === false) args.push('--no-layout');
+  const child = spawn(PYTHON, args, { cwd: ROOT, env });
   let stderr = '';
   child.stderr.on('data', (d) => { stderr += d.toString(); });
   child.on('close', (code) => {
     unlink(inFile, () => {});
     if (code === 0 && existsSync(outFile)) {
-      jobs.set(id, { id, status: 'done', file: `${id}.mp4` });
+      const file = `${id}.mp4`;
+      jobs.set(id, { id, status: 'done', file });
+      // Best-effort — a post record can vanish (deleted) between the render
+      // starting and finishing; the file itself is still there either way.
+      if (payload.postId) setGoldVideo(payload.postId, file, payload.narration).catch(() => {});
     } else {
       jobs.set(id, { id, status: 'error', error: stderr.trim().slice(-500) || `exit ${code}` });
     }

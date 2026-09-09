@@ -214,6 +214,26 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
                   </Button>
                 </div>
 
+                <label className="flex items-center gap-2 text-sm text-foreground/90 cursor-pointer w-fit">
+                  <input
+                    type="checkbox"
+                    checked={vg.includeIntro}
+                    onChange={(e) => vg.setIncludeIntro(e.target.checked)}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  Chèn video intro &quot;101 Chuyện Úc chút chút&quot; sau hook
+                </label>
+
+                <label className="flex items-center gap-2 text-sm text-foreground/90 cursor-pointer w-fit">
+                  <input
+                    type="checkbox"
+                    checked={vg.includeLayout}
+                    onChange={(e) => vg.setIncludeLayout(e.target.checked)}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  Layout 9:16 (khung viền + tiêu đề) — bỏ chọn để chỉ có ảnh/video + caption
+                </label>
+
                 <Button
                   onClick={vg.render}
                   disabled={vg.jobStatus === 'running'}

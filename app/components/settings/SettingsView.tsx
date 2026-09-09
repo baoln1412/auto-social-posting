@@ -101,7 +101,7 @@ export default function SettingsView({
 }: SettingsViewProps) {
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
-      <h2 className="text-display text-foreground">Market Settings</h2>
+      <h2 className="text-display font-display text-foreground">Market Settings</h2>
 
       {/* Market info */}
       <Card className="card-warm">

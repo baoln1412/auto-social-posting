@@ -1,19 +1,19 @@
 /**
  * GET /api/image/card — render a branded news card (per the design SOP).
  *
- * Layers (bottom → top):  article photo → red→transparent gradient →
- *   { title (white + #F8EF63 highlight) · watermark · circle inset w/ red stroke }.
+ * Layers (bottom → top):  article photo → "101 Chuyện Úc chút chút" brand
+ *   overlay (logo + blue gradient, baked into one PNG) →
+ *   { title (white + #F8EF63 highlight) · circle inset w/ blue stroke }.
  *
- * All graphics/text are composited deterministically (next/og = Satori) so
- * Vietnamese diacritics and exact-hex highlights are pixel-correct. Only the
- * BACKGROUND may come from an AI model (Case 2) — everything above is code.
+ * All text is composited deterministically (next/og = Satori) so Vietnamese
+ * diacritics and exact-hex highlights are pixel-correct. Only the BACKGROUND
+ * may come from an AI model (Case 2) — everything above is code.
  *
- * Query params (all optional — default to the CuongNguyenEurope sample):
+ * Query params (all optional — default to the sample headline):
  *   title=…            full ALL-CAPS headline
  *   hl=…|…             '|'-separated exact phrases to paint yellow
- *   watermark=…        brand text (70% white)
  *   bg=<url>           background photo (Case 1). Omitted → dark placeholder.
- *   inset=<url>        secondary photo → circle + red stroke, top-left
+ *   inset=<url>        secondary photo → circle + blue stroke, top-left
  *   ratio=1:1 | 4:5    default 4:5
  */
 
@@ -27,12 +27,22 @@ import crypto from 'node:crypto';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const RED = '#9F181B';
+const BLUE = '#1D51A4';
 const YELLOW = '#F8EF63';
 
 const FONT_DIR = path.join(process.cwd(), 'public', 'fonts');
 const fontBold = fs.readFileSync(path.join(FONT_DIR, 'BeVietnamPro-Bold.ttf'));
 const fontBlack = fs.readFileSync(path.join(FONT_DIR, 'BeVietnamPro-Black.ttf'));
+
+// Brand overlay (logo + blue gradient) — one PNG per ratio, pre-cropped to
+// exact canvas size so it can be laid down with no scaling. 4:5 is the
+// source art (1080x1350). 1:1 is stitched from that same art: the logo
+// (top-right, rows 0-230) + the gradient (rows 500-1350) with the fully
+// transparent gap between them removed — a plain bottom-crop would have cut
+// the logo off entirely now that it sits at the top, not the bottom.
+const OVERLAY_DIR = path.join(process.cwd(), 'public', 'overlays');
+const overlay45 = `data:image/png;base64,${fs.readFileSync(path.join(OVERLAY_DIR, 'card-bg-4x5.png')).toString('base64')}`;
+const overlay11 = `data:image/png;base64,${fs.readFileSync(path.join(OVERLAY_DIR, 'card-bg-1x1.png')).toString('base64')}`;
 
 const UA = 'Mozilla/5.0 (compatible; CardBot/1.0)';
 
@@ -311,10 +321,10 @@ export async function GET(req: NextRequest) {
     .trim()
     .toUpperCase();
   const hl = (q.get('hl') ?? 'TIÊM FILLER CHUI,|THU 100 TRIỆU MỖI NGÀY').split('|');
-  const watermark = q.get('watermark') ?? '#CuongNguyenEurope';
   const ratio = q.get('ratio') === '1:1' ? '1:1' : '4:5';
   const W = 1080;
   const H = ratio === '1:1' ? 1080 : 1350;
+  const overlay = ratio === '1:1' ? overlay11 : overlay45;
 
   let bgUrl = q.get('bg');
   const insetUrl = q.get('inset');
@@ -345,7 +355,7 @@ export async function GET(req: NextRequest) {
 
   // Auto-fit headline size by length.
   const L = title.length;
-  const fontSize = L <= 45 ? 78 : L <= 70 ? 64 : L <= 95 ? 54 : 46;
+  const fontSize = L <= 45 ? 80 : L <= 70 ? 70 : L <= 95 ? 60 : 52;
   const lineGap = Math.round(fontSize * 0.42); // → line spacing ≈ 90–95px feel
   const wordGap = Math.round(fontSize * 0.26);
 
@@ -357,21 +367,16 @@ export async function GET(req: NextRequest) {
 
   return new ImageResponse(
     (
-      <div style={{ position: 'relative', width: W, height: H, display: 'flex', backgroundColor: bg ? '#141414' : '#6d1518', fontFamily: 'BVP', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: W, height: H, display: 'flex', backgroundColor: '#141414', fontFamily: 'BVP', overflow: 'hidden' }}>
         {/* Layer 1 — background photo */}
         {bg && <img src={bg} width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, width: W, height: H, objectFit: 'cover' }} />}
 
-        {/* Layer 2 — red → transparent gradient (bottom) */}
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: Math.round(H * 0.56), display: 'flex', backgroundImage: `linear-gradient(to top, ${RED} 0%, rgba(159,24,27,0.92) 24%, rgba(159,24,27,0) 100%)` }} />
+        {/* Layer 2 — brand overlay (logo + blue gradient, baked into the PNG) */}
+        <img src={overlay} width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, width: W, height: H, objectFit: 'cover' }} />
 
-        {/* Layer 3 — watermark (centred, 70% white) */}
-        <div style={{ position: 'absolute', top: Math.round(H * 0.44), left: 0, right: 0, display: 'flex', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 50, fontWeight: 700, letterSpacing: 1 }}>
-          {watermark}
-        </div>
-
-        {/* Layer 3 — circle inset with red stroke (top-left) */}
+        {/* Layer 3 — circle inset with blue stroke (top-left) */}
         {inset && (
-          <img src={inset} width={300} height={300} style={{ position: 'absolute', top: 48, left: 48, width: 300, height: 300, borderRadius: 300, border: `8px solid ${RED}`, objectFit: 'cover' }} />
+          <img src={inset} width={300} height={300} style={{ position: 'absolute', top: 48, left: 48, width: 300, height: 300, borderRadius: 300, border: `8px solid ${BLUE}`, objectFit: 'cover' }} />
         )}
 
         {/* Layer 3 — headline (white + yellow highlight), centre-aligned.

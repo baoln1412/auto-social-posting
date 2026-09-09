@@ -30,4 +30,5 @@ claude -p "Run the /immigration-pipeline skill to completion. Do every step." \
   --model claude-sonnet-5 \
   --effort medium \
   --permission-mode bypassPermissions \
+  --exclude-dynamic-system-prompt-sections \
   >> /Users/nguyenbaole/auto-social-posting/data/pipeline.log 2>&1

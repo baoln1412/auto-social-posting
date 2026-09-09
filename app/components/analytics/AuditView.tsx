@@ -44,7 +44,7 @@ export default function AuditView({ pageId }: { pageId: string }) {
 
   return (
     <div className="flex flex-col gap-5 max-w-3xl">
-      <h2 className="text-display text-foreground">Pipeline Audit</h2>
+      <h2 className="text-display font-display text-foreground">Pipeline Audit</h2>
 
       {/* Layer counts */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -57,7 +57,7 @@ export default function AuditView({ pageId }: { pageId: string }) {
         ].map((c) => (
           <Card key={c.label} className="card-warm">
             <CardContent className="p-4">
-              <p className="text-2xl font-bold text-foreground tabular-nums">{c.value}</p>
+              <p className="font-mono text-2xl font-bold text-foreground tabular-nums">{c.value}</p>
               <p className="text-xs font-normal text-foreground mt-1">{c.label}</p>
               <p className="text-[11px] text-muted-foreground">{c.sub}</p>
             </CardContent>
@@ -85,9 +85,9 @@ export default function AuditView({ pageId }: { pageId: string }) {
                 {sources.map((s) => (
                   <tr key={s.source} className="border-b border-border/50">
                     <td className="py-2 font-medium text-foreground">{s.source}</td>
-                    <td className="py-2 text-right">{s.bronze}</td>
-                    <td className="py-2 text-right">{s.silver}</td>
-                    <td className="py-2 text-right text-muted-foreground">
+                    <td className="py-2 text-right font-mono">{s.bronze}</td>
+                    <td className="py-2 text-right font-mono">{s.silver}</td>
+                    <td className="py-2 text-right font-mono text-muted-foreground">
                       {s.bronze ? `${Math.round((s.silver / s.bronze) * 100)}%` : '—'}
                     </td>
                   </tr>
@@ -117,10 +117,10 @@ export default function AuditView({ pageId }: { pageId: string }) {
                 {(data.feedHealth ?? []).filter((f) => f.stale).map((f) => (
                   <tr key={f.source} className="border-b border-border/50">
                     <td className="py-2 font-medium text-foreground">{f.source}</td>
-                    <td className="py-2 text-right">
+                    <td className="py-2 text-right font-mono">
                       {f.quietDays === null ? 'never' : `${f.quietDays}d ago`}
                     </td>
-                    <td className="py-2 text-right text-muted-foreground">{f.errorRuns || '—'}</td>
+                    <td className="py-2 text-right font-mono text-muted-foreground">{f.errorRuns || '—'}</td>
                   </tr>
                 ))}
               </tbody>

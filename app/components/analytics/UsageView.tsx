@@ -93,7 +93,7 @@ export default function UsageView({ pageId }: { pageId: string }) {
   return (
     <div className="flex flex-col gap-5 max-w-4xl">
       <div>
-        <h2 className="text-display text-foreground">Source Usage</h2>
+        <h2 className="text-display font-display text-foreground">Source Usage</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Estimated token spend vs. content yield per source. Sources that crawl a lot
           but produce no posts are burning screening effort — candidates to drop.
@@ -110,7 +110,7 @@ export default function UsageView({ pageId }: { pageId: string }) {
         ].map((c) => (
           <Card key={c.label} className="card-warm">
             <CardContent className="p-4">
-              <p className="text-2xl font-bold text-foreground tabular-nums">{c.value}</p>
+              <p className="font-mono text-2xl font-bold text-foreground tabular-nums">{c.value}</p>
               <p className="text-xs font-normal text-foreground mt-1">{c.label}</p>
               <p className="text-[11px] text-muted-foreground">{c.sub}</p>
             </CardContent>
@@ -142,13 +142,13 @@ export default function UsageView({ pageId }: { pageId: string }) {
                   {rows.map((r) => (
                     <tr key={r.source} className="border-b border-border/50">
                       <td className="py-2 font-medium text-foreground">{r.source}</td>
-                      <td className="py-2 text-right">{r.bronze}</td>
-                      <td className="py-2 text-right">{r.silver}</td>
-                      <td className="py-2 text-right">{r.gold}</td>
-                      <td className="py-2 text-right text-muted-foreground">
+                      <td className="py-2 text-right font-mono">{r.bronze}</td>
+                      <td className="py-2 text-right font-mono">{r.silver}</td>
+                      <td className="py-2 text-right font-mono">{r.gold}</td>
+                      <td className="py-2 text-right font-mono text-muted-foreground">
                         {r.yieldPct === null ? '—' : `${Math.round(r.yieldPct)}%`}
                       </td>
-                      <td className="py-2 text-right tabular-nums">{fmt(r.tokens)}</td>
+                      <td className="py-2 text-right font-mono tabular-nums">{fmt(r.tokens)}</td>
                       <td className={`py-2 text-right font-medium ${r.verdict.tone}`}>
                         <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${r.verdict.dot}`} />{r.verdict.label}
                       </td>
@@ -158,13 +158,13 @@ export default function UsageView({ pageId }: { pageId: string }) {
                 <tfoot>
                   <tr className="border-t border-border font-semibold text-foreground">
                     <td className="py-2">Total</td>
-                    <td className="py-2 text-right">{totals.bronze}</td>
-                    <td className="py-2 text-right">{totals.silver}</td>
-                    <td className="py-2 text-right">{totals.gold}</td>
-                    <td className="py-2 text-right text-muted-foreground">
+                    <td className="py-2 text-right font-mono">{totals.bronze}</td>
+                    <td className="py-2 text-right font-mono">{totals.silver}</td>
+                    <td className="py-2 text-right font-mono">{totals.gold}</td>
+                    <td className="py-2 text-right font-mono text-muted-foreground">
                       {totals.bronze ? `${Math.round((totals.gold / totals.bronze) * 100)}%` : '—'}
                     </td>
-                    <td className="py-2 text-right tabular-nums">{fmt(totals.tokens)}</td>
+                    <td className="py-2 text-right font-mono tabular-nums">{fmt(totals.tokens)}</td>
                     <td className="py-2" />
                   </tr>
                 </tfoot>

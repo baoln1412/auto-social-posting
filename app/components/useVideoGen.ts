@@ -22,14 +22,19 @@ let mediaSeq = 0;
  * even while the drawer is closed.
  */
 export function useVideoGen(post: PostDraft, channelName?: string) {
-  const [script, setScript] = useState('');
+  // A previously finished render is persisted on the post (videoUrl/narration —
+  // see lake.ts::setGoldVideo), so a page refresh should show it as already done
+  // instead of resetting to a blank script and losing track of the rendered file.
+  const [script, setScript] = useState(post.narration ?? '');
   const [loading, setLoading] = useState(false);
-  const [approved, setApproved] = useState(false);
+  const [approved, setApproved] = useState(Boolean(post.narration));
   const [media, setMedia] = useState<VgMedia[]>([]);
+  const [includeIntro, setIncludeIntro] = useState(true);
+  const [includeLayout, setIncludeLayout] = useState(true);
 
   const [jobId, setJobId] = useState<string | null>(null);
-  const [jobStatus, setJobStatus] = useState<VgJobStatus>('idle');
-  const [jobFile, setJobFile] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<VgJobStatus>(post.videoUrl ? 'done' : 'idle');
+  const [jobFile, setJobFile] = useState<string | null>(post.videoUrl ?? null);
   const [jobError, setJobError] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -110,7 +115,7 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
       const res = await fetch('/api/video/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emojiTitle: post.emojiTitle || post.article.title, narration: script, media: media_ }),
+        body: JSON.stringify({ emojiTitle: post.emojiTitle || post.article.title, narration: script, media: media_, includeIntro, includeLayout, postId: post.id }),
       });
       const data = await res.json();
       if (!res.ok || !data.jobId) {
@@ -123,7 +128,7 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
       setJobStatus('error');
       setJobError(String(err));
     }
-  }, [media, post.article.imageUrl, post.article.imageUrls, post.emojiTitle, post.article.title, script]);
+  }, [media, post.id, post.article.imageUrl, post.article.imageUrls, post.emojiTitle, post.article.title, script, includeIntro, includeLayout]);
 
   // Poll job status while running — independent of whether the drawer is open.
   useEffect(() => {
@@ -156,7 +161,7 @@ export function useVideoGen(post: PostDraft, channelName?: string) {
   return {
     script, setScript, loading, approved, setApproved, media,
     addFiles, removeMedia, moveMedia, generate, render, resetJob,
-    jobStatus, jobFile, jobError,
+    jobStatus, jobFile, jobError, includeIntro, setIncludeIntro, includeLayout, setIncludeLayout,
   };
 }
 

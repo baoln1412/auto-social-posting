@@ -7,7 +7,12 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        // brand.json `type`: sans = body, mono = "every number, every path, every
+        // id" (not just code), display = headings and anything said in the
+        // product's own voice. `font-mono` pairs with the `display` size below.
+        sans: ['"Source Sans 3"', 'system-ui', 'sans-serif'],
+        mono: ['"Source Code Pro"', 'ui-monospace', 'Menlo', 'monospace'],
+        display: ['"Baloo 2"', '"Source Sans 3"', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         // The measured scale topped out at 24px, so no size said "top of the

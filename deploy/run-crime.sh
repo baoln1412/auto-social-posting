@@ -19,17 +19,16 @@ ROOT=/Users/nguyenbaole/auto-social-posting
 LOG="$ROOT/data/crime.log"
 LOCK="$ROOT/data/crime.lock"
 
-# Series to DELIVER per day, not a promise. Rejection is a normal, tolerated outcome, but
-# "keep going until TARGET is hit" made every rejected case a pure ADD to the day's cost
-# rather than something absorbed within a fixed budget - the design was unbounded in
-# practice even though a ceiling existed, because the ceiling was generous enough to almost
-# never bind. Measured worst day (2026-08-28): a 15-attempt dry spell against a 4x ceiling
-# of 32 meant the run very nearly used its whole budget chasing the last 2 of 8. This is
-# now 2x: it will not always reach TARGET on a bad day, and that is the intended trade -
-# accept fewer written series in exchange for a bounded cost, rather than grinding for a
-# fixed count regardless of what the queue holds that day.
+# Series to DELIVER per day, not a promise. Rejection is a normal, tolerated outcome. This
+# was 4x, tightened to 2x on 2026-08-28's worst day (a 15-attempt dry spell nearly used a
+# 32-attempt ceiling for target 8). Raised to 3x on 2026-08-30: the opinion-chase loop that
+# made a rejected attempt expensive is gone (CRIME_SOP.md §2 no longer requires it before
+# writing), so a reject is cheap now - that day's batch rejected 6 of 8 in a few minutes
+# each, mostly a CourtListener search-API check with no full-text fetch at all. More shots
+# on goal costs little; it still will not always reach TARGET on a genuinely bad day, and
+# that stays the intended trade.
 TARGET="${CRIME_SERIES_PER_RUN:-8}"
-MAX_ATTEMPTS="${CRIME_MAX_ATTEMPTS:-$(( TARGET * 2 ))}"
+MAX_ATTEMPTS="${CRIME_MAX_ATTEMPTS:-$(( TARGET * 3 ))}"
 MAX_SECONDS="${CRIME_MAX_SECONDS:-18000}"   # 5h: must be finished well within the morning
 DISCOVER_TO=$(( TARGET * 2 ))
 
@@ -117,7 +116,9 @@ claim_case() {
 import json, sys, urllib.request
 cases = (json.load(sys.stdin).get('cases') or [])
 if not cases: raise SystemExit
-c = sorted(cases, key=lambda x: x.get('created_at') or '')[0]
+# press_hint=0 (discovery-time search found zero coverage) sorts last, not out - a soft
+# deprioritization, not a filter. Within each group, oldest first as before.
+c = sorted(cases, key=lambda x: (0 if x.get('press_hint', 1) else 1, x.get('created_at') or ''))[0]
 urllib.request.urlopen(urllib.request.Request(
     'http://localhost:3000/api/crime/cases', method='PATCH',
     data=json.dumps({'id': c['id'], 'status': 'researching'}).encode(),
@@ -151,6 +152,17 @@ run_case() {
     sleep 5
   done
 
+  # Backstop underneath the research-budget endpoint and MAX_ATTEMPTS, not a replacement for
+  # either: those two bound "how many times does it try," this bounds "how much does any ONE
+  # try cost," which catches a single attempt running long even while attempt-counting logic
+  # is working exactly as designed. $3.00 estimated from Anthropic's Aug-2026 list pricing
+  # ($2/$10 per Mtok in/out, $0.20/Mtok cache-read): the fixed regression run that hit the
+  # full research budget and correctly gave up cost ~1.93M cache-read tokens (~$0.40-0.70
+  # depending on the fresh-input share); the pre-fix blowout's 35 stray fetches added fresh,
+  # uncached input at 10x that per-token rate. $3.00 leaves real headroom over the legitimate
+  # worst case while still cutting off a runaway well short of blowout territory. A session
+  # killed by this exits the same way a killed worker does - case left at 'researching' - and
+  # the existing recovery below already hands it back to the queue, so no separate handling.
   claude -p "Run the /crime-series skill for exactly ONE case: id $cid.
 
 That case has already been claimed for you and is at status 'researching'. Do not read the
@@ -169,6 +181,8 @@ never is." \
     --model claude-sonnet-5 \
     --effort medium \
     --permission-mode bypassPermissions \
+    --exclude-dynamic-system-prompt-sections \
+    --max-budget-usd "${CRIME_MAX_BUDGET_USD:-3.00}" \
     > "$out" 2>&1
 
   # A worker killed mid-research leaves its case stuck at 'researching', where nothing will

@@ -123,7 +123,7 @@ export default function ContentCalendar({ pageId }: ContentCalendarProps) {
       {/* Calendar grid */}
       <div className="flex-1">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-display text-foreground">
+          <h2 className="text-display font-display text-foreground">
             {MONTHS[month]} {year}
           </h2>
           <div className="flex items-center gap-2">
@@ -174,13 +174,13 @@ export default function ContentCalendar({ pageId }: ContentCalendarProps) {
                     `}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm font-normal w-7 h-7 flex items-center justify-center rounded-full
+                      <span className={`font-mono text-sm font-normal w-7 h-7 flex items-center justify-center rounded-full
                         ${isToday ? 'bg-primary text-primary-foreground font-bold' : 'text-foreground'}
                       `}>
                         {day}
                       </span>
                       {dayPosts.length > 0 && (
-                        <span className="text-[10px] text-muted-foreground font-medium">
+                        <span className="font-mono text-[10px] text-muted-foreground font-medium">
                           {dayPosts.length}
                         </span>
                       )}

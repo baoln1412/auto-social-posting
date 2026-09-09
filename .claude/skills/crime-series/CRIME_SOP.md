@@ -21,14 +21,20 @@ hồ sơ tòa chỉ là dấu hiệu ban đầu và có sai số — `Lee`, `Par
 biến của người không gốc Á. **Đọc bản án để xác nhận bị cáo/nạn nhân thực sự thuộc cộng đồng
 gốc Á trước khi viết**; không phải thì từ chối vụ án.
 
-### 0a. MỐC THỜI GIAN: vụ án phải xảy ra từ năm 2010 trở đi
+### 0a. MỐC THỜI GIAN: vụ án phải xảy ra từ năm 2000 trở đi
 
-**Vụ án có thời điểm gây án TRƯỚC 2010 → từ chối**, dù hồ sơ tòa có đầy đủ đến đâu.
+**Vụ án có thời điểm gây án TRƯỚC 2000 → từ chối**, dù hồ sơ tòa có đầy đủ đến đâu.
 
-Lý do là đo được, không phải sở thích: báo địa phương Mỹ trước khoảng 2005 chỉ có bản in,
-chưa số hoá. Trong 12 bộ bài không tìm được tấm ảnh nào, **10 bộ là vụ án trước 2005**. Không
-ảnh nghĩa là không có ảnh nghi phạm, không ảnh hiện trường, và mất luôn phần không khí mà
-báo chí đương thời mang lại.
+Mốc cũ là 2010, dựng lên vì lý do ảnh: báo địa phương Mỹ trước khoảng 2005 chỉ có bản in,
+chưa số hoá, mà ảnh tư liệu thật khi đó bắt buộc phải có. Từ khi ảnh tư liệu thật chuyển
+thành TUỲ CHỌN (§9a) — mặc định dùng `image_prompt` dựng cảnh, không cần ảnh thật — lý do
+đó không còn chặn được nữa, nên mốc lùi về 2000.
+
+**Rủi ro còn lại không phải ảnh mà là VĂN BẢN:** cùng lý do báo in chưa số hoá cũng áp dụng
+cho tin tức, không riêng ảnh — vụ án 2000-2004 có khả năng cao **không có báo chí trên
+mạng** lẫn không có ảnh. Theo §2, nguồn bắt buộc duy nhất là "ít nhất một nguồn thật" (bản
+án HOẶC báo chí); vụ 2000-2004 mà cả hai đều trống thì vẫn áp dụng **"hồ sơ quá mỏng, từ
+chối"** như bình thường — đó là kết quả đúng, không phải dấu hiệu có lỗi.
 
 **Đọc năm GÂY ÁN trong bản án, đừng đọc năm ra bản án.** Kháng cáo được xử nhiều năm — có khi
 vài chục năm — sau khi án xảy ra: một bản án năm 2024 hoàn toàn có thể là vụ nổ súng năm 1995,
@@ -89,41 +95,45 @@ người; muốn thấy công lý được thực thi.
 
 ## 2. NGUỒN TƯ LIỆU (FACT-CHECKING BẮT BUỘC)
 
-### 2a. Ngân sách tìm bản án — BẮT BUỘC gọi API, không tự đếm
+**Điều kiện DUY NHẤT để viết: vụ án có thật, xác nhận được qua ít nhất một nguồn thật** —
+bản án HOẶC báo chí đều tính, không phân cấp bậc. Không nguồn nào xác nhận vụ án tồn tại →
+từ chối vụ án. Có ít nhất một nguồn thật xác nhận → viết, dùng đúng những gì nguồn đó có, dù
+nguồn đó chỉ là một bài báo chứ không phải bản án.
 
-**Chỉ có 5 nguồn hợp lệ cho văn bản bản án:** CourtListener (link gốc), Justia
-(`law.justia.com`), FindLaw (`caselaw.findlaw.com`), Leagle, Casetext. Hết 5 nguồn này mà
-không đọc được thì vụ án **không có hồ sơ tư pháp truy cập được** — không phải lý do để tìm
-thêm nguồn khác.
+**Bản án không còn là điều kiện bắt buộc, kể cả cho KỲ III (kết cục pháp lý).** Trước đây
+thiếu bản án nêu kết cục cuối cùng thì từ chối viết kỳ cuối; giờ không cần nữa:
+- Báo chí có tường thuật kết quả (tuyên án, nhận tội, hòa giải, vẫn đang xử) → dùng kết quả
+  báo chí nêu.
+- Không nguồn nào nói tới kết cục → viết kỳ cuối theo diễn biến mới nhất đã biết, và ghi rõ
+  trong bài **"đây là diễn biến mới nhất được công khai; phán quyết sau cùng, nếu có, chưa
+  được báo chí đưa tin"**. Không suy đoán, không bịa kết cục.
 
-Trước **MỖI LẦN** thử fetch/search một trong 5 nguồn trên, gọi:
+Bản án (khi tìm được, xem §2a) vẫn hữu ích: chi tiết pháp lý chính xác hơn, tên đầy đủ theo
+tiêu đề vụ kiện, tội danh đúng thuật ngữ pháp lý. Coi đây là LÀM DÀY cho chất lượng, không
+phải điều kiện để được viết.
+
+### 2a. Tìm bản án — tuỳ chọn, thử thì phải gọi API ngân sách
+
+Bước này KHÔNG BẮT BUỘC. Báo chí đã đủ để viết theo quy tắc trên; chỉ thử tìm bản án khi có
+tín hiệu sẽ tìm nhanh (tên vụ kiện rõ ràng, bang có hồ sơ số hoá tốt) — không đáng bỏ nhiều
+lượt gọi cho một khả năng thấp.
+
+**Nếu thử, chỉ có 5 nguồn hợp lệ cho văn bản bản án:** CourtListener (link gốc), Justia
+(`law.justia.com`), FindLaw (`caselaw.findlaw.com`), Leagle, Casetext. Trước **MỖI LẦN** thử
+fetch/search một trong 5 nguồn trên, gọi:
 
 `POST /api/crime/research-budget` với `{ "id": "<case id>" }`
 
-Response trả về `allowed: true|false` và một `message`. **`allowed: false` nghĩa là DỪNG
-NGAY** — không tìm bản án qua nguồn nào nữa, xử lý như hồ sơ tư pháp không truy cập được
-(áp dụng quy tắc "không có nguồn" bên dưới). Quy tắc này đo được bằng thực nghiệm: một lượt
-nghiên cứu không giám sát, sau khi hết 5 nguồn thật, đã **không dừng lại** — tự bịa thêm 35
-lượt fetch vào Reddit, Medium, SSRN, trang chủ thư viện luật, một API đoán mò — tốn 2,17
-triệu token, vụ án sau đó xác nhận không truy cập được ở bất kỳ đâu. Tự đếm trong đầu không
-đủ tin cậy; đây là lý do ngân sách này nằm ở server, không phải ở lời nhắc.
+Response trả về `allowed: true|false`. **`allowed: false` nghĩa là DỪNG NGAY** — viết tiếp
+bằng nguồn báo chí đã có sẵn, không tìm thêm nguồn nào khác cho bản án. Quy tắc này đo được
+bằng thực nghiệm: một lượt nghiên cứu không giám sát, sau khi hết 5 nguồn thật, đã **không
+dừng lại** — tự bịa thêm 35 lượt fetch vào Reddit, Medium, SSRN, trang chủ thư viện luật,
+một API đoán mò, tốn 2,17 triệu token cho một vụ sau đó xác nhận không truy cập được ở bất
+kỳ đâu. Tự đếm trong đầu không đủ tin cậy — bước này giờ tuỳ chọn nhưng ngân sách vẫn nằm ở
+server, không phải ở lời nhắc, phòng khi vẫn thử.
 
-**Không áp dụng cho tìm báo chí/hình ảnh** — chỉ áp dụng cho việc tìm VĂN BẢN BẢN ÁN. Tìm
-báo địa phương, ảnh hồ sơ cảnh sát vẫn tự do như bình thường (§2, §9a).
-
-**Phân biệt nguồn BẮT BUỘC và nguồn LÀM DÀY.** Đây là chỗ dễ từ chối oan một vụ án tốt.
-
-- **BẮT BUỘC, thiếu thì từ chối vụ án:** hồ sơ tư pháp cho biết diễn biến, tội danh, và
-  **kết cục pháp lý cuối cùng**. Bản án bị **tuyên hủy để xử lại** mà không tra được kết quả
-  sau đó thì KHÔNG viết được KỲ III, vì kỳ cuối đòi hỏi phán quyết sau cùng. Ưu tiên vụ có
-  bản án **được giữ nguyên**.
-- **LÀM DÀY, thiếu thì viết ngắn hơn chứ KHÔNG từ chối:** báo địa phương Mỹ và báo tiếng
-  Việt tại Mỹ. Vắng nguồn này thì mất phần không khí hiện trường và phản ứng cộng đồng, bài
-  mỏng hơn và có thể chỉ đủ hai kỳ, nhưng nếu hồ sơ tòa đã dựng được diễn biến và kết cục
-  thì **vẫn viết được**. Vụ án thập niên 1980 và 1990 gần như không còn báo trên mạng; đó là
-  chuyện bình thường, không phải lý do loại bỏ.
-  - Tên đầy đủ của bị cáo thường **đã có sẵn trong tiêu đề vụ kiện của bản án**. Dùng cách
-    viết trong bản án; chỉ cần tới báo tiếng Việt khi bản án không nêu.
+**Không áp dụng cho tìm báo chí/hình ảnh** — chỉ áp dụng cho việc tìm VĂN BẢN BẢN ÁN nếu có
+thử. Tìm báo địa phương, ảnh hồ sơ cảnh sát vẫn tự do như bình thường (§9).
 
 | Nhóm nguồn | Nguồn cụ thể | Dữ liệu khai thác |
 |---|---|---|
@@ -133,12 +143,14 @@ báo địa phương, ảnh hồ sơ cảnh sát vẫn tự do như bình thư�
 | Tác phẩm điều tra | Sách phi hư cấu, báo cáo chuyên án | Diễn biến nghiệp vụ, hồi tưởng của điều tra viên |
 
 - **Mọi DỮ KIỆN phải có trong nguồn:** tên riêng, tuổi, nghề nghiệp, quan hệ, ngày tháng,
-  địa chỉ, con số, tội danh, bản án. Không suy đoán động cơ nếu tòa không kết luận.
+  địa chỉ, con số, tội danh, bản án. Không suy đoán động cơ nếu nguồn không kết luận. Nguồn
+  duy nhất là một bài báo thì dữ kiện vẫn phải khớp đúng bài báo đó — hạ chuẩn về SỐ LƯỢNG
+  nguồn cần, không hạ chuẩn về việc mỗi dữ kiện phải truy được về nguồn.
 - **Phân biệt rõ hai thứ:** *dữ kiện* thì bắt buộc có nguồn; *mô tả bối cảnh* (không gian,
   thời tiết, không khí) được phép dựng lại để đạt độ sâu. Độ dài đến từ vế thứ hai, tuyệt
   đối không đến từ việc bịa thêm vế thứ nhất.
-- **Hồ sơ quá mỏng** (không đủ dữ kiện cho ba kỳ): viết ít kỳ hơn, hoặc từ chối vụ án. Ghi
-  lý do vào `summary`, KHÔNG ghi vào bài.
+- **Hồ sơ quá mỏng** (không đủ dữ kiện cho ba kỳ dù chỉ có báo chí): viết ít kỳ hơn, hoặc từ
+  chối vụ án nếu không đủ cho cả một kỳ. Ghi lý do vào `summary`, KHÔNG ghi vào bài.
 - **Vụ chưa xét xử:** luôn ghi rõ *"đây mới là cáo buộc, chưa có phán quyết của tòa"*.
 
 ## 3. AN TOÀN CHÍNH SÁCH MẠNG XÃ HỘI
@@ -269,10 +281,16 @@ Quy tắc "không chân dung người có thật" ở trên **chỉ áp dụng c
 ảnh dựng ra mà trông như bằng chứng thì chính là bịa đặt). Ảnh tư liệu THẬT lấy từ báo chí
 đi theo §9a, và bắt buộc phải che mặt.
 
-### 9a. Ảnh tư liệu thật của vụ án (che mặt bắt buộc)
+### 9a. Ảnh tư liệu thật của vụ án (TUỲ CHỌN — che mặt bắt buộc nếu dùng)
 
-Trong lúc nghiên cứu, thu thập **tối đa 3 đường dẫn ảnh** từ chính các trang báo đã đọc.
-Sau khi POST bộ bài và nhận `seriesId`, gọi tiếp:
+**Không bắt buộc.** Dùng `image_prompt` (§9) làm ảnh minh hoạ là lựa chọn hợp lệ ngay từ
+đầu, không phải phương án cuối. Bỏ qua toàn bộ bước này không sao. Chỉ thu thập ảnh thật khi
+đang mở đúng trang báo vì lý do khác (đọc dữ kiện, §2) và tiện thấy ảnh phù hợp — đừng chủ
+động tốn thêm lượt tìm kiếm hay mở trang CHỈ để kiếm ảnh, đó là chi phí không cần cho một
+phần không bắt buộc.
+
+Thấy ảnh phù hợp thì thu thập **tối đa 3 đường dẫn ảnh** từ chính các trang báo đã đọc. Sau
+khi POST bộ bài và nhận `seriesId`, gọi tiếp:
 
 `POST /api/crime/images` với
 `{ "seriesId": "...", "images": [{ "url": "...", "credit": "Tên báo", "role": "suspect", "article": "https://..." }] }`
@@ -307,15 +325,21 @@ vì vậy hãy chọn ảnh chân dung, ảnh hồ sơ, ảnh hiện trường v
 **CÁCH LÀM BẮT BUỘC — chạy script, đừng tự dò bằng tay:**
 
 1. Soạn TRỌN payload POST vào một file, ví dụ `/tmp/series.json`.
-2. `python3 deploy/check-series.py /tmp/series.json`
-3. Sửa **đúng những gì script liệt kê**, rồi chạy lại cho tới khi in `OK`.
-4. POST chính file đó lên `/api/crime/series`.
+2. `python3 deploy/fix-series.py /tmp/series.json` — **sửa TỰ ĐỘNG tại chỗ** mọi lỗi máy móc
+   (từ cấm §3a, dấu gạch ngang dài, VIẾT HOA/🩸 tiêu đề, hai dòng đầu thân bài, trường §8a
+   thiếu). In ra đúng những gì đã đổi — đọc lại để chắc các thay thế còn hợp văn cảnh.
+3. `python3 deploy/check-series.py /tmp/series.json`
+4. Sửa **đúng những gì script liệt kê** (giờ chỉ còn thứ cần tự viết lại: độ dài, số kỳ, số
+   comment), rồi chạy lại `check-series.py` cho tới khi in `OK`.
+5. POST chính file đó lên `/api/crime/series`.
 
-Đo được, đây là chỗ tốn token nhất của cả quy trình: một bộ bài tốn khoảng 32.700 token đầu
-ra qua 72 lượt gọi, trong đó 4 lần Write (26.600), 17 lần Edit (11.700) và 38 lần Bash
+Đo được, đây từng là chỗ tốn token nhất của cả quy trình: một bộ bài tốn khoảng 32.700 token
+đầu ra qua 72 lượt gọi, trong đó 4 lần Write (26.600), 17 lần Edit (11.700) và 38 lần Bash
 (9.200) — phần lớn là tự kiểm từng tiêu chí một rồi viết lại cả kỳ để sửa. Nội dung thật chỉ
-khoảng 13.000 token. Script trả về **toàn bộ lỗi trong một lần chạy**, nên chỉ cần một vòng
-sửa.
+khoảng 13.000 token. `fix-series.py` là bước mới thêm để cắt chính phần lãng phí đó: nó xử lý
+mọi thứ máy móc suy ra được thẳng từ bảng quy đổi và từ chính các trường đã có trong payload
+(không cần viết gì mới), để phần cần đến `Edit` thủ công chỉ còn lại thứ thật sự cần tư duy.
+`check-series.py` trả về **toàn bộ lỗi còn lại trong một lần chạy**, nên chỉ cần một vòng sửa.
 
 Script kiểm: số từ từng kỳ, độ dài tiêu đề đại án và tiêu đề kỳ, VIẾT HOA, `🩸`, gạch ngang
 dài, bảng quy đổi §3a (cả tiêu đề), hai dòng đầu thân bài, đủ 3 comment, ghi chú biên tập

@@ -321,7 +321,7 @@ export default function Home() {
         {/* The one element at the display rung on this view — the measured scale
             had nothing above 24px, so no size said "top of the page". The
             breadcrumb above is nav chrome at 14px; this is the page's identity. */}
-        <h2 className="text-display text-foreground">{activePage.name}</h2>
+        <h2 className="text-display font-display text-foreground">{activePage.name}</h2>
 
         {/* Market sub-tabs */}
         <PageTabs
@@ -360,26 +360,26 @@ export default function Home() {
             value={filterKeyword}
             onChange={(e) => setFilterKeyword(e.target.value)}
             placeholder="Search keywords…"
-            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground w-44"
+            className="text-sm px-3 py-2 rounded-lg pen-line-static bg-card text-foreground w-44"
           />
           <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}
-            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground">
+            className="text-sm px-3 py-2 rounded-lg pen-line-static bg-card text-foreground">
             <option value="All">All Sources</option>
             {sources.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <select value={filterTopic} onChange={(e) => setFilterTopic(e.target.value)}
-            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground">
+            className="text-sm px-3 py-2 rounded-lg pen-line-static bg-card text-foreground">
             <option value="All">All Topics</option>
             {TOPICS.filter((t) => (activePage?.enabledTopics ?? TOPICS.map((x) => x.id)).includes(t.id))
               .map((t) => <option key={t.id} value={t.id}>{t.vi}</option>)}
           </select>
           <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)}
-            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground" />
+            className="text-sm px-3 py-2 rounded-lg pen-line-static bg-card text-foreground" />
           <span className="text-xs text-muted-foreground">to</span>
           <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)}
-            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground" />
+            className="text-sm px-3 py-2 rounded-lg pen-line-static bg-card text-foreground" />
           <select value={filterDone} onChange={(e) => setFilterDone(e.target.value)}
-            className="text-sm px-3 py-2 rounded-lg border border-border bg-card text-foreground">
+            className="text-sm px-3 py-2 rounded-lg pen-line-static bg-card text-foreground">
             <option value="all">All Status</option>
             <option value="not_done">Drafts</option>
             <option value="done">Published</option>
@@ -387,7 +387,7 @@ export default function Home() {
           {filterKeyword && (
             <button onClick={() => setFilterKeyword('')} className="text-xs text-muted-foreground hover:text-foreground underline">Clear</button>
           )}
-          <span className="text-xs ml-auto text-muted-foreground">{totalCount} posts</span>
+          <span className="text-xs ml-auto text-muted-foreground"><span className="font-mono">{totalCount}</span> posts</span>
         </div>
 
         {/* Posts */}

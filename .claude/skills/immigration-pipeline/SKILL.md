@@ -46,6 +46,21 @@ else
   echo $$ > data/pipeline.lock                          # took it; release in Step 5
 fi
 ```
+**If `IMM_PIPELINE_LOCK_HELD` is set, do not read `data/pipeline.lock` at all — not its
+PID, not its age, nothing.** That file legitimately belongs to `run-pipeline.sh`, your
+own parent process, and inspecting it "just to double check" is exactly the failure
+mode that has already happened twice: the wrapper's own PID in that file gets mistaken
+for a hostile concurrent run and the whole cycle self-aborts for no reason (missed the
+2026-09-04 06:00 scheduled run this way — nothing was actually stuck, the abort was the
+bug), or a sub-agent mid-run raises a false collision alarm over the same misreading
+(also 2026-09-04, caught and self-corrected that time). The env var alone is the
+complete, sufficient answer; checking further can only produce a wrong one.
+
+**Sub-agents spawned later (Step 3/4 market fanout) never touch `data/pipeline.lock`
+themselves** — the lock is a whole-cycle concern the top-level session already resolved
+in Step 0. A sub-agent that stumbles onto the lock file mid-run and reasons about it
+independently is the second half of the same failure mode above.
+
 **If it says ABORT, stop — do not run the cycle.** A lock older than 30 minutes is a
 crashed run and may be taken over. Use a **per-run scratch path** (e.g.
 `/tmp/imm_pipeline_$$`), never a fixed one, so even a bypassed lock cannot make two

@@ -55,9 +55,13 @@ const COURTS = ['calctapp', 'cal', 'texapp', 'washctapp'];
 // Pages to follow per surname/court. 5 x 20 covers the full result set for every surname
 // tested, without hammering a free API.
 const MAX_PAGES = 5;
-// Only opinions filed from here on. This biases the pool toward recent CRIMES, which is what
-// actually matters: pre-2005 crimes were covered in print that was never digitised, and 10 of
-// the 12 series that found no photograph were pre-2005.
+// Only opinions filed from here on. This biases the pool toward recent CRIMES - not because
+// old crimes are ineligible (CRIME_SOP.md §0a's hard floor is 2000, not a proxy for this),
+// but because pre-2005 crimes were also covered in print that was never digitised, and PRESS
+// is now the primary source bar (§2), not a photo. Leaving this at 2015 under-reaches a
+// little into 2000-2009: an appeal about a crime that old still has to have been FILED
+// recently to surface here. Worth lowering once there's real data on how often that binds,
+// not before.
 //
 // It is a bias, not a guarantee, and cannot be more than that. An appeal is decided years
 // after the offence, so a 2024 opinion is routinely a 1995 shooting - that exact case is in
@@ -89,6 +93,45 @@ const AFFIRMED = /affirm/i;
 // narrates it, so there is no scene, no victim and no investigation to write from. Two of
 // today's six rejections read exactly like this in the snippet, and no good case does.
 const SENTENCE_ONLY = /\bstrike\b.{0,20}prior|prior.{0,20}\bstrike\b|§§?\s*667|1170\.12|667\.5|12022|\benhancements?\b|Penal Code section 654|§\s*654/i;
+// "X v. Y" between two private parties (or a private party and an LLC) is a civil suit -
+// premises-liability, wrongful-death, insurance - that MENTIONS a killing in its facts
+// without anyone being tried for it. The "murder" term in the query matches the facts, not
+// a charge. Every US criminal prosecution has the sovereign as a named party, so its absence
+// is close to definitive. Measured 2026-08-30: 2 of 8 attempts in one batch were civil suits
+// that reached the writer - "Peng Wang... v. TREA Churchill on the Park, LLC" and "Ling
+// Huang v. John Hackbarth" - each caught only after a research-budget spend.
+const CRIMINAL_PARTY = /\b(People|State|Commonwealth|United States)\b/i;
+// A writ proceeding, not a trial record - same shape as PROCEDURAL above, but the snippet
+// doesn't always say "habeas" even when the caption does. Measured 2026-08-30: "Ex Parte
+// Hiep Duc Ngo" reached the writer and cost two research-budget attempts on a case with no
+// crime narrative to find in the first place.
+const EX_PARTE = /^ex parte\b/i;
+
+/**
+ * Cheap, code-only existence check: does ANY news coverage turn up for this name at
+ * all? Not a confirmation of relevance or accuracy - just whether the writer would
+ * find zero press the moment it starts researching. Only applied to court-sweep
+ * candidates: DA-sourced ones already carry the DA's own release as a real source,
+ * satisfying CRIME_SOP.md §2 regardless of what else does or doesn't turn up.
+ *
+ * Soft signal only, never a hard filter (see press_hint's schema comment in lake.ts
+ * for the measured cause and the immigration keyword-prefilter NO-GO precedent this
+ * is deliberately softer than): a single query can miss coverage indexed under a
+ * different name, so a zero-hit case is still queued - just claimed last.
+ */
+async function hasPressHint(name: string): Promise<boolean> {
+  if (!name) return true; // nothing to search - don't penalize on missing data
+  try {
+    const res = await fetch(
+      `https://news.google.com/rss/search?q=${encodeURIComponent(`"${name}"`)}&hl=en&gl=US&ceid=US:en`,
+      { headers: { 'User-Agent': 'auto-social-posting/1.0' }, signal: AbortSignal.timeout(8_000) },
+    );
+    if (!res.ok) return true; // fetch trouble - don't penalize, just skip the check
+    return /<item>/i.test(await res.text());
+  } catch {
+    return true; // network hiccup - don't penalize
+  }
+}
 
 /**
  * One crime can appear in the archive several times over: the direct appeal, an order
@@ -121,17 +164,18 @@ function caseKeys(text: string, docket?: string): string[] {
  * Prosecutor press rooms, as a second way in.
  *
  * CourtListener only holds appellate opinions, and an appeal is decided years after the
- * offence - so every case it surfaces skews old, and pre-2005 crimes were reported in print
- * that was never digitised. Measured on the first backfill: 10 of the 12 series that found no
- * photograph were pre-2005 crimes.
+ * offence - so every case it surfaces skews old. Recency here isn't chasing a photo anymore
+ * (real-photo sourcing is optional now, §9a) - it's chasing PRESS: pre-2005 crimes were also
+ * covered in print that was never digitised, and a case with zero digitised coverage often
+ * has no accessible source at all under §2's "at least one real source" bar.
  *
  * A conviction or sentencing release names a RECENT crime that already has a final outcome,
- * which is the combination §2 needs for KỲ III and the image search needs for coverage.
+ * which is the combination §2 needs for KỲ III.
  *
  * The release itself carries no usable photograph - every image on a checked LA County DA
- * conviction release was a logo or a social icon. It is a lead: it gives the name, county and
- * charge, and recent cases are covered by outlets that are still online, which is where the
- * booking photo lives.
+ * conviction release was a logo or a social icon, and that no longer matters. It is a lead:
+ * it gives the name, county and charge, and recent cases are covered by outlets that are
+ * still online, which is where the real reporting - the thing §2 actually needs - lives.
  *
  * Only offices that answer a plain server-side fetch are listed. Orange County, Alameda and
  * Santa Clara all sit behind bot protection that returns 403 to any headers, so scraping them
@@ -279,7 +323,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // 'both' by default: prosecutor releases supply recent, photographable cases, the courts
     // supply volume. Neither alone fills a daily batch.
     const source = (body.source ?? 'both') as 'courts' | 'da' | 'both';
-    const minYear = Number(body.minYear ?? process.env.CRIME_MIN_CRIME_YEAR ?? 2010);
+    const minYear = Number(body.minYear ?? process.env.CRIME_MIN_CRIME_YEAR ?? 2000);
 
     // Dedup against everything already queued, written or rejected, so a repeat run does
     // not re-add a case that was already judged unusable.
@@ -289,7 +333,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // notes, where the sweep already records the docket and the caption line.
     const seenCases = new Set(existing.flatMap((c) => caseKeys(`${c.notes ?? ''} ${c.title ?? ''}`)));
 
-    const found: { title: string; url: string; court: string; date: string; notes: string }[] = [];
+    const found: { title: string; url: string; court: string; date: string; notes: string; pressHint?: boolean }[] = [];
     const daBlocked: string[] = [];
 
     // Prosecutor releases first: they are the recent, photographable cases, so they should
@@ -347,6 +391,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             // "In re X" is habeas or juvenile: a review of a prior proceeding, never a
             // trial record. Belt-and-braces on top of the query.
             if (/^in re\b/i.test(title)) continue;
+            if (EX_PARTE.test(title)) continue;
+            if (title && !CRIMINAL_PARTY.test(title)) continue;
             const link = r.absolute_url ? `https://www.courtlistener.com${r.absolute_url}` : '';
             if (!title || !link || seen.has(link) || seen.has(title)) continue;
             // Same prosecution under a different document? Skip before spending a research
@@ -374,6 +420,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               court,
               date: r.dateFiled ?? '',
               notes: bits.join(' · ') || 'Chưa đọc được trích yếu, cần mở bản án để xác minh.',
+              pressHint: await hasPressHint(meta.defendant ?? title),
             });
           }
           }
@@ -389,6 +436,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         title: `${f.title}${f.date ? ` (${f.date.slice(0, 4)})` : ''}`,
         source_url: f.url,
         notes: f.notes,
+        // undefined (DA-sourced - never checked) defaults to 1, same as "hit found".
+        press_hint: f.pressHint === false ? 0 : 1,
       });
     }
 

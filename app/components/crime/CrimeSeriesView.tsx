@@ -333,7 +333,7 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
   return (
     <div className="flex flex-col gap-5 max-w-4xl">
       <div>
-        <h2 className="text-display text-foreground">Kỳ án hình sự</h2>
+        <h2 className="text-display font-display text-foreground">Kỳ án hình sự</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Phóng sự tư liệu 3 kỳ. Mỗi vụ án được nghiên cứu từ hồ sơ tòa án và báo chí, không
           lấy từ RSS — chạy skill <code className="text-xs">crime-series</code> với link hoặc
@@ -439,7 +439,7 @@ export default function CrimeSeriesView({ pageId }: { pageId: string }) {
               )}
               <div className="flex items-start justify-between gap-3">
                 <h3 className="text-base font-semibold text-foreground flex-1">{s.seriesTitle}</h3>
-                <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+                <span className="font-mono text-xs text-muted-foreground whitespace-nowrap tabular-nums">
                   {/* Rendered in the viewer's timezone, same boundary the filter uses — a
                       series the filter puts on the 27th must not read as the 26th here. */}
                   {new Date(s.generatedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}

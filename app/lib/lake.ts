@@ -138,10 +138,23 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
       -- had to backstop with code once (check-series.py, for the SOP's own word-count and
       -- wording rules) - so this is a hard counter the API itself enforces.
       research_attempts INTEGER DEFAULT 0,
+      -- Soft ordering signal, not a filter: 1 (default) means either press coverage was
+      -- found for this name at discovery time, or it was never checked (DA-sourced cases
+      -- already carry the DA's own release as a source, so they're never checked). 0 means
+      -- a discovery-time search came back completely empty. Measured cause: three cases in
+      -- one batch (Dang Duy Truong, Ex Parte Hiep Duc Ngo, Thanh Kim Hoang) got claimed,
+      -- researched and rejected specifically because no coverage existed anywhere - each
+      -- cost real research-budget attempts and minutes to discover that by hand. A single
+      -- discovery-time query can still miss coverage indexed under a different name, so
+      -- this only reorders the queue (claim press_hint=1 first) rather than dropping
+      -- press_hint=0 cases - the immigration pipeline's own keyword relevance pre-filter
+      -- was tried as a hard filter and measured a NO-GO, so this is deliberately softer.
+      press_hint  INTEGER DEFAULT 1,
       created_at  TEXT,
       updated_at  TEXT
     );
     ALTER TABLE crime_cases ADD COLUMN IF NOT EXISTS research_attempts INTEGER DEFAULT 0;
+    ALTER TABLE crime_cases ADD COLUMN IF NOT EXISTS press_hint INTEGER DEFAULT 1;
     ALTER TABLE bronze_news        ADD COLUMN IF NOT EXISTS image_urls TEXT;
     ALTER TABLE silver_immigration ADD COLUMN IF NOT EXISTS image_urls TEXT;
     ALTER TABLE gold_content       ADD COLUMN IF NOT EXISTS image_urls TEXT;
@@ -150,6 +163,13 @@ async function initSchema(conn: DuckDBConnection): Promise<void> {
     -- regardless of how many topics it carries. category stays = topics[0] for back-compat.
     ALTER TABLE silver_immigration ADD COLUMN IF NOT EXISTS topics TEXT;
     ALTER TABLE gold_content       ADD COLUMN IF NOT EXISTS topics TEXT;
+    -- Video Gen + the Facebook-draft editor both used to live in React state only —
+    -- a refresh (or the server restarting mid-render) silently threw away a finished
+    -- reel and any manual text edit. video_url/narration are written when a render
+    -- job completes (see videoJobs.ts); fb_draft when the draft box is saved.
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS video_url TEXT;
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS narration TEXT;
+    ALTER TABLE gold_content ADD COLUMN IF NOT EXISTS fb_draft TEXT;
 
     CREATE TABLE IF NOT EXISTS audit_runs (
       id           TEXT PRIMARY KEY,
@@ -259,12 +279,50 @@ export async function getBronze(
   status: 'unclassified' | 'all' = 'unclassified',
   limit = 100,
 ): Promise<Record<string, any>[]> {
-  const where = status === 'unclassified' ? 'AND classified = false' : '';
+  if (status === 'all') {
+    return all(
+      `SELECT id, market_id, source_name, article_url, title, description, location, pub_date
+         FROM bronze_news WHERE market_id = ?
+         ORDER BY fetched_at DESC LIMIT ?`,
+      [marketId, limit],
+    );
+  }
+  // Source-level trust weighting for the classify queue specifically (not the 'all'
+  // display path - a human browsing bronze expects recency order, not this).
+  //
+  // Keyword-based relevance filtering was measured and killed for this pipeline
+  // (see keyword-prefilter-learning-plan.md): the taxonomy is too broad for a literal
+  // vocabulary. What that same research found DID predict relevance was the SOURCE -
+  // e.g. CIC News is ~100% immigration-relevant, others are far noisier - but source
+  // weighting was never built. This is that: within the per-cycle classify LIMIT, a
+  // source with a strong recent silver-conversion rate gets classified ahead of one
+  // that rarely converts, so classify tokens go where they're likelier to land. Not a
+  // filter - every source still gets classified eventually, just not always first.
+  //
+  // Laplace-smoothed ((+1)/(+2)) so a source with only 1-2 observations doesn't read
+  // as a confident 0% or 100% - same reasoning as press_hint's soft, not hard, signal.
+  // Sources with zero bronze history in the window default to 1.0 (unproven, not
+  // penalized) rather than being buried behind established ones on day one.
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   return all(
-    `SELECT id, market_id, source_name, article_url, title, description, location, pub_date
-       FROM bronze_news WHERE market_id = ? ${where}
-       ORDER BY fetched_at DESC LIMIT ?`,
-    [marketId, limit],
+    `WITH bronze_counts AS (
+       SELECT source_name, COUNT(*) AS n
+       FROM bronze_news WHERE market_id = ? AND classified = true AND fetched_at >= ?
+       GROUP BY source_name
+     ), silver_counts AS (
+       SELECT source_name, COUNT(*) AS n
+       FROM silver_immigration WHERE market_id = ? AND classified_at >= ?
+       GROUP BY source_name
+     ), rates AS (
+       SELECT bc.source_name, (COALESCE(sc.n, 0) + 1.0) / (bc.n + 2.0) AS rate
+       FROM bronze_counts bc LEFT JOIN silver_counts sc ON sc.source_name = bc.source_name
+     )
+     SELECT b.id, b.market_id, b.source_name, b.article_url, b.title, b.description, b.location, b.pub_date
+     FROM bronze_news b LEFT JOIN rates r ON r.source_name = b.source_name
+     WHERE b.market_id = ? AND b.classified = false
+     ORDER BY COALESCE(r.rate, 1.0) DESC, b.fetched_at DESC
+     LIMIT ?`,
+    [marketId, cutoff, marketId, cutoff, marketId, limit],
   );
 }
 
@@ -569,11 +627,24 @@ export async function setGoldImages(id: string, imageUrl: string, insetUrl: stri
   return true;
 }
 
+/**
+ * Persist a finished reel onto its post — called once by videoJobs.ts when the
+ * ffmpeg child process exits 0, so the render survives a page refresh (or the
+ * server restarting mid-job) instead of only living in React state.
+ */
+export async function setGoldVideo(id: string, videoUrl: string, narration: string): Promise<boolean> {
+  await run(
+    'UPDATE gold_content SET video_url = ?, narration = ? WHERE id = ?',
+    [videoUrl, narration, id],
+  );
+  return true;
+}
+
 /** Text fields of a published post that may be corrected in place. */
 const EDITABLE_GOLD_FIELDS = [
   'emoji_title', 'body_text', 'summary', 'hook', 'hashtags',
   'comment_1', 'comment_2', 'comment_3', 'series_title', 'image_prompt',
-  'victim_name', 'suspect_name', 'state_name',
+  'victim_name', 'suspect_name', 'state_name', 'fb_draft',
 ] as const;
 export type EditableGoldField = (typeof EDITABLE_GOLD_FIELDS)[number];
 
@@ -796,7 +867,7 @@ export async function deleteGold(ids: string[]): Promise<number> {
 export interface CrimeCase {
   id: string; market_id: string; title: string; source_url?: string;
   notes?: string; status: string; series_id?: string; research_attempts?: number;
-  created_at?: string; updated_at?: string;
+  press_hint?: number; created_at?: string; updated_at?: string;
 }
 
 /**
@@ -811,12 +882,12 @@ export async function spendResearchAttempt(id: string, max: number): Promise<{ a
   return { attempts, allowed: attempts <= max };
 }
 
-export async function addCrimeCase(r: { market_id: string; title: string; source_url?: string; notes?: string }): Promise<string> {
+export async function addCrimeCase(r: { market_id: string; title: string; source_url?: string; notes?: string; press_hint?: number }): Promise<string> {
   const id = randomUUID(); const ts = nowIso();
   await run(
-    `INSERT INTO crime_cases (id, market_id, title, source_url, notes, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)`,
-    [id, r.market_id, r.title, r.source_url ?? '', r.notes ?? '', ts, ts],
+    `INSERT INTO crime_cases (id, market_id, title, source_url, notes, press_hint, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?)`,
+    [id, r.market_id, r.title, r.source_url ?? '', r.notes ?? '', r.press_hint ?? 1, ts, ts],
   );
   return id;
 }
