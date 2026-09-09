@@ -23,9 +23,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const text = body?.text;
     const style = body?.style;
-    // brief's "Produces" line names this `plateUrl`; its own Step 1 sample code
-    // reads `plate` instead. Accept either so a mismatched caller still works.
-    const plate = body?.plateUrl ?? body?.plate ?? null;
+    // `plate` is the name, settled: it is the key make-reel.py's config reads and the
+    // one the drawer sends. (The plan says `plateUrl` in a prose line and `plate` in its
+    // own code — one name, not two, or every future caller has to guess.)
+    const plate = body?.plate ?? null;
 
     dir = mkdtempSync(join(tmpdir(), 'reel-prev-'));
     const cfg = join(dir, 'cfg.json');
@@ -37,13 +38,20 @@ export async function POST(req: NextRequest) {
         cwd: ROOT,
         env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH ?? ''}` },
       });
+      // Capture stderr for the error body — an exit code alone makes a failed preview
+      // undiagnosable — and reading both pipes keeps a chatty child from stalling on a
+      // full one, the same way videoJobs.ts drains its stdout.
+      let err = '';
+      child.stderr.on('data', (d) => { err += d.toString(); });
+      child.stdout.resume();
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
         resolve({ ok: false, reason: 'preview timed out' });
       }, TIMEOUT_MS);
       child.on('close', (code) => {
         clearTimeout(timer);
-        resolve(code === 0 ? { ok: true } : { ok: false, reason: `preview failed (exit ${code})` });
+        resolve(code === 0 ? { ok: true }
+                           : { ok: false, reason: `preview failed (exit ${code}): ${err.trim().slice(-300)}` });
       });
       child.on('error', (err) => {
         clearTimeout(timer);
