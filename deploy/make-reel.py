@@ -324,11 +324,30 @@ def resolve_plate(plate):
         return None
     if not plate.startswith(("http://", "https://")):
         return plate if os.path.exists(plate) else None
-    os.makedirs(PLATE_CACHE, exist_ok=True)
+    try:
+        os.makedirs(PLATE_CACHE, exist_ok=True)
+    except OSError:
+        return None                    # unwritable cache dir -> neutral plate, never a crash
     dst = os.path.join(PLATE_CACHE, hashlib.sha1(plate.encode("utf-8")).hexdigest() + ".img")
     if os.path.exists(dst) and os.path.getsize(dst) > 1000:
         return dst
-    return dst if fetch_image(plate, dst) else None
+    # Download to a per-process temp name, prove it actually decodes as an image, and only
+    # then publish it under the cache name. Two guarantees, both learned on this branch:
+    # a hotlink-blocked host answering 200 with an HTML body would otherwise be cached as a
+    # "plate" forever (size alone can't tell them apart), and two concurrent previews of the
+    # same URL would otherwise interleave their writes into one spliced file.
+    part = f"{dst}.{os.getpid()}.part"
+    try:
+        if not fetch_image(plate, part):
+            return None
+        Image.open(part).verify()
+        os.replace(part, dst)
+        return dst
+    except Exception:
+        return None
+    finally:
+        if os.path.exists(part):
+            os.remove(part)
 
 def preview_frame(text, st, plate_path, out_png):
     """One full-frame PNG showing the caption band as the video will draw it. Uses the
