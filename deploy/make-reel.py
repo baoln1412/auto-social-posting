@@ -418,6 +418,14 @@ def slideshow_risk(bg_items, dur, per=10.0):
     return None
 
 
+def media_is_fatal(requested, fetched):
+    """True when every requested source failed to fetch. A post that requested NO media is
+    fine - captions over a plain background is a legitimate reel. A post whose only photo
+    404'd is not: it renders as a blank navy frame, exits 0, and looks like a success. Two
+    of the twelve most recent reels on this machine shipped exactly that way."""
+    return bool(requested) and not fetched
+
+
 def get_media(post):
     """Ordered [{"url","kind"}] for the slideshow. New (--json) callers send
     `media`; the old marketId/index path only ever had a single article.imageUrl."""
@@ -517,6 +525,13 @@ def prepare(post, work_dir):
         p = os.path.join(work_dir, f"bg{i}.{'mp4' if is_video else 'jpg'}")
         if (fetch_video(m["url"], p) if is_video else fetch_image(m["url"], p)):
             items.append({"path": os.path.basename(p), "kind": m["kind"]})
+    if media_is_fatal(media, items):
+        step("media", "failed")
+        print(f"  media: all {len(media)} source(s) failed to fetch — refusing to render a "
+              f"reel with no background. First url: {media[0]['url'][:120]}")
+        return None
+    if len(items) < len(media):
+        print(f"  media: {len(media) - len(items)} of {len(media)} failed, continuing with {len(items)}")
     step("media", "done")
 
     proj = {"key": project_key(post), "narration": nar, "audio": "v.mp3",
@@ -736,6 +751,14 @@ def demo():
     assert take_opt(["x", "m", "3"], "--style") == (["x", "m", "3"], None)
     assert take_opt(["x", "--style", "{}", "m", "3"], "--style") == (["x", "m", "3"], "{}")
     assert take_opt(["x", "m", "3", "--style", "{}"], "--style") == (["x", "m", "3"], "{}")
+
+    # A reel with no background must be an ERROR, not a silent success - but only when
+    # media was actually asked for.
+    one = [{"url": "u", "kind": "image"}]
+    assert media_is_fatal(one, []) is True            # the only photo 404'd -> refuse
+    assert media_is_fatal(one, one) is False          # fetched fine
+    assert media_is_fatal(one * 3, one) is False      # partial -> render with what arrived
+    assert media_is_fatal([], []) is False            # nothing requested -> legitimate
 
     # --- caption style ---------------------------------------------------------
     st = caption_style.resolve(None)
