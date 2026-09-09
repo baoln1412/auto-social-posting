@@ -22,7 +22,7 @@ DEFAULTS = {
     "outline": {"color": "#000000", "w": 7},
     "shadow": {"dx": 0, "dy": 0, "color": "#000000B3"},     # dy 0 == shadow off
     "highlight": {"mode": "word", "color": "#FFDD00", "bg": None},  # word | block | none
-    "pos": 780 / 1920,                                      # fraction of frame height
+    "pos": 855 / 1920,                                      # centre of the historical 150px band (780 + 150/2)
     "wordsPerCue": 5,
     "maxLines": 2,
 }
@@ -94,8 +94,11 @@ def band_height(st):
     return int(line_height(st) * st["maxLines"] + st["size"] * 0.5)
 
 def cap_y(st, frame_h):
-    """Top edge of the band, kept fully inside the frame."""
-    return max(0, min(int(st["pos"] * frame_h), frame_h - band_height(st)))
+    """Top edge of the band, derived from `pos` as the band's CENTRE line and kept fully
+    inside the frame. Centre rather than top edge so captions hold their position when the
+    font size changes - a taller band grows symmetrically instead of pushing text down."""
+    top = int(st["pos"] * frame_h - band_height(st) / 2)
+    return max(0, min(top, frame_h - band_height(st)))
 
 def font_path(name):
     p = os.path.join(FONT_DIR, f"{name}.ttf")
@@ -107,9 +110,15 @@ def demo():
     assert s["outline"] == {"color": "#000000", "w": 7}, s
     assert s["highlight"]["color"] == "#FFDD00", s
     assert s["wordsPerCue"] == 5, s
-    # The default MUST reproduce today's CAP_Y=780 on a 1920-tall frame, or every
-    # existing reel moves. This is the regression guard for "101 Classic".
-    assert cap_y(s, 1920) == 780, cap_y(s, 1920)
+    # The regression guard for "101 Classic": text must land where it always has.
+    # Historical layout was a fixed 150px band at y=780, so a one-line cue started at
+    # 780 + (150-78)//2 = 816 and a two-line cue at 777. The band is taller now (it has
+    # to be - 150px clipped two lines), so `pos` anchors its CENTRE to keep those same
+    # on-screen positions.
+    assert cap_y(s, 1920) == 761, cap_y(s, 1920)
+    lh, bh, cy = line_height(s), band_height(s), cap_y(s, 1920)
+    assert cy + (bh - lh * 1) // 2 == 816, "one-line cue moved"
+    assert cy + (bh - lh * 2) // 2 == 777, "two-line cue moved"
 
     # preset applies
     d = resolve({"preset": "dam"})
