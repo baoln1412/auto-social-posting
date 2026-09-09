@@ -33,7 +33,7 @@ source decided first (which track/sound, and is it actually royalty-free), not j
 yellow keyword highlight this comment used to list here shipped a while back (title_segments()
 + render_title()) and this note just never got updated. Core proven, $0 local.
 """
-import sys, os, re, json, asyncio, subprocess, tempfile, urllib.request, difflib, unicodedata, shutil
+import sys, os, re, json, asyncio, subprocess, array, urllib.request, difflib, unicodedata, shutil
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -330,6 +330,27 @@ def video_duration(path):
     except Exception:
         return 0.0
 
+def audio_peaks(mp3, buckets=400):
+    """Coarse waveform envelope, 0..1 per bucket. Nothing in S0-S2 draws this - the
+    timeline (S3) does. It is computed HERE anyway because the audio only exists during
+    prepare: adding it later would mean re-running TTS on every project just to get a
+    picture of a waveform. ffmpeg is already a hard dependency, so this costs one extra
+    decode of a file that is at most a minute long."""
+    try:
+        raw = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", mp3, "-ac", "1", "-ar", "8000", "-f", "s16le", "-"],
+            capture_output=True).stdout
+        a = array.array("h")
+        a.frombytes(raw[:len(raw) - len(raw) % 2])
+        if not a:
+            return []
+        n = max(1, len(a) // buckets)
+        return [min(1.0, max(abs(v) for v in a[i:i + n]) / 32768.0)
+                for i in range(0, len(a), n)][:buckets]
+    except Exception:
+        return []                      # a missing waveform must never fail a render
+
+
 def slideshow_risk(bg_items, dur, per=10.0):
     """Warn when the reel is really a slideshow. A Ken Burns pan over one or two stills stretched
     across a minute is the exact failure mode OpenMontage flags, and it is what this pipeline
@@ -352,50 +373,90 @@ def get_media(post):
     single = post.get("article", {}).get("imageUrl")
     return [{"url": single, "kind": "image"}] if single else []
 
+import hashlib
+
+def project_key(post):
+    """Identity of the EXPENSIVE work (voice + alignment + fetched media), so a project
+    can be reused. Style is excluded on purpose: restyling is exactly the case that must
+    not pay for TTS and whisper again."""
+    parts = [(post.get("narration") or "").strip()]
+    for m in (post.get("media") or []):
+        parts.append(f"{m.get('kind')}:{m.get('url')}")
+    if not post.get("media"):
+        parts.append(str((post.get("article") or {}).get("imageUrl") or ""))
+    return hashlib.sha1("\x1f".join(parts).encode("utf-8")).hexdigest()
+
 def take_flag(argv, name):
     """Pull a bare flag out of argv wherever it sits, so the positional args keep their places."""
     rest = [a for a in argv if a != name]
     return rest, len(rest) != len(argv)
 
 
-def build_content(tmp, post, content, validate_to=None, include_layout=True, st=None):
-    mp3 = os.path.join(tmp, "v.mp3")
-    if post.get("narration"):  # approved script from the web UI overrides the auto-lead
+def prepare(post, work_dir):
+    """Expensive, style-independent half: voice, word timings, media on disk, waveform.
+    Returns the project dict and writes it to work_dir/project.json."""
+    os.makedirs(work_dir, exist_ok=True)
+    proj_path = os.path.join(work_dir, "project.json")
+    if os.path.exists(proj_path):
+        with open(proj_path, encoding="utf-8") as f:
+            proj = json.load(f)
+        if proj.get("key") == project_key(post):
+            print("  project cache hit — skipping tts + alignment")
+            for name in ("tts", "align", "media"):
+                step(name, "done")
+            return proj
+
+    mp3 = os.path.join(work_dir, "v.mp3")
+    if post.get("narration"):
         nar = clean(" ".join(ln.strip() for ln in post["narration"].splitlines() if ln.strip()))[:4000]
     else:
         nar = narration(post)
     step("tts")
     dur, hook_end = asyncio.run(tts(nar, mp3))
     if dur <= 0:
-        step("tts", "failed")
         return None
     step("tts", "done")
-    st = caption_style.resolve(st if isinstance(st, dict) else None)
-    step("align")
-    cues = align_cues(nar, whisper_words(mp3), dur, size=st["wordsPerCue"])   # voice-accurate word timing
-    step("align", "done")
-    print(f"  voice: {dur:.1f}s, {len(cues)} cues, hook_end {hook_end:.1f}s")
 
-    # ponytail: direction gate. Voice + wording decide whether the reel is right, and both exist
-    # by this line — everything after it (media fetch over the network, Ken Burns per image, the
-    # caption track, three concats) is the expensive part. Hear it first, re-run without the flag.
-    if validate_to:
-        shutil.copy(mp3, validate_to)
-        print(f"\n  VALIDATE — narration ({len(nar)} chars):\n{nar}\n\n  audio: {validate_to}"
-              f"\n  Looks right? Re-run the same command without --validate to render.")
-        return None
+    step("align")
+    ww = whisper_words(mp3)
+    step("align", "done")
 
     step("media")
-    bg_items = []
     media = get_media(post)
+    items = []
     for i, m in enumerate(media):
         step("media", f"{i + 1}/{len(media)}")
         is_video = m["kind"] == "video"
-        p = os.path.join(tmp, f"bg{i}.{'mp4' if is_video else 'jpg'}")
-        ok = fetch_video(m["url"], p) if is_video else fetch_image(m["url"], p)
-        if ok:
-            bg_items.append({"path": p, "kind": m["kind"]})
+        p = os.path.join(work_dir, f"bg{i}.{'mp4' if is_video else 'jpg'}")
+        if (fetch_video(m["url"], p) if is_video else fetch_image(m["url"], p)):
+            items.append({"path": os.path.basename(p), "kind": m["kind"]})
     step("media", "done")
+
+    proj = {"key": project_key(post), "narration": nar, "audio": "v.mp3",
+            "dur": dur, "hookEnd": hook_end,
+            "words": [[w, s, e] for s, e, w in ww],
+            "media": items,
+            "peaks": audio_peaks(mp3),
+            "emojiTitle": post.get("emojiTitle", "")}
+    with open(proj_path, "w", encoding="utf-8") as f:
+        json.dump(proj, f, ensure_ascii=False)
+    return proj
+
+
+def render_from_project(proj, work_dir, out, st, include_layout=True):
+    """Cheap, style-dependent half. Everything expensive already happened in prepare();
+    this reads its output and composites. Returns (dur, hook_end) or None."""
+    st = caption_style.resolve(st)
+    dur, hook_end = proj["dur"], proj["hookEnd"]
+    mp3 = os.path.join(work_dir, proj["audio"])
+    # Cues are rebuilt here, not cached: wordsPerCue is a STYLE knob, so the chunking has
+    # to be redone whenever the style changes - while the word timings underneath it, the
+    # part that cost a whisper pass, are reused as-is.
+    ww = [(s, e, w) for w, s, e in proj["words"]]
+    cues = align_cues(proj["narration"], ww, dur, size=st["wordsPerCue"])
+    bg_items = [{"path": os.path.join(work_dir, m["path"]), "kind": m["kind"]}
+                for m in proj["media"]]
+    post = {"emojiTitle": proj.get("emojiTitle", "")}     # only the title overlay needs it
     n_bg = max(1, len(bg_items))  # background segments: one per media item, or 1 solid-color fallback
     target = dur / n_bg
     # A video clip shorter than its equal time-share can't fill it — trim can't pad,
@@ -414,10 +475,10 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
         print("  ⚠ " + risk)
 
     if include_layout:
-        title_png = os.path.join(tmp, "title.png")
+        title_png = os.path.join(work_dir, "title.png")
         th = render_title(title_png, title_segments(post.get("emojiTitle", "")), 50, TITLE_W, 4)
     step("captions")
-    caps_mov = os.path.join(tmp, "caps.mov")
+    caps_mov = os.path.join(work_dir, "caps.mov")
     if not render_caption_track(caps_mov, cues, dur, st):
         step("captions", "failed")
         return None
@@ -485,7 +546,7 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
 
     cmd = ["ffmpeg", "-y", *inputs, "-filter_complex", fc, "-map", f"[{out_label}]", "-map", f"{audio_idx}:a",
            "-t", f"{dur:.2f}", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
-           "-ar", "44100", "-ac", "2", "-r", "30", "-shortest", content]
+           "-ar", "44100", "-ac", "2", "-r", "30", "-shortest", out]
     step("compose")
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
@@ -493,6 +554,20 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
         print(r.stderr[-1800:]); return None
     step("compose", "done")
     return dur, hook_end
+
+
+def build_content(tmp, post, content, validate_to=None, include_layout=True, st=None):
+    """Back-compat shim: prepare + render in one call, which is what `--json in out` and
+    every current caller expect."""
+    proj = prepare(post, tmp)
+    if not proj:
+        return None
+    if validate_to:
+        shutil.copy(os.path.join(tmp, proj["audio"]), validate_to)
+        print(f"\n  VALIDATE — narration ({len(proj['narration'])} chars):\n{proj['narration']}"
+              f"\n\n  audio: {validate_to}\n  Looks right? Re-run without --validate to render.")
+        return None
+    return render_from_project(proj, tmp, content, st, include_layout)
 
 def splice_intro(content, dur, hook_end, out):
     he = max(1.0, min(hook_end, dur - 1.0))
@@ -581,6 +656,17 @@ def demo():
     assert fmt_step("intro", "skipped") == "::step:intro:skipped"
     assert fmt_step("captions", "failed") == "::step:captions:failed"
 
+    # --- project cache key -----------------------------------------------------
+    a = {"narration": "xin chào", "media": [{"url": "u1", "kind": "image"}]}
+    b = {"narration": "xin chào", "media": [{"url": "u1", "kind": "image"}]}
+    c = {"narration": "khác",     "media": [{"url": "u1", "kind": "image"}]}
+    d = {"narration": "xin chào", "media": [{"url": "u2", "kind": "image"}]}
+    assert project_key(a) == project_key(b), "same inputs must reuse the cached project"
+    assert project_key(a) != project_key(c), "a script change must invalidate the cache"
+    assert project_key(a) != project_key(d), "a media change must invalidate the cache"
+    # style is deliberately NOT part of the key - restyling must reuse TTS and whisper
+    assert project_key({**a, "style": {"preset": "dam"}}) == project_key(a)
+
     print("make-reel.py self-check ok")
 
 
@@ -588,6 +674,8 @@ def main():
     sys.argv[:], validate = take_flag(sys.argv, "--validate")
     sys.argv[:], no_intro = take_flag(sys.argv, "--no-intro")
     sys.argv[:], no_layout = take_flag(sys.argv, "--no-layout")
+    sys.argv[:], only_prepare = take_flag(sys.argv, "--prepare")
+    sys.argv[:], only_render = take_flag(sys.argv, "--render")
     if sys.argv[1] == "--demo":
         demo(); return
     if sys.argv[1] == "--json":
@@ -600,12 +688,30 @@ def main():
         post = posts[index]
     print("Post:", post.get("emojiTitle", "")[:60])
 
-    tmp = tempfile.mkdtemp()
+    # Keyed by inputs, not random per run - so two posts with identical narration + media
+    # share one prepare, and a second render of the SAME post (a restyle) hits the cache.
+    tmp = os.path.join(ROOT, "data", "reels", "work", project_key(post))
     content = os.path.join(tmp, "content.mp4")
-    res = build_content(tmp, post, content, validate_to=(out + ".mp3") if validate else None,
-                         include_layout=not no_layout)
-    if validate:
+
+    if only_prepare:
+        proj = prepare(post, tmp)
+        if not proj:
+            print("prepare failed"); sys.exit(1)
+        print("PREPARED:", tmp)
         return
+
+    if only_render:
+        proj_path = os.path.join(tmp, "project.json")
+        if not os.path.exists(proj_path):
+            print("no prepared project at", tmp, "- run --prepare first"); sys.exit(1)
+        with open(proj_path, encoding="utf-8") as f:
+            proj = json.load(f)
+        res = render_from_project(proj, tmp, content, None, include_layout=not no_layout)
+    else:
+        res = build_content(tmp, post, content, validate_to=(out + ".mp3") if validate else None,
+                             include_layout=not no_layout)
+        if validate:
+            return
     if not res:
         print("content build failed"); sys.exit(1)
     dur, hook_end = res
