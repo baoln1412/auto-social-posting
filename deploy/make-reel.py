@@ -53,6 +53,15 @@ WHITE, YELLOW = (255, 255, 255, 255), (255, 221, 0, 255)
 CAP_BASE, CAP_ACTIVE = WHITE, YELLOW   # captions read white, the word being spoken flips to brand yellow
 EMOJI = re.compile("[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF\U0000FE0F]")
 
+# Progress markers. The web UI reads these off stdout (app/lib/videoJobs.ts) to show which
+# stage is running; anything else printed here is human-facing noise and is ignored by it.
+# Keep the format exact - it is a contract with the parser on the other side.
+def fmt_step(name, state="start"):
+    return f"::step:{name}:{state}"
+
+def step(name, state="start"):
+    print(fmt_step(name, state), flush=True)
+
 def clean(s):
     s = EMOJI.sub("", s or ""); s = re.sub(r"#\S+", "", s); s = re.sub(r"[*_#>]", "", s)
     return re.sub(r"[ \t]+", " ", s).strip()
@@ -237,7 +246,12 @@ def render_caption_track(path, cues, dur, st, fps=30):
         ["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgba",
          "-s", f"{W}x{cap_h}", "-r", str(fps), "-i", "-", "-c:v", "qtrle", path],
         stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    last_pct = -5
     for f in range(n):
+        pct = int(f * 100 / n)
+        if pct >= last_pct + 5:
+            step("captions", f"{pct}%")
+            last_pct = pct
         key = active_word(cues, f / fps)
         if key is None:
             p.stdin.write(blank)
@@ -350,11 +364,15 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
         nar = clean(" ".join(ln.strip() for ln in post["narration"].splitlines() if ln.strip()))[:4000]
     else:
         nar = narration(post)
+    step("tts")
     dur, hook_end = asyncio.run(tts(nar, mp3))
     if dur <= 0:
         return None
+    step("tts", "done")
     st = caption_style.resolve(st if isinstance(st, dict) else None)
+    step("align")
     cues = align_cues(nar, whisper_words(mp3), dur, size=st["wordsPerCue"])   # voice-accurate word timing
+    step("align", "done")
     print(f"  voice: {dur:.1f}s, {len(cues)} cues, hook_end {hook_end:.1f}s")
 
     # ponytail: direction gate. Voice + wording decide whether the reel is right, and both exist
@@ -366,13 +384,17 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
               f"\n  Looks right? Re-run the same command without --validate to render.")
         return None
 
+    step("media")
     bg_items = []
-    for i, m in enumerate(get_media(post)):
+    media = get_media(post)
+    for i, m in enumerate(media):
+        step("media", f"{i + 1}/{len(media)}")
         is_video = m["kind"] == "video"
         p = os.path.join(tmp, f"bg{i}.{'mp4' if is_video else 'jpg'}")
         ok = fetch_video(m["url"], p) if is_video else fetch_image(m["url"], p)
         if ok:
             bg_items.append({"path": p, "kind": m["kind"]})
+    step("media", "done")
     n_bg = max(1, len(bg_items))  # background segments: one per media item, or 1 solid-color fallback
     target = dur / n_bg
     # A video clip shorter than its equal time-share can't fill it — trim can't pad,
@@ -393,9 +415,11 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
     if include_layout:
         title_png = os.path.join(tmp, "title.png")
         th = render_title(title_png, title_segments(post.get("emojiTitle", "")), 50, TITLE_W, 4)
+    step("captions")
     caps_mov = os.path.join(tmp, "caps.mov")
     if not render_caption_track(caps_mov, cues, dur, st):
         return None
+    step("captions", "done")
 
     inputs = []
     if bg_items:
@@ -460,9 +484,11 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True, st=
     cmd = ["ffmpeg", "-y", *inputs, "-filter_complex", fc, "-map", f"[{out_label}]", "-map", f"{audio_idx}:a",
            "-t", f"{dur:.2f}", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
            "-ar", "44100", "-ac", "2", "-r", "30", "-shortest", content]
+    step("compose")
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         print(r.stderr[-1800:]); return None
+    step("compose", "done")
     return dur, hook_end
 
 def splice_intro(content, dur, hook_end, out):
@@ -546,6 +572,11 @@ def demo():
     big = caption_style.resolve({"size": 92})
     assert render_cue(words, 0, big).size[1] > img.size[1]
 
+    # --- step markers ----------------------------------------------------------
+    assert fmt_step("media", "2/5") == "::step:media:2/5"
+    assert fmt_step("tts") == "::step:tts:start"
+    assert fmt_step("intro", "skipped") == "::step:intro:skipped"
+
     print("make-reel.py self-check ok")
 
 
@@ -575,12 +606,15 @@ def main():
         print("content build failed"); sys.exit(1)
     dur, hook_end = res
     if no_intro:
+        step("intro", "skipped")
         print("  intro skipped (--no-intro)…")
         shutil.move(content, out)
     else:
+        step("intro")
         print("  splicing intro after hook…")
         if not splice_intro(content, dur, hook_end, out):
             print("splice failed"); sys.exit(1)
+        step("intro", "done")
     print("OUT:", out)
 
 if __name__ == "__main__":
