@@ -47,7 +47,7 @@ LANG = (os.environ.get("REEL_LANG") or "vi").lower()      # REEL_LANG=en for the
 VOICES = {"vi": "vi-VN-HoaiMyNeural", "en": "en-US-AriaNeural"}
 VOICE = os.environ.get("REEL_VOICE") or VOICES.get(LANG, VOICES["vi"])
 W, H = 1080, 1920
-CAP_Y, CAP_H = 780, 150               # captions over the image
+CAP_Y_DEFAULT = 780                   # kept for reference; real value comes from the style
 TITLE_X, TITLE_Y, TITLE_W = 185, 1420, 840   # title inside the blue block, right of the bar
 WHITE, YELLOW = (255, 255, 255, 255), (255, 221, 0, 255)
 CAP_BASE, CAP_ACTIVE = WHITE, YELLOW   # captions read white, the word being spoken flips to brand yellow
@@ -222,17 +222,20 @@ def active_word(cues, t):
     return None
 
 
-def render_caption_track(path, cues, dur, fps=30):
+def render_caption_track(path, cues, dur, st, fps=30):
     """Pre-composite the whole caption band into ONE alpha clip, so the filter graph carries a
     single overlay instead of one per word. Measured on a 15s clip: 30 overlays 2.9s vs 150
     overlays 39.7s — overlay count scales superlinearly, so per-word highlighting cannot live in
-    the filter graph. Frames are cached per (cue, word), so PIL draws once per word, not per frame."""
+    the filter graph. Frames are cached per (cue, word), so PIL draws once per word, not per frame.
+    The band's height comes from the style: a 92px preset needs a taller strip than a 64px one,
+    and the rawvideo size below must agree with what render_cue actually produces."""
+    cap_h = caption_style.band_height(st)
     n = max(1, int(round(dur * fps)))
-    blank = Image.new("RGBA", (W, CAP_H), (0, 0, 0, 0)).tobytes()
+    blank = Image.new("RGBA", (W, cap_h), (0, 0, 0, 0)).tobytes()
     cache = {}
     p = subprocess.Popen(
         ["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgba",
-         "-s", f"{W}x{CAP_H}", "-r", str(fps), "-i", "-", "-c:v", "qtrle", path],
+         "-s", f"{W}x{cap_h}", "-r", str(fps), "-i", "-", "-c:v", "qtrle", path],
         stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     for f in range(n):
         key = active_word(cues, f / fps)
@@ -240,7 +243,7 @@ def render_caption_track(path, cues, dur, fps=30):
             p.stdin.write(blank)
             continue
         if key not in cache:
-            cache[key] = render_cue(cues[key[0]][2], key[1]).tobytes()
+            cache[key] = render_cue(cues[key[0]][2], key[1], st).tobytes()
         p.stdin.write(cache[key])
     p.stdin.close()
     if p.wait() != 0:
@@ -341,7 +344,7 @@ def take_flag(argv, name):
     return rest, len(rest) != len(argv)
 
 
-def build_content(tmp, post, content, validate_to=None, include_layout=True):
+def build_content(tmp, post, content, validate_to=None, include_layout=True, st=None):
     mp3 = os.path.join(tmp, "v.mp3")
     if post.get("narration"):  # approved script from the web UI overrides the auto-lead
         nar = clean(" ".join(ln.strip() for ln in post["narration"].splitlines() if ln.strip()))[:4000]
@@ -350,7 +353,8 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True):
     dur, hook_end = asyncio.run(tts(nar, mp3))
     if dur <= 0:
         return None
-    cues = align_cues(nar, whisper_words(mp3), dur)   # voice-accurate word timing
+    st = caption_style.resolve(st if isinstance(st, dict) else None)
+    cues = align_cues(nar, whisper_words(mp3), dur, size=st["wordsPerCue"])   # voice-accurate word timing
     print(f"  voice: {dur:.1f}s, {len(cues)} cues, hook_end {hook_end:.1f}s")
 
     # ponytail: direction gate. Voice + wording decide whether the reel is right, and both exist
@@ -390,7 +394,7 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True):
         title_png = os.path.join(tmp, "title.png")
         th = render_title(title_png, title_segments(post.get("emojiTitle", "")), 50, TITLE_W, 4)
     caps_mov = os.path.join(tmp, "caps.mov")
-    if not render_caption_track(caps_mov, cues, dur):
+    if not render_caption_track(caps_mov, cues, dur, st):
         return None
 
     inputs = []
@@ -445,7 +449,7 @@ def build_content(tmp, post, content, validate_to=None, include_layout=True):
 
     # one pre-composited caption strip (see render_caption_track), then - if the branded layout
     # wasn't switched off - the frame on top, then the title inside its blue block.
-    parts.append(f"[bg][{cap_idx}:v]overlay=0:{CAP_Y}[cap]")
+    parts.append(f"[bg][{cap_idx}:v]overlay=0:{caption_style.cap_y(st, H)}[cap]")
     out_label = "cap"
     if include_layout:
         parts.append(f"[cap][{frame_idx}:v]overlay=0:0[fr]")
