@@ -29,9 +29,15 @@ The marketing skills (`.claude/skills/`, from coreyhaines31/marketingskills) —
 `social`, `ads`, `launch` — must run their output through this compliance gate before a
 draft is saved.
 
-## Skills — 53 are installed, ~8 apply to this page
+## Skills — 6 load per session, 47 are parked one directory away
 
-Almost none of this was written for us. `.claude/skills/` holds **47 symlinks into
+Almost none of this was written for us. **As of 2026-09-11 the 47 `vendor/marketingskills/`
+symlinks live in `.claude/skills-parked/`, not `.claude/skills/`.** Claude Code does not scan
+skills-parked, so they cost 0 tokens per session instead of 8,255 — measured, and in a repo whose
+whole point is that this pack does not apply here. They stay reachable: `~/.claude/hooks/suggest-skills.py`
+matches them on disk and injects the body (or names it with a path when it is over the cap), so
+"write a cold email sequence" still surfaces `cold-email`. What it costs is invocation by name —
+the Skill tool only sees `.claude/skills/`. Originally this held **47 symlinks into
 `vendor/marketingskills/`** (a vendored clone of coreyhaines31/marketingskills), one
 `hallmark` from `skills-lock.json`, and five real directories. The pack is B2B SaaS growth
 advice; this repo is a Vietnamese-language Facebook page publishing immigration news and
