@@ -195,6 +195,10 @@ const parser = new Parser({
       ['media:content', 'media:content', { keepArray: true }],
       ['media:thumbnail', 'media:thumbnail'],
       ['content:encoded', 'content:encoded'],
+      // RSS <source> = the publication an item originally came from. Google News sets it
+      // per item; most native feeds omit it. Renamed off `source` so it can't collide with
+      // rss-parser's own channel-level field.
+      ['source', 'sourceTag'],
     ],
   },
 });
@@ -276,6 +280,27 @@ function extractImages(item: any): { imageUrl?: string; imageUrls: string[] } {
   return { imageUrl: imageUrls[0], imageUrls };
 }
 
+/**
+ * A Google News *topic* search aggregates many outlets under one feed, so `feed.name`
+ * ("Google News · Di trú Việt Nam") names the query, not whoever published the story —
+ * and every sensitive post has to cite its actual source (see CLAUDE.md). Site-scoped
+ * wrappers (`site:www.newsweek.com`) are left alone: their feed.name is already the
+ * publisher, and switching them would split their audit history across two names.
+ */
+function isAggregateFeed(feedUrl: string): boolean {
+  return /news\.google\.com/i.test(feedUrl) && !/site(:|%3A)/i.test(feedUrl);
+}
+
+/** Publisher from the item's <source> tag; '' when absent. rss-parser hands this back as
+ *  a bare string or as `{ _: name, $: { url } }` depending on whether the tag had
+ *  attributes, so accept both rather than assuming one. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function publisherOf(item: any): string {
+  const s = item?.sourceTag;
+  const name = typeof s === 'string' ? s : (s?._ ?? s?.['#'] ?? '');
+  return String(name ?? '').trim();
+}
+
 // ── Fetchers ─────────────────────────────────────────────────────────────────
 async function parseFeedWithRetry(url: string, retries = 2): Promise<Awaited<ReturnType<typeof parser.parseURL>>> {
   let lastErr: unknown;
@@ -308,6 +333,7 @@ async function fetchRssFeed(feed: FeedEntry, cutoffTime: Date): Promise<{ articl
   try {
     const feedData = await parseFeedWithRetry(feed.url);
     const articles: Article[] = [];
+    const aggregate = isAggregateFeed(feed.url);
     for (const item of feedData.items ?? []) {
       const title = (item.title ?? '').trim();
       if (!title) continue;
@@ -324,8 +350,10 @@ async function fetchRssFeed(feed: FeedEntry, cutoffTime: Date): Promise<{ articl
       const { imageUrl, imageUrls } = extractImages(item);
       const description = getDescription(item);
       const location = detectUsLocation(title, description);
+      // On an aggregate feed the real publisher is per-item, not per-feed.
+      const publisher = aggregate ? publisherOf(item) : '';
       articles.push({
-        title, url, pubDate: pubDateStr, source: feed.name, description,
+        title, url, pubDate: pubDateStr, source: publisher || feed.name, description,
         ...(imageUrl && { imageUrl }),
         ...(imageUrls.length > 0 && { imageUrls }),
         ...(location && { location }),
