@@ -448,20 +448,26 @@ export async function markSilverGenerated(ids: string[]): Promise<void> {
  * when `marketId` is given, otherwise all markets.
  */
 export async function resetForRegeneration(
-  marketId?: string,
+  marketId: string,
 ): Promise<{ goldCleared: number; silverReset: number }> {
-  const goldWhere = marketId ? 'WHERE market_id = ?' : '';
-  const silverWhere = marketId ? 'WHERE market_id = ?' : '';
-  const args = marketId ? [marketId] : [];
+  // Scope is mandatory. With marketId absent the WHERE clause used to come out empty, so
+  // this ran a bare `DELETE FROM gold_content` against every market. On 2026-09-12 an agent
+  // called it with `silverIds` — a key this path has never read — and that empty clause
+  // deleted 9,029 gold rows across all 8 markets, three times over. There is no legitimate
+  // caller for "regenerate everything", so refuse rather than infer one.
+  if (!marketId) {
+    throw new Error('resetForRegeneration requires a marketId - refusing an unscoped reset');
+  }
+  const args = [marketId];
 
-  const goldBefore = await all(`SELECT COUNT(*) AS c FROM gold_content ${goldWhere}`, args);
+  const goldBefore = await all('SELECT COUNT(*) AS c FROM gold_content WHERE market_id = ?', args);
   const silverBefore = await all(
-    `SELECT COUNT(*) AS c FROM silver_immigration ${silverWhere ? silverWhere + ' AND' : 'WHERE'} generated = true`,
+    'SELECT COUNT(*) AS c FROM silver_immigration WHERE market_id = ? AND generated = true',
     args,
   );
 
-  await run(`DELETE FROM gold_content ${goldWhere}`, args);
-  await run(`UPDATE silver_immigration SET generated = false ${silverWhere}`, args);
+  await run('DELETE FROM gold_content WHERE market_id = ?', args);
+  await run('UPDATE silver_immigration SET generated = false WHERE market_id = ?', args);
 
   return {
     goldCleared: Number(goldBefore[0]?.c ?? 0),
