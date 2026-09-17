@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import { writeFileSync, unlink, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { setGoldVideo } from './lake';
+import { localizeMediaUrl } from './localMedia';
 
 const ROOT = process.cwd();
 const OUT_DIR = join(ROOT, 'data', 'reels');
@@ -58,7 +59,7 @@ export function startRenderJob(payload: {
     JSON.stringify({
       emojiTitle: payload.emojiTitle,
       narration: payload.narration,
-      media: payload.media ?? [],
+      media: (payload.media ?? []).map((m) => ({ ...m, url: localizeMediaUrl(m.url) })),
     }),
   );
   jobs.set(id, { id, status: 'running' });
@@ -112,10 +113,12 @@ export function startRenderJob(payload: {
       if (payload.postId) setGoldVideo(payload.postId, file, payload.narration).catch(() => {});
     } else {
       const prev = jobs.get(id);
-      // make-reel.py print()s ffmpeg's error tail, so its diagnostics arrive on STDOUT;
-      // stderr alone leaves every caption/compose failure showing a bare `exit 1` while
-      // the 1800 characters explaining it were read and thrown away.
-      const why = (stderr.trim() || tail.trim()).slice(-500);
+      // make-reel.py print()s its reasons — and ffmpeg's error tail — to STDOUT, so that
+      // leads. stderr used to win outright, and it is often just interpreter noise on
+      // shutdown: faster-whisper's leaked-semaphore warning replaced the real cause and
+      // left "Lỗi ở bước: Ghép video" with nothing actionable under it.
+      const why = [tail.trim().slice(-450), stderr.trim().slice(-200)]
+        .filter(Boolean).join('\n— stderr —\n');
       jobs.set(id, { ...prev, id, status: 'error', error: why || `exit ${code}` });
     }
   });

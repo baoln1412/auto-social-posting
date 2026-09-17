@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import { writeFileSync, readFileSync, mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { localizeMediaUrl } from '@/app/lib/localMedia';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
     // `plate` is the name, settled: it is the key make-reel.py's config reads and the
     // one the drawer sends. (The plan says `plateUrl` in a prose line and `plate` in its
     // own code — one name, not two, or every future caller has to guess.)
-    const plate = body?.plate ?? null;
+    const plate = body?.plate ? localizeMediaUrl(String(body.plate)) : null;
 
     dir = mkdtempSync(join(tmpdir(), 'reel-prev-'));
     const cfg = join(dir, 'cfg.json');

@@ -307,11 +307,30 @@ def render_title(path, segs, fontsize, box_w, stroke_w):
     img.save(path)
     return h
 
+def looks_like_markup(path):
+    """A login wall, error page or redirect answers HTTP 200 with HTML, and size alone
+    cannot tell a 38KB sign-in page from a 38KB photo. Checked on the leading bytes."""
+    with open(path, "rb") as f:
+        return f.read(512).lstrip()[:1] == b"<"
+
 def fetch_image(url, dst):
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         open(dst, "wb").write(urllib.request.urlopen(req, timeout=20).read())
-        return os.path.getsize(dst) > 1000
+        if os.path.getsize(dst) <= 1000:
+            return False
+        # Prove it decodes. On 2026-09-17 all seven uploads for one reel came back as the
+        # Cloudflare Access sign-in page; this returned True for each, and ffmpeg then spent
+        # an hour at 150% CPU trying to decode HTML as JPEG without writing a single frame.
+        try:
+            with Image.open(dst) as im:
+                im.verify()
+        except Exception:
+            kind = "an HTML page (login wall or error)" if looks_like_markup(dst) else "not an image"
+            print(f"  image fetch got {kind}: {url[:90]}")
+            os.remove(dst)
+            return False
+        return True
     except Exception as e:
         print("  image fetch failed:", e); return False
 
@@ -372,7 +391,13 @@ def fetch_video(url, dst):
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         open(dst, "wb").write(urllib.request.urlopen(req, timeout=60).read())
-        return os.path.getsize(dst) > 1000
+        if os.path.getsize(dst) <= 1000:
+            return False
+        if looks_like_markup(dst):   # same trap as fetch_image: a 200 that is really a web page
+            print(f"  video fetch got an HTML page (login wall or error): {url[:90]}")
+            os.remove(dst)
+            return False
+        return True
     except Exception as e:
         print("  video fetch failed:", e); return False
 
@@ -670,7 +695,17 @@ def render_from_project(proj, work_dir, out, st, include_layout=True):
            "-t", f"{dur:.2f}", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
            "-ar", "44100", "-ac", "2", "-r", "30", "-shortest", out]
     step("compose")
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    # ponytail: fixed 15-minute ceiling. A normal compose takes a few minutes; without any
+    # bound, one bad input left ffmpeg spinning for an hour while the drawer said "Ghép
+    # video". run(timeout=) also kills the child, so nothing is orphaned. Scale it with
+    # duration if long reels ever legitimately need more.
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    except subprocess.TimeoutExpired:
+        step("compose", "failed")
+        print("compose exceeded 15 minutes and was stopped - check the media inputs")
+        cleanup()
+        return None
     if r.returncode != 0:
         step("compose", "failed")
         print(r.stderr[-1800:])
