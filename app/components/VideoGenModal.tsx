@@ -23,6 +23,7 @@ const DEFAULT_VIEW: Record<string, unknown> = {
   outline: { color: '#000000', w: 7 },
   shadow: { dx: 0, dy: 0, color: '#000000B3' },
   highlight: { mode: 'word', color: '#FFDD00', bg: null },
+  band: { on: false, color: '#000000', opacity: 70, pad: 18, radius: 16 },
 };
 
 // <input type="color"> only takes a 6-digit hex; caption_style.py allows an 8-digit
@@ -94,7 +95,7 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
   // explicit per-post override on top one level deep gives the same defaults <- preset <-
   // override precedence as caption_style.py's _deep_merge, without ever dropping a sibling
   // field (writing outline.color must not erase outline.w, and vice versa).
-  const grp = (key: 'outline' | 'shadow' | 'highlight'): Record<string, unknown> => ({
+  const grp = (key: 'outline' | 'shadow' | 'highlight' | 'band'): Record<string, unknown> => ({
     ...(DEFAULT_VIEW[key] as Record<string, unknown>),
     ...(viewBase[key] as Record<string, unknown>),
     ...((vg.style[key] as Record<string, unknown> | undefined) ?? {}),
@@ -102,6 +103,7 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
   const outlineView = grp('outline');
   const shadowView = grp('shadow');
   const highlightView = grp('highlight');
+  const bandView = grp('band');
 
   // Render finished → drawer auto-closes; the result surfaces in the post list instead.
   // Gated on the running→done transition (not just "is done"), so reopening the
@@ -307,6 +309,31 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
                       value={swatch(highlightView.bg, '#FFDD00')}
                       onChange={(e) => vg.setStyle({ ...vg.style, highlight: { ...highlightView, bg: e.target.value } })} />
                   </label>
+                )}
+
+                <label className="flex items-center gap-2 text-xs cursor-pointer w-fit">
+                  <input type="checkbox" className="w-4 h-4 accent-primary"
+                    checked={Boolean(bandView.on)}
+                    onChange={(e) => vg.setStyle({ ...vg.style, band: { ...bandView, on: e.target.checked } })} />
+                  Nền phụ đề
+                </label>
+
+                {Boolean(bandView.on) && (
+                  <>
+                    <label className="flex items-center gap-3 text-xs">
+                      <span className="w-28 shrink-0 text-muted-foreground">Màu nền</span>
+                      <input type="color" className="h-7 w-12 rounded-md border border-border bg-card p-0.5"
+                        value={swatch(bandView.color, '#000000')}
+                        onChange={(e) => vg.setStyle({ ...vg.style, band: { ...bandView, color: e.target.value } })} />
+                    </label>
+                    <label className="flex items-center gap-3 text-xs">
+                      <span className="w-28 shrink-0 text-muted-foreground">Độ đậm nền</span>
+                      <input type="range" min={0} max={100} step={5} className="flex-1"
+                        value={Number(bandView.opacity ?? 70)}
+                        onChange={(e) => vg.setStyle({ ...vg.style, band: { ...bandView, opacity: Number(e.target.value) } })} />
+                      <span className="w-12 text-right font-mono">{`${Number(bandView.opacity ?? 70)}%`}</span>
+                    </label>
+                  </>
                 )}
 
                 <Button variant="outline" size="sm" onClick={vg.saveStyle} className="text-xs h-7">

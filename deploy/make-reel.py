@@ -200,6 +200,21 @@ def render_cue(words, active, st=None):
     lines = lines[:st["maxLines"]]
     lh = caption_style.line_height(st)
     y = (cap_h - lh * len(lines)) // 2
+
+    # Plate behind the text, drawn first so glyphs and the active-word block sit on top.
+    # One rect per line, hugging that line's width, rather than one box spanning the union:
+    # centred captions are ragged, and a union box leaves wide empty shoulders on the short
+    # line. Alpha comes from opacity, not from an 8-digit hex - see caption_style.DEFAULTS.
+    band = st["band"]
+    if band["on"]:
+        plate = caption_style.parse_color(band["color"])[:3] + (round(255 * band["opacity"] / 100),)
+        pad, by = band["pad"], y
+        for _line, lw in lines:
+            bx = (W - lw) / 2
+            d.rounded_rectangle([bx - pad, by - pad // 2, bx + lw + pad, by + lh + pad // 2],
+                                radius=band["radius"], fill=plate)
+            by += lh
+
     i = 0
     for line, lw in lines:
         x = (W - lw) / 2
@@ -786,6 +801,17 @@ def demo():
     assert take_opt(["x", "m", "3"], "--style") == (["x", "m", "3"], None)
     assert take_opt(["x", "--style", "{}", "m", "3"], "--style") == (["x", "m", "3"], "{}")
     assert take_opt(["x", "m", "3", "--style", "{}"], "--style") == (["x", "m", "3"], "{}")
+
+    # --- caption band plate -----------------------------------------------------
+    words_b = [("MOT", 0, 0), ("HAI", 0, 0)]
+    off = render_cue(words_b, 0, caption_style.resolve(None))
+    on = render_cue(words_b, 0, caption_style.resolve({"band": {"on": True}}))
+    # Anchored on where the glyphs actually start, not a guessed offset: the plate hugs the
+    # line, so a fixed x can sit outside a short cue and fail for the wrong reason.
+    left = off.getbbox()[0]
+    assert off.getpixel((left - 8, off.height // 2))[3] == 0, "band off should stay transparent beside the text"
+    assert on.getpixel((left - 8, on.height // 2))[3] > 0, "band on should paint a plate beside the text"
+    assert caption_style.band_height(caption_style.resolve(None)) == 188, "band-off geometry moved"
 
     # A reel with no background must be an ERROR, not a silent success - but only when
     # media was actually asked for.

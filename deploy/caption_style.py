@@ -22,12 +22,18 @@ DEFAULTS = {
     "outline": {"color": "#000000", "w": 7},
     "shadow": {"dx": 0, "dy": 0, "color": "#000000B3"},     # dy 0 == shadow off
     "highlight": {"mode": "word", "color": "#FFDD00", "bg": None},  # word | block | none
+    # A plate behind the caption text, the "Background" toggle in reference editors. Off by
+    # default so a post with no style renders exactly what it rendered before this existed.
+    # Opacity is separate from colour because <input type="color"> cannot express an alpha
+    # channel - the panel would silently turn a 70% plate fully opaque on the first click.
+    "band": {"on": False, "color": "#000000", "opacity": 70, "pad": 18, "radius": 16},
     "pos": 855 / 1920,                                      # centre of the historical 150px band (780 + 150/2)
     "wordsPerCue": 5,
     "maxLines": 2,
 }
 
 CLAMPS = {"size": (24, 160), "pos": (0.0, 0.95), "wordsPerCue": (1, 12), "maxLines": (1, 4)}
+BAND_CLAMPS = {"opacity": (0, 100), "pad": (0, 60), "radius": (0, 64)}
 
 def load_presets():
     try:
@@ -82,6 +88,15 @@ def resolve(style):
         out["case"] = "none"
     if out.get("highlight", {}).get("mode") not in ("word", "block", "none"):
         out["highlight"]["mode"] = "word"
+    # Same guarantee as CLAMPS, one level down: a slider sending 900 or "" must not reach
+    # PIL as a rectangle radius.
+    band = out.setdefault("band", dict(DEFAULTS["band"]))
+    band["on"] = bool(band.get("on"))
+    for key, (lo, hi) in BAND_CLAMPS.items():
+        try:
+            band[key] = min(hi, max(lo, int(band.get(key, DEFAULTS["band"][key]))))
+        except Exception:
+            band[key] = DEFAULTS["band"][key]
     return out
 
 def line_height(st):
@@ -91,7 +106,11 @@ def band_height(st):
     """The caption band is derived, not fixed. CAP_H was 150 while two lines at 64px
     already needed 156 - today's output clips ~3px off the top line, and a 92px preset
     would clip badly. Half a font-size of padding covers descenders, stroke and shadow."""
-    return int(line_height(st) * st["maxLines"] + st["size"] * 0.5)
+    h = int(line_height(st) * st["maxLines"] + st["size"] * 0.5)
+    # The plate is drawn outside the glyphs, so it needs its own room or it clips at the
+    # band edge. Only when it is on, so band-off geometry is untouched.
+    b = st.get("band") or {}
+    return h + 2 * int(b.get("pad", 0)) if b.get("on") else h
 
 def cap_y(st, frame_h):
     """Top edge of the band, derived from `pos` as the band's CENTRE line and kept fully
