@@ -12,10 +12,24 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile);
 
+/**
+ * Length bands, as intent levels — "hook only", "trimmed", "the whole post".
+ *
+ * Measured 2026-09-22 against the lake: 10,244 gold posts, body_text length projected at
+ * 20.6 chars/second (the one real render available — 1,684 chars of Vietnamese narration
+ * through edge-tts at rate=+25% came out at 81.7s). p05 61s · median 92s · p95 134s.
+ *
+ * So a whole gold post IS a `long` reel, not an exception to `medium`. `long`'s floor is 45
+ * rather than 60 because the measured p05 sits at 61s and this rate rests on a single
+ * render: a gate for catching runaway length should not fire on a slightly short post.
+ *
+ * Crime series are not in scope here at all — market 26ffffde's median body is 13,935 chars,
+ * about eleven minutes. Nobody is making that as a reel.
+ */
 export const DURATION_BANDS = {
   short: [12, 35],
   medium: [25, 75],
-  long: [60, 180],
+  long: [45, 200],
 } as const;
 
 export type DurationBand = keyof typeof DURATION_BANDS;
@@ -42,7 +56,7 @@ const FRAME_W = 1080;
 
 export function budgetFindings(durationSec: number, narration: string, kit: BudgetKit): string[] {
   const findings: string[] = [];
-  const [lo, hi] = DURATION_BANDS[kit.durationBand] ?? DURATION_BANDS.medium;
+  const [lo, hi] = DURATION_BANDS[kit.durationBand] ?? DURATION_BANDS.long;
   if (durationSec > hi) findings.push(`Video dài ${Math.round(durationSec)}s, quá dải ${lo}–${hi}s.`);
   if (durationSec < lo) findings.push(`Video chỉ ${Math.round(durationSec)}s, ngắn hơn dải ${lo}–${hi}s.`);
 

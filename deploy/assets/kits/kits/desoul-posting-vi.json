@@ -1,0 +1,53 @@
+{
+  "id": "desoul-posting-vi",
+  "name": "Desoul Posting VI",
+  "schemaVersion": 1,
+  "identity": {
+    "channelName": "101 Australia — Chuyện Úc chút chút",
+    "handle": "@101australia"
+  },
+  "post": {
+    "preset": "hook-first",
+    "format": "hook-first",
+    "length": "long",
+    "emoji": "light",
+    "hashtags": 6
+  },
+  "card": {
+    "preset": "news",
+    "ratio": "4:5",
+    "highlight": "after-colon",
+    "background": "article"
+  },
+  "voice": {
+    "preset": "hoaimy",
+    "provider": "edge-tts",
+    "voiceId": "vi-VN-HoaiMyNeural"
+  },
+  "captions": {
+    "preset": "classic",
+    "size": 72,
+    "pos": 0.72,
+    "wordsPerCue": 5,
+    "maxLines": 2,
+    "case": "none"
+  },
+  "frame": {
+    "preset": "card-top",
+    "layout": "card-top",
+    "intro": true,
+    "durationBand": "long"
+  },
+  "stickers": {
+    "preset": "none",
+    "set": "",
+    "where": []
+  },
+  "signature": {
+    "handle": false,
+    "watermark": false
+  },
+  "music": {
+    "tier": "none"
+  }
+}

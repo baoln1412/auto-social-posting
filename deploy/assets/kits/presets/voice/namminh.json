@@ -1,0 +1,5 @@
+{
+  "preset": "namminh",
+  "provider": "edge-tts",
+  "voiceId": "vi-VN-NamMinhNeural"
+}

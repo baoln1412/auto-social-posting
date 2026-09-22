@@ -1,0 +1,290 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://desoul.dev/schemas/kit.schema.json",
+  "title": "Desoul Brand Kit",
+  "description": "Portable by DATA, not by React. Every field here maps to something an engine already accepts — no field exists that nothing can honour.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "schemaVersion",
+    "identity"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{1,64}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "identity": {
+      "$ref": "#/definitions/identity"
+    },
+    "post": {
+      "$ref": "#/definitions/post"
+    },
+    "card": {
+      "$ref": "#/definitions/card"
+    },
+    "voice": {
+      "$ref": "#/definitions/voice"
+    },
+    "captions": {
+      "$ref": "#/definitions/captions"
+    },
+    "frame": {
+      "$ref": "#/definitions/frame"
+    },
+    "stickers": {
+      "$ref": "#/definitions/stickers"
+    },
+    "signature": {
+      "$ref": "#/definitions/signature"
+    },
+    "music": {
+      "$ref": "#/definitions/music"
+    }
+  },
+  "definitions": {
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channelName"
+      ],
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "channelName": {
+          "type": "string"
+        },
+        "handle": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "logo": {
+          "type": "string"
+        }
+      }
+    },
+    "post": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "hook-first",
+            "listicle",
+            "qa",
+            "quote-card",
+            "thread"
+          ]
+        },
+        "length": {
+          "enum": [
+            "short",
+            "medium",
+            "long"
+          ]
+        },
+        "emoji": {
+          "enum": [
+            "none",
+            "light",
+            "heavy"
+          ]
+        },
+        "hashtags": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        }
+      }
+    },
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "ratio": {
+          "enum": [
+            "4:5",
+            "1:1"
+          ]
+        },
+        "highlight": {
+          "enum": [
+            "none",
+            "after-colon",
+            "first-clause"
+          ]
+        },
+        "background": {
+          "enum": [
+            "article",
+            "none"
+          ]
+        }
+      }
+    },
+    "voice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "edge-tts"
+          ]
+        },
+        "voiceId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "captions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "size": {
+          "type": "number",
+          "minimum": 24,
+          "maximum": 160
+        },
+        "pos": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.95
+        },
+        "wordsPerCue": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "maxLines": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "case": {
+          "enum": [
+            "upper",
+            "none"
+          ]
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "layout": {
+          "enum": [
+            "card-top",
+            "continuous"
+          ]
+        },
+        "intro": {
+          "type": "boolean"
+        },
+        "durationBand": {
+          "enum": [
+            "short",
+            "medium",
+            "long"
+          ]
+        },
+        "background": {
+          "type": "string"
+        }
+      }
+    },
+    "stickers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "set": {
+          "type": "string"
+        },
+        "where": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "cover",
+              "intro",
+              "reactions"
+            ]
+          }
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "handle": {
+          "type": "boolean"
+        },
+        "watermark": {
+          "type": "boolean"
+        }
+      }
+    },
+    "music": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "preset": {
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "none",
+            "soft",
+            "groove"
+          ]
+        },
+        "track": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

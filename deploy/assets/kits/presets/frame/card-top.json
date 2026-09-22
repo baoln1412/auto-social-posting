@@ -1,0 +1,6 @@
+{
+  "preset": "card-top",
+  "layout": "card-top",
+  "intro": true,
+  "durationBand": "long"
+}

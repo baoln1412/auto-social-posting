@@ -1,0 +1,6 @@
+{
+  "preset": "clause",
+  "ratio": "4:5",
+  "highlight": "first-clause",
+  "background": "article"
+}

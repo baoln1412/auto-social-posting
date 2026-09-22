@@ -1,0 +1,6 @@
+{
+  "preset": "continuous",
+  "layout": "continuous",
+  "intro": false,
+  "durationBand": "short"
+}

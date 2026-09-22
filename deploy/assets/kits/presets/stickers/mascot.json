@@ -1,0 +1,8 @@
+{
+  "preset": "mascot",
+  "set": "desoul-mascot",
+  "where": [
+    "cover",
+    "intro"
+  ]
+}

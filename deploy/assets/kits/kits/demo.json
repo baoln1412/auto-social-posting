@@ -1,0 +1,55 @@
+{
+  "id": "demo",
+  "name": "Demo",
+  "schemaVersion": 1,
+  "identity": {
+    "channelName": "Kênh thử",
+    "handle": "@demo"
+  },
+  "post": {
+    "preset": "listicle",
+    "format": "listicle",
+    "length": "short",
+    "emoji": "heavy",
+    "hashtags": 3
+  },
+  "card": {
+    "preset": "square-flat",
+    "ratio": "1:1",
+    "highlight": "none",
+    "background": "none"
+  },
+  "voice": {
+    "preset": "namminh",
+    "provider": "edge-tts",
+    "voiceId": "vi-VN-NamMinhNeural"
+  },
+  "captions": {
+    "preset": "dam",
+    "size": 104,
+    "pos": 0.5,
+    "wordsPerCue": 2,
+    "maxLines": 1,
+    "case": "upper"
+  },
+  "frame": {
+    "preset": "continuous",
+    "layout": "continuous",
+    "intro": false,
+    "durationBand": "short"
+  },
+  "stickers": {
+    "preset": "mascot",
+    "set": "desoul-mascot",
+    "where": [
+      "cover"
+    ]
+  },
+  "signature": {
+    "handle": true,
+    "watermark": true
+  },
+  "music": {
+    "tier": "soft"
+  }
+}

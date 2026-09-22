@@ -16,10 +16,10 @@ test('one real gold post becomes a post, a card and an MP4', async ({ page, requ
   });
   const { id: channelId } = (await ch.json()) as { id: string };
 
+  // No band override: the default has to be the one that fits a real gold post, or every
+  // hand-over starts blocked. Measured median is ~92s (see gates/budget.ts).
   const run = await request.post('/api/studio/runs', {
-    // `long` band: a four-sentence gold post reads for well over a minute, and the budget
-    // gate is right to hold that against the default medium band.
-    data: { channelId, mode: 'read-post', overrides: { durationBand: 'long' } },
+    data: { channelId, mode: 'read-post' },
   });
   const { id: runId } = (await run.json()) as { id: string };
   await page.goto(`/studio/runs/${runId}`);

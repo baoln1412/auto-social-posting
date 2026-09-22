@@ -197,3 +197,29 @@ describe('measureCard()', () => {
     expect((await measureCard(await card({ inkAtEdge: true }))).edgeInk).toBe(true);
   });
 });
+
+describe('the default duration band', () => {
+  it('is long — a whole gold post measures ~92s, so medium would block almost all of them', async () => {
+    const { effectiveFrame } = await import('@/lib/studio/kits/load');
+    expect(effectiveFrame({ id: 'k', name: 'K' }, {}).durationBand).toBe('long');
+    expect(effectiveFrame({ id: 'k', name: 'K', frame: {} }, {}).durationBand).toBe('long');
+  });
+
+  it('accepts the measured p05..p95 of the gold corpus without a finding', async () => {
+    const kit = { durationBand: 'long' as const, maxLines: 2, size: 72, wordsPerCue: 5 };
+    for (const sec of [61, 82, 92, 104, 134]) {
+      expect(budgetFindings(sec, 'một hai ba', kit), `${sec}s`).toEqual([]);
+    }
+  });
+
+  it('still catches a runaway length, which is what the gate is for', () => {
+    const kit = { durationBand: 'long' as const, maxLines: 2, size: 72, wordsPerCue: 5 };
+    expect(budgetFindings(676, 'một hai ba', kit)).toHaveLength(1); // a 3-part crime series
+    expect(budgetFindings(9, 'một hai ba', kit)).toHaveLength(1);
+  });
+
+  it('a kit that explicitly wants a short reel still gets a short reel', () => {
+    const kit = { durationBand: 'short' as const, maxLines: 2, size: 72, wordsPerCue: 5 };
+    expect(budgetFindings(92, 'một hai ba', kit)).toHaveLength(1);
+  });
+});

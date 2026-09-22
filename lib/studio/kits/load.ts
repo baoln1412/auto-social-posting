@@ -64,7 +64,10 @@ export function effectiveFrame(kit: Kit, ov: Overrides) {
   return {
     includeLayout: ov.includeLayout ?? f.layout !== 'continuous',
     includeIntro: ov.includeIntro ?? f.intro !== false,
-    durationBand: ov.durationBand ?? f.durationBand ?? 'medium',
+    // `long` and not `medium`: a kit with no band stated gets the one that matches this
+    // repo's actual content. At 25–75s, `medium` would have blocked ~95% of gold posts —
+    // a default that fires on almost everything teaches the owner to click past the gate.
+    durationBand: ov.durationBand ?? f.durationBand ?? 'long',
   };
 }
 
