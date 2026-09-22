@@ -1,0 +1,9 @@
+{
+  "preset": "pastel",
+  "engine": "studio",
+  "font": "BeVietnamPro-Black",
+  "theme": "pastel",
+  "ratio": "4:5",
+  "highlight": "after-colon",
+  "background": "none"
+}

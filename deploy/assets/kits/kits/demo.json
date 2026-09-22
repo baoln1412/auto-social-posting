@@ -14,10 +14,15 @@
     "hashtags": 3
   },
   "card": {
-    "preset": "square-flat",
-    "ratio": "1:1",
-    "highlight": "none",
-    "background": "none"
+    "preset": "toi",
+    "engine": "studio",
+    "theme": "toi",
+    "ratio": "9:16",
+    "highlight": "after-colon",
+    "background": "none",
+    "font": "BeVietnamPro-Black",
+    "radius": 28,
+    "highlightColor": "#F8EF63"
   },
   "voice": {
     "preset": "namminh",
@@ -51,5 +56,6 @@
   },
   "music": {
     "tier": "soft"
-  }
+  },
+  "revision": 2
 }

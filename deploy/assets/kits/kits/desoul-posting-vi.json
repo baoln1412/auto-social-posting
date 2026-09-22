@@ -17,7 +17,8 @@
     "preset": "news",
     "ratio": "4:5",
     "highlight": "after-colon",
-    "background": "article"
+    "background": "article",
+    "engine": "classic"
   },
   "voice": {
     "preset": "hoaimy",
@@ -49,5 +50,6 @@
   },
   "music": {
     "tier": "none"
-  }
+  },
+  "revision": 2
 }

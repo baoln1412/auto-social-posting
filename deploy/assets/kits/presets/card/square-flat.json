@@ -2,5 +2,6 @@
   "preset": "square-flat",
   "ratio": "1:1",
   "highlight": "none",
-  "background": "none"
+  "background": "none",
+  "engine": "classic"
 }

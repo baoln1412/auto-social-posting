@@ -1,0 +1,9 @@
+{
+  "preset": "toi",
+  "engine": "studio",
+  "font": "BeVietnamPro-Black",
+  "theme": "toi",
+  "ratio": "4:5",
+  "highlight": "after-colon",
+  "background": "article"
+}

@@ -28,13 +28,21 @@ export function seedDemo(): void {
       | { json: string }
       | undefined;
 
-    // An existing row that does NOT validate was never an owner's edit — it is a leftover
-    // stub (slice 0 seeded `demo` as {identity:{name}} before the schema existed). Preserving
-    // it silently left two kits rendering the same card. A row that validates is left alone.
+    // Two reasons to replace a row that is already there.
+    //
+    // 1. It does not validate: it was never an owner's edit, it is a leftover stub (slice 0
+    //    seeded `demo` as {identity:{name}} before the schema existed), and preserving it
+    //    silently left two kits rendering the same card.
+    // 2. The shipped kit has a higher `revision`: without this, a change to the pack reaches
+    //    a fresh install and nowhere else. A bump replaces the stored copy, so an owner who
+    //    has customised a shipped kit should duplicate it under a new id first.
     let stale = false;
     if (existing) {
       try {
-        stale = validateKit(JSON.parse(existing.json)) !== null;
+        const stored = JSON.parse(existing.json) as { revision?: number };
+        stale =
+          validateKit(stored) !== null ||
+          ((kit as { revision?: number }).revision ?? 1) > (stored.revision ?? 1);
       } catch {
         stale = true;
       }

@@ -5,9 +5,15 @@
 import type { Kit, Overrides } from '../steps/types';
 
 export interface CardTab {
-  ratio?: '4:5' | '1:1';
+  engine?: 'classic' | 'studio';
+  ratio?: '4:5' | '1:1' | '9:16';
   highlight?: 'none' | 'after-colon' | 'first-clause';
   background?: 'article' | 'none';
+  theme?: string;
+  font?: string;
+  radius?: number;
+  titleSize?: number;
+  highlightColor?: string;
 }
 
 /** The clause the SOP paints in the highlight colour. */
@@ -18,15 +24,47 @@ function highlightOf(title: string, mode: CardTab['highlight']): string | null {
   return title.split(/[:—–]/)[1]?.trim() || null;
 }
 
+/** Which route renders this kit's card. */
+export function cardEngine(kit: Kit): 'classic' | 'studio' {
+  return ((kit.card ?? {}) as CardTab).engine === 'studio' ? 'studio' : 'classic';
+}
+
+export function cardPath(kit: Kit): string {
+  return cardEngine(kit) === 'studio' ? '/api/studio/card' : '/api/image/card';
+}
+
+/**
+ * Only what the chosen engine actually reads. Sending `theme` to the classic route would be
+ * a kit promising a look that route has no parameter for — the mistake that made the Brand
+ * Kit smaller than it was drawn.
+ */
 export function cardParams(kit: Kit, draft: { title: string }, articleUrl?: string): URLSearchParams {
   const card = (kit.card ?? {}) as CardTab;
+  const studio = cardEngine(kit) === 'studio';
+  const ratio = card.ratio ?? '4:5';
+
   const q = new URLSearchParams({
     title: draft.title,
-    ratio: card.ratio === '1:1' ? '1:1' : '4:5',
+    ratio: studio ? ratio : ratio === '1:1' ? '1:1' : '4:5',
   });
+
   const hl = highlightOf(draft.title, card.highlight ?? 'after-colon');
   if (hl) q.set('hl', hl);
-  if (articleUrl && (card.background ?? 'article') === 'article') q.set('article', articleUrl);
+
+  if (studio) {
+    for (const [k, v] of [
+      ['theme', card.theme],
+      ['font', card.font],
+      ['radius', card.radius],
+      ['titleSize', card.titleSize],
+      ['highlightColor', card.highlightColor],
+    ] as const) {
+      if (v !== undefined && v !== '') q.set(k, String(v));
+    }
+    if (articleUrl && (card.background ?? 'none') === 'article') q.set('bg', articleUrl);
+  } else if (articleUrl && (card.background ?? 'article') === 'article') {
+    q.set('article', articleUrl);
+  }
   return q;
 }
 

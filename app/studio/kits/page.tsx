@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { studioDb } from '@/lib/studio/db';
-import { cardParams } from '@/lib/studio/kits/load';
+import { cardParams, cardPath } from '@/lib/studio/kits/load';
 import type { Kit } from '@/lib/studio/steps/types';
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +41,7 @@ export default function KitsPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   data-testid={`kit-card-${r.id}`}
-                  src={`/api/image/card?${cardParams(kit, SAMPLE)}`}
+                  src={`${cardPath(kit)}?${cardParams(kit, SAMPLE)}`}
                   alt={r.name}
                   className="w-full rounded-md"
                 />

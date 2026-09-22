@@ -58,8 +58,8 @@ describe('the shipped kits', () => {
       json: string;
     }[];
     expect(rows.map((r) => r.id)).toEqual(['demo', 'desoul-posting-vi']);
-    expect(JSON.parse(rows[0].json).card.ratio).toBe('1:1');
-    expect(JSON.parse(rows[1].json).card.ratio).toBe('4:5');
+    expect(JSON.parse(rows[0].json).card.engine).toBe('studio');
+    expect(JSON.parse(rows[1].json).card.engine).toBe('classic');
   });
 
   it('never overwrites a kit the owner edited', () => {
@@ -82,7 +82,7 @@ describe('seeding over an older row', () => {
     );
     seedDemo();
     const row = d.prepare('SELECT json FROM studio_kits WHERE id=?').get('demo') as { json: string };
-    expect(JSON.parse(row.json).card.ratio).toBe('1:1');
+    expect(JSON.parse(row.json).card.engine).toBe('studio');
   });
 
   it('leaves a valid kit the owner edited exactly as they left it', () => {
@@ -94,5 +94,33 @@ describe('seeding over an older row', () => {
     seedDemo();
     const after = JSON.parse((d.prepare('SELECT json FROM studio_kits WHERE id=?').get('demo') as any).json);
     expect(after.captions.size).toBe(33);
+  });
+});
+
+describe('shipped kit revisions', () => {
+  it('replaces a stored kit when the pack ships a higher revision', () => {
+    seedDemo();
+    const d = studioDb();
+    const kit = JSON.parse((d.prepare('SELECT json FROM studio_kits WHERE id=?').get('demo') as any).json);
+    // Pretend the install is on an older revision with an older look.
+    d.prepare('UPDATE studio_kits SET json=? WHERE id=?').run(
+      JSON.stringify({ ...kit, revision: 1, card: { ...kit.card, engine: 'classic', ratio: '1:1' } }),
+      'demo',
+    );
+    seedDemo();
+    const after = JSON.parse((d.prepare('SELECT json FROM studio_kits WHERE id=?').get('demo') as any).json);
+    expect(after.card.engine).toBe('studio');
+    expect(after.revision).toBeGreaterThan(1);
+  });
+
+  it('leaves a kit at the shipped revision alone, however the owner edited it', () => {
+    seedDemo();
+    const d = studioDb();
+    const kit = JSON.parse((d.prepare('SELECT json FROM studio_kits WHERE id=?').get('demo') as any).json);
+    kit.card.radius = 7;
+    d.prepare('UPDATE studio_kits SET json=? WHERE id=?').run(JSON.stringify(kit), 'demo');
+    seedDemo();
+    const after = JSON.parse((d.prepare('SELECT json FROM studio_kits WHERE id=?').get('demo') as any).json);
+    expect(after.card.radius).toBe(7);
   });
 });

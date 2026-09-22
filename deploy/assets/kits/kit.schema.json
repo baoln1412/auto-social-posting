@@ -49,6 +49,11 @@
     },
     "music": {
       "$ref": "#/definitions/music"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bumped when a SHIPPED kit changes. Seeding replaces a stored kit whose revision is lower, so a change to the pack actually reaches an install. An owner who has customised a shipped kit should duplicate it first: a bump replaces their copy."
     }
   },
   "definitions": {
@@ -125,7 +130,8 @@
         "ratio": {
           "enum": [
             "4:5",
-            "1:1"
+            "1:1",
+            "9:16"
           ]
         },
         "highlight": {
@@ -140,8 +146,45 @@
             "article",
             "none"
           ]
+        },
+        "engine": {
+          "enum": [
+            "classic",
+            "studio"
+          ]
+        },
+        "theme": {
+          "enum": [
+            "sang",
+            "toi",
+            "pastel",
+            "bao"
+          ]
+        },
+        "font": {
+          "enum": [
+            "BeVietnamPro-Black",
+            "BeVietnamPro-Bold",
+            "BeVietnamPro-Medium",
+            "BeVietnamPro-Regular"
+          ]
+        },
+        "radius": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 96
+        },
+        "titleSize": {
+          "type": "integer",
+          "minimum": 24,
+          "maximum": 160
+        },
+        "highlightColor": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
         }
-      }
+      },
+      "description": "engine 'classic' = GET /api/image/card (brand overlay, og:image upgrade, focal crop; reads ratio/highlight/background only). engine 'studio' = GET /api/studio/card (theme/font/radius/titleSize/highlightColor/9:16). A field the chosen engine does not read is simply not sent."
     },
     "voice": {
       "type": "object",

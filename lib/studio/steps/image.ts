@@ -9,9 +9,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { NextRequest } from 'next/server';
-import { GET as renderCard } from '@/app/api/image/card/route';
+import { GET as renderClassic } from '@/app/api/image/card/route';
+import { GET as renderStudio } from '@/app/api/studio/card/route';
 import { layoutFindings, measureCard } from '../gates/layout';
-import { cardParams } from '../kits/load';
+import { cardParams, cardEngine, cardPath } from '../kits/load';
+import { paletteFor } from '../card/theme';
 import type { Draft } from '../gold';
 import type { RunCtx, SourceItem, Step } from './types';
 
@@ -29,11 +31,12 @@ export interface CardAsset {
 
 function cardUrl(draft: Draft, ctx: RunCtx): string {
   const item = ctx.outputs.fetch as SourceItem | undefined;
-  return `http://127.0.0.1/api/image/card?${cardParams(ctx.kit, draft, item?.url)}`;
+  return `http://127.0.0.1${cardPath(ctx.kit)}?${cardParams(ctx.kit, draft, item?.url)}`;
 }
 
 async function renderTo(file: string, draft: Draft, ctx: RunCtx): Promise<string> {
-  const res = await renderCard(new NextRequest(cardUrl(draft, ctx)));
+  const render = cardEngine(ctx.kit) === 'studio' ? renderStudio : renderClassic;
+  const res = await render(new NextRequest(cardUrl(draft, ctx)));
   if (!res.ok) throw new Error(`Trình dựng ảnh trả về ${res.status}.`);
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const abs = path.join(OUT_DIR, file);
@@ -66,8 +69,15 @@ export const imageStep: Step<Draft, CardAsset> = {
     return { url: `/studio-runs/${file}`, path: abs, kind: 'png' as const };
   },
 
-  async gate(card) {
+  async gate(card, ctx) {
+    // The palette under test is the one that rendered: the classic route's fixed blue band,
+    // or the theme this kit chose.
+    const tab = (ctx.kit.card ?? {}) as { theme?: string; highlightColor?: string };
+    const pal = cardEngine(ctx.kit) === 'studio' ? paletteFor(tab.theme as any, tab.highlightColor) : null;
     const m = await measureCard(fs.readFileSync(card.path));
-    return { checked: 3, findings: layoutFindings(m, HIGHLIGHT, BAND) };
+    return {
+      checked: 3,
+      findings: layoutFindings(m, pal ? pal.hl : HIGHLIGHT, pal ? pal.bg : BAND),
+    };
   },
 };

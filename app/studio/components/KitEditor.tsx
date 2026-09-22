@@ -8,7 +8,8 @@
  */
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { cardParams } from '@/lib/studio/kits/load';
+import { cardParams, cardPath } from '@/lib/studio/kits/load';
+import { contrastRatio, paletteFor, type ThemeName } from '@/lib/studio/card/theme';
 import type { Kit } from '@/lib/studio/steps/types';
 
 export interface FieldSpec {
@@ -62,12 +63,31 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
 
   const tab = tabs.find((t) => t.key === active)!;
   const values = (kit[active] ?? {}) as Record<string, unknown>;
-  const src = useMemo(() => `/api/image/card?${cardParams(kit, SAMPLE)}`, [kit]);
+  const src = useMemo(() => `${cardPath(kit)}?${cardParams(kit, SAMPLE)}`, [kit]);
 
   const patch = (next: Record<string, unknown>) => {
     setKit((k) => ({ ...k, [active]: { ...((k[active] ?? {}) as object), ...next } }));
     setSaved(false);
   };
+
+  /**
+   * Choosing a preset REPLACES the tab; it does not merge into it. Merging kept the previous
+   * kit's highlightColor through a theme change, which painted the demo kit's yellow onto the
+   * newspaper theme's white — 1.2:1, and unreadable.
+   */
+  const applyPreset = (values: Record<string, unknown>) => {
+    setKit((k) => ({ ...k, [active]: { ...values } }));
+    setSaved(false);
+  };
+
+  // The same arithmetic the layout gate will judge by, run while the owner is still choosing.
+  const warn = (() => {
+    if (active !== 'card' || (values.engine ?? 'classic') !== 'studio') return null;
+    const pal = paletteFor(values.theme as ThemeName, values.highlightColor as string | undefined);
+    const r = contrastRatio(pal.hl, pal.bg);
+    if (r >= 3) return null;
+    return `Màu nhấn chỉ đạt ${r.toFixed(2)}:1 trên nền ${pal.bg} — dưới ngưỡng 3:1, cổng ảnh sẽ chặn.`;
+  })();
 
   async function save() {
     setSaving(true);
@@ -113,7 +133,7 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
                     key={p.id}
                     type="button"
                     data-testid={`preset-${tab.key}-${p.id}`}
-                    onClick={() => patch(p.values)}
+                    onClick={() => applyPreset(p.values)}
                     className={`pen-line-sm rounded-md px-2 py-1 text-xs font-semibold ${
                       values.preset === p.id ? 'bg-primary text-primary-foreground' : 'bg-card'
                     }`}
@@ -122,6 +142,15 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
                   </button>
                 ))}
               </div>
+            )}
+
+            {warn && (
+              <p
+                data-testid="kit-contrast-warning"
+                className="pen-line-sm rounded-md bg-[hsl(var(--warning))] px-2 py-1 text-[11px] text-[hsl(var(--warning-foreground))]"
+              >
+                {warn}
+              </p>
             )}
 
             {tab.media && tab.media.length > 0 && (

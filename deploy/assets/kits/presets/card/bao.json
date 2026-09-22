@@ -1,0 +1,10 @@
+{
+  "preset": "bao",
+  "engine": "studio",
+  "font": "BeVietnamPro-Black",
+  "theme": "bao",
+  "ratio": "4:5",
+  "highlight": "after-colon",
+  "background": "none",
+  "radius": 0
+}
