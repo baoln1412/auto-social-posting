@@ -15,7 +15,7 @@ export default function StudioNewPage() {
   }[];
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
       <header>
         <h1 className="text-2xl font-bold">Tạo mới</h1>
         <p className="text-sm text-muted-foreground">

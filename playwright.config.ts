@@ -16,6 +16,15 @@ export default defineConfig({
     url: 'http://127.0.0.1:3001/studio',
     reuseExistingServer: true,
     timeout: 240_000,
-    env: { STUDIO_ENABLED: '1', NEXT_DIST_DIR: '.next-dev' },
+    env: {
+      STUDIO_ENABLED: '1',
+      NEXT_DIST_DIR: '.next-dev',
+      // DuckDB is single-writer across processes and :3000 holds data/lake.duckdb. Dev reads
+      // its own snapshot (`cp data/lake.duckdb data/lake-dev.duckdb`) — same code path, real
+      // rows, and production's lock is never contested.
+      DUCKDB_PATH: 'data/lake-dev.duckdb',
+      // Channels and runs a test creates do not belong in the owner's data/local.db.
+      STUDIO_SQLITE_PATH: 'data/studio-test.db',
+    },
   },
 });

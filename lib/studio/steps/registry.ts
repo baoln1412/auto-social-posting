@@ -4,6 +4,7 @@
  */
 import type { Channel, Step, StepName } from './types';
 import { DEMO_STEPS } from '../demo/steps';
+import { fetchStep } from './fetch';
 
 export function isDemoChannel(c: Channel): boolean {
   try {
@@ -15,8 +16,10 @@ export function isDemoChannel(c: Channel): boolean {
   }
 }
 
-/** Real engines, filled in by slice 3. */
-const REAL: Partial<Record<StepName, Step>> = {};
+/** Real engines. draft/image/reel land in slice 3. */
+const REAL: Partial<Record<StepName, Step>> = {
+  fetch: fetchStep,
+};
 
 export function resolveStep(name: StepName, channel: Channel): Step {
   const step = (isDemoChannel(channel) ? DEMO_STEPS : REAL)[name];

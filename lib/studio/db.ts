@@ -39,6 +39,7 @@ export function ensureStudioTables(d: Database.Database): void {
       sources_json  TEXT DEFAULT '[]',
       auto_continue INTEGER DEFAULT 0,
       tier_min      TEXT DEFAULT 'owner',
+      makes_json    TEXT DEFAULT '["post","reel"]',
       created_at    TEXT DEFAULT ${NOW}
     );
 
@@ -102,6 +103,17 @@ export function ensureStudioTables(d: Database.Database): void {
     CREATE INDEX IF NOT EXISTS studio_assets_run ON studio_assets (run_id);
     CREATE INDEX IF NOT EXISTS studio_runs_channel ON studio_runs (channel_id);
   `);
+
+  // SQLite has no IF NOT EXISTS for a column, and studio_channels already exists on this
+  // machine from slice 0.
+  ensureColumn(d, 'studio_channels', 'makes_json', `TEXT DEFAULT '["post","reel"]'`);
+}
+
+function ensureColumn(d: Database.Database, table: string, name: string, def: string): void {
+  const cols = (d.prepare(`PRAGMA table_info("${table}")`).all() as { name: string }[]).map(
+    (r) => r.name,
+  );
+  if (!cols.includes(name)) d.exec(`ALTER TABLE "${table}" ADD COLUMN "${name}" ${def}`);
 }
 
 /** Tests only: drop the handle so the next studioDb() re-opens (and re-creates) the file. */
