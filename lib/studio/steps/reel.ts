@@ -14,6 +14,7 @@ import { STEP_ORDER } from '@/app/lib/videoSteps';
 import { scenesFor } from '../scenes';
 import { setRunJob } from '../progress';
 import { captionStyle, effectiveFrame, voiceId } from '../kits/load';
+import { applyStickers, backgroundMedia } from './overlay';
 import { budgetFindings, probeDuration, type BudgetKit, type DurationBand } from '../gates/budget';
 import type { Draft } from '../gold';
 import type { CardAsset } from './image';
@@ -83,7 +84,11 @@ export const reelStep: Step<Draft, ReelAsset> = {
       jobId = startRenderJob({
         emojiTitle: draft.title,
         narration: narrationFor(draft, ctx),
-        media: card ? [{ url: `file://${card.path}`, kind: 'image' }] : [],
+          // The owner's own background leads when the kit names one; the card follows it.
+        media: [
+          backgroundMedia(ctx.kit),
+          card ? ({ url: `file://${card.path}`, kind: 'image' } as const) : null,
+        ].filter(Boolean) as { url: string; kind: 'image' | 'video' }[],
         includeIntro: frame.includeIntro,
         includeLayout: frame.includeLayout,
         style: Object.keys(style).length ? JSON.stringify(style) : undefined,
@@ -98,6 +103,8 @@ export const reelStep: Step<Draft, ReelAsset> = {
     for (;;) {
       const job = getJob(jobId);
       if (job?.status === 'done' && job.file) {
+        // One ffmpeg pass beside the engine, never inside it.
+        await applyStickers(outputPath(job.file), ctx.kit);
         return {
           url: `/api/video/file?f=${job.file}`,
           file: job.file,

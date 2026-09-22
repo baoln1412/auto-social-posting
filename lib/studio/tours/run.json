@@ -1,0 +1,5 @@
+[
+  { "target": "[data-testid='step-fetch']", "title": "Từng bước một", "body": "Mỗi bước hiện kết quả và giá của nó. Không bước nào tiêu tiền trước khi bạn thấy nó sẽ làm gì." },
+  { "target": "[data-testid='scene-list']", "title": "Danh sách cảnh", "body": "Bài viết tách thành từng cảnh. Bình luận bạn chọn được chèn vào cuối, kèm số lượt thích." },
+  { "target": "[data-testid='comment-pool']", "title": "Kho bình luận", "body": "Tích một bình luận để biến nó thành cảnh. Danh sách cảnh đổi ngay, trước khi dựng." }
+]

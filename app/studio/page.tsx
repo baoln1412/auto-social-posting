@@ -1,6 +1,8 @@
 import { studioDb } from '@/lib/studio/db';
 import { tier, can } from '@/lib/studio/tier';
 import { NewRunBox, type ChannelRow } from './components/NewRunBox';
+import newTour from '@/lib/studio/tours/new.json';
+import { Tour } from './components/Tour';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +62,8 @@ export default function StudioNewPage() {
           <p className="text-sm text-muted-foreground/70">Chưa có lượt chạy nào.</p>
         </div>
       </section>
+
+      <Tour id="new" steps={newTour} />
     </div>
   );
 }

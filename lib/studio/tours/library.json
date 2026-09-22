@@ -1,0 +1,4 @@
+[
+  { "target": "[data-testid='lib-search']", "title": "Tìm bằng link", "body": "Gõ chính đường dẫn bạn đã dán — hoặc tên kênh, tiêu đề, mã lượt chạy." },
+  { "target": "[data-testid='lib-view']", "title": "Lưới hay bảng", "body": "Lưới để nhìn ảnh, bảng để rà nhanh trạng thái." }
+]

@@ -10,6 +10,7 @@
  * failure mode this table exists to prevent.
  */
 import { randomUUID } from 'node:crypto';
+import { statSync } from 'node:fs';
 import { studioDb } from './db';
 import { resolveStep } from './steps/registry';
 import {
@@ -279,6 +280,25 @@ export async function advance(
     startedAt,
     new Date().toISOString(),
   );
+
+  // One place records artefacts, so no step has to remember to. Keyed run+step, so a
+  // re-run replaces its asset instead of stacking a second row next to a deleted file.
+  const asset = output as { kind?: string; url?: string; path?: string } | null;
+  if (!error && asset && typeof asset === 'object' && asset.kind && asset.url) {
+    let bytes: number | null = null;
+    try {
+      if (asset.path) bytes = statSync(asset.path).size;
+    } catch {
+      /* the file may be served from elsewhere; size is a nicety, not a reason to fail */
+    }
+    d.prepare(
+      `INSERT OR REPLACE INTO studio_assets (id, run_id, kind, path, meta_json)
+       VALUES (?,?,?,?,?)`,
+    ).run(`${id}:${name}`, id, asset.kind, asset.path ?? null, JSON.stringify({ url: asset.url }));
+    if (bytes !== null) {
+      d.prepare('UPDATE studio_assets SET bytes=? WHERE id=?').run(bytes, `${id}:${name}`);
+    }
+  }
 
   let status: RunStatus;
   let current: StepName = name;

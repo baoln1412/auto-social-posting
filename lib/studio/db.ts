@@ -95,6 +95,7 @@ export function ensureStudioTables(d: Database.Database): void {
       run_id     TEXT,
       kind       TEXT,
       path       TEXT,
+      bytes      INTEGER,
       meta_json  TEXT DEFAULT '{}',
       created_at TEXT DEFAULT ${NOW}
     );
@@ -107,6 +108,7 @@ export function ensureStudioTables(d: Database.Database): void {
   // SQLite has no IF NOT EXISTS for a column, and studio_channels already exists on this
   // machine from slice 0.
   ensureColumn(d, 'studio_channels', 'makes_json', `TEXT DEFAULT '["post","reel"]'`);
+  ensureColumn(d, 'studio_assets', 'bytes', 'INTEGER');
 }
 
 function ensureColumn(d: Database.Database, table: string, name: string, def: string): void {

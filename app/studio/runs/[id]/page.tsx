@@ -4,6 +4,8 @@ import { declaresGate, getRun, previewStep } from '@/lib/studio/runs';
 import { can, tier } from '@/lib/studio/tier';
 import type { SourceItem, StepName } from '@/lib/studio/steps/types';
 import { RunView, type StepView } from '../../components/RunView';
+import runTour from '@/lib/studio/tours/run.json';
+import { Tour } from '../../components/Tour';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +31,9 @@ export default async function RunPage({ params }: { params: { id: string } }) {
   }[];
 
   return (
-    <RunView
+    <>
+      <Tour id="run" steps={runTour} />
+      <RunView
       runId={rec.run.id}
       mode={rec.run.mode}
       status={rec.run.status}
@@ -44,7 +48,8 @@ export default async function RunPage({ params }: { params: { id: string } }) {
       kits={kits}
       overrides={rec.run.overrides}
       selection={rec.run.selection}
-      canSpend={can(t, 'spend')}
-    />
+        canSpend={can(t, 'spend')}
+      />
+    </>
   );
 }

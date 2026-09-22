@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import fs from 'node:fs';
 import { studioDb } from '@/lib/studio/db';
 import { kitSchema, listPresetFiles } from '@/lib/studio/kits/schema';
+import { listMedia, type MediaKind } from '@/lib/studio/assets';
 import type { Kit } from '@/lib/studio/steps/types';
 import { KitEditor, type FieldSpec, type TabSpec } from '../../components/KitEditor';
 import captionPresets from '@/deploy/assets/caption-presets.json';
@@ -50,12 +51,27 @@ export default function KitEditorPage({ params }: { params: { id: string } }) {
   const defs = kitSchema().definitions ?? {};
   const files = listPresetFiles();
 
+  // Which kit field an uploaded file lands in, per tab. A tab with no entry shows no uploads.
+  const MEDIA_FOR: Record<string, { kind: MediaKind; field: string }> = {
+    frame: { kind: 'bg', field: 'background' },
+    stickers: { kind: 'sticker', field: 'set' },
+    music: { kind: 'music', field: 'track' },
+  };
+
   const tabs: TabSpec[] = Object.keys(LABELS)
     .filter((k) => defs[k])
     .map((key) => ({
       key,
       label: LABELS[key],
       fields: fieldsOf(defs[key]),
+      media: MEDIA_FOR[key]
+        ? listMedia(MEDIA_FOR[key].kind).map((m) => ({
+            id: m.id,
+            name: m.name,
+            url: m.url,
+            field: MEDIA_FOR[key].field,
+          }))
+        : undefined,
       presets:
         key === 'captions'
           ? // One file, two readers (app/lib/captionPresets.ts) — the wall comes from there,

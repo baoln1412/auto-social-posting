@@ -1,0 +1,6 @@
+[
+  { "target": "[data-testid='mode-read-post']", "title": "Chọn kiểu video", "body": "Bốn kiểu: đọc nguyên bài, tự viết lời đọc, lồng tiếng lên ảnh/video của bạn, hoặc video dọc từ chữ." },
+  { "target": "[data-testid='channel-picker']", "title": "Chọn kênh", "body": "Mỗi kênh gắn với một nguồn đã thử chạy được và một bộ nhận diện." },
+  { "target": "[data-testid='override-drawer']", "title": "Sửa riêng lượt này", "body": "Mọi thứ ở đây chỉ áp dụng cho lượt chạy này. Bộ nhận diện của kênh không bị đổi." },
+  { "target": "[data-testid='create-run']", "title": "Bắt đầu", "body": "Từ đây mỗi bước sẽ hiện kết quả và chi phí trước khi bước sau chạy." }
+]

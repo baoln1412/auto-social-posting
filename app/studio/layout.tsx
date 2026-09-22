@@ -13,9 +13,9 @@ const NAV: { href: string; label: string; soon?: boolean }[] = [
   { href: '/studio', label: 'Tạo mới' },
   { href: '/studio/channels', label: 'Kênh' },
   { href: '/studio/kits', label: 'Bộ nhận diện' },
-  { href: '/studio/library', label: 'Thư viện', soon: true },
-  { href: '/studio/assets', label: 'Kho tài nguyên', soon: true },
-  { href: '/studio/guide', label: 'Hướng dẫn', soon: true },
+  { href: '/studio/library', label: 'Thư viện' },
+  { href: '/studio/assets', label: 'Kho tài nguyên' },
+  { href: '/studio/guide', label: 'Hướng dẫn' },
   { href: '/studio/settings', label: 'Cài đặt', soon: true },
 ];
 

@@ -24,6 +24,8 @@ export interface TabSpec {
   label: string;
   fields: FieldSpec[];
   presets: { id: string; values: Record<string, unknown> }[];
+  /** The owner's own uploads for this tab, from Kho tài nguyên. */
+  media?: { id: string; name: string; url: string; field: string }[];
 }
 
 const SAMPLE = {
@@ -119,6 +121,30 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
                     {p.id}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {tab.media && tab.media.length > 0 && (
+              <div data-testid="kit-media" className="flex flex-col gap-1.5">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Tệp của bạn
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {tab.media.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      title={m.name}
+                      data-testid={`media-pick-${m.id}`}
+                      onClick={() => patch({ [m.field]: m.id })}
+                      className={`pen-line-sm max-w-[8rem] truncate rounded-md px-2 py-1 text-[10px] font-semibold ${
+                        values[m.field] === m.id ? 'bg-primary text-primary-foreground' : 'bg-card'
+                      }`}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
