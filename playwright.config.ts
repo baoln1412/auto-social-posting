@@ -23,6 +23,9 @@ export default defineConfig({
     timeout: 240_000,
     env: {
       STUDIO_ENABLED: '1',
+      // Inlined into the client bundle at build time. Unset on :3000, so the production
+      // build does not even contain the link.
+      NEXT_PUBLIC_STUDIO_ENABLED: '1',
       NEXT_DIST_DIR: '.next-dev',
       // DuckDB is single-writer across processes and :3000 holds data/lake.duckdb. Dev reads
       // its own snapshot (`cp data/lake.duckdb data/lake-dev.duckdb`) — same code path, real

@@ -466,6 +466,19 @@ export default function PostCard({ post, isNew, onToggleDone, onStatusChange, pa
           </button>
         )}
 
+        {/* Open this post in Studio. Additive: the Tạo Video drawer below is untouched, and
+            this renders only where NEXT_PUBLIC_STUDIO_ENABLED is set — production never sees
+            a link into a route tree it does not serve. */}
+        {process.env.NEXT_PUBLIC_STUDIO_ENABLED && post.id && (
+          <a
+            href={`/studio/runs/new?item=gold:${post.id}&market=${pageId}`}
+            data-testid="open-in-studio"
+            className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm font-semibold hover:bg-muted transition-colors"
+          >
+            Mở trong Studio
+          </a>
+        )}
+
         {/* Video Generation */}
         <Button onClick={() => setVideoOpen(true)}
           className="w-full bg-gradient-to-r from-primary to-primary hover:from-primary hover:to-primary text-white font-semibold">
