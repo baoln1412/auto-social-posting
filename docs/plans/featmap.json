@@ -1,0 +1,373 @@
+{
+ "status": {
+  "now": [
+   "#2f6b4f",
+   "",
+   "now · a slice"
+  ],
+  "preset": [
+   "#0f8fa3",
+   "",
+   "preset · content in a kit tab"
+  ],
+  "later": [
+   "#b45309",
+   "",
+   "later · a named slice"
+  ],
+  "engine": [
+   "#6b7280",
+   "6 4",
+   "engine · needs make-reel.py changed (second plan)"
+  ],
+  "never": [
+   "#b91c1c",
+   "2 4",
+   "never · not for this owner"
+  ]
+ },
+ "left": [
+  {
+   "id": "A",
+   "title": "Tạo video",
+   "mock": "create",
+   "features": [
+    {
+     "feature": "Dán link · nguồn · kit",
+     "target": "new",
+     "status": "now",
+     "ours": "One box: paste a URL, pick a source, or write text; channel and kit pickers beside it.",
+     "reason": "Slice 0. Sources day one: news RSS, Reddit, article URL, own text, own-account Threads. Other people's Meta posts: paste the text."
+    },
+    {
+     "feature": "4 chế độ: Đọc bài · Viết lời · Lồng tiếng · Video dọc",
+     "target": "new",
+     "status": "now",
+     "ours": "`mode` on the run: read-post · write-narration · voice-over-media · text-to-reel.",
+     "reason": "Slice 1. Lồng tiếng works today because startRenderJob already takes media[]."
+    },
+    {
+     "feature": "Gợi ý từ kho nguồn · Kết quả gần đây",
+     "target": "new",
+     "status": "now",
+     "ours": "Suggestions = gold posts of this channel with no reel yet; Recent = last runs.",
+     "reason": "Slice 0. Same query feeds the Library's bottom strip."
+    }
+   ]
+  },
+  {
+   "id": "B",
+   "title": "Tuỳ chỉnh video (drawer)",
+   "mock": "drawer",
+   "features": [
+    {
+     "feature": "kit · thời lượng · bình luận · duyệt trước",
+     "target": "run",
+     "status": "now",
+     "ours": "Per-run override drawer (overrides_json), merged over the kit at run time; never writes back to the kit.",
+     "reason": "Slice 1. Duyệt trước = auto_continue off; duration = the budget gate's band; comment mode auto/manual = the pool."
+    },
+    {
+     "feature": "intro · layout · nhạc · style",
+     "target": "run",
+     "status": "now",
+     "ours": "Toggles in the same drawer.",
+     "reason": "Slice 1/3. Each maps to a flag the render job already accepts (--no-intro, includeLayout, style, music tier)."
+    },
+    {
+     "feature": "che mặt · SFX · GIF phản ứng · outro CTA",
+     "target": "engine",
+     "status": "engine",
+     "ours": "Not in make-reel.py.",
+     "reason": "A renderer feature, not a surface one. Belongs to a second plan after the surface exists and has been used."
+    },
+    {
+     "feature": "chất lượng HD/30fps",
+     "target": "never",
+     "status": "never",
+     "ours": "One output quality.",
+     "reason": "Nothing to choose; the renderer has one profile."
+    }
+   ]
+  },
+  {
+   "id": "C",
+   "title": "Cấu hình video (Brand Kit, 8 tab)",
+   "mock": "kit",
+   "features": [
+    {
+     "feature": "Thương hiệu: tên · logo · hashtag",
+     "target": "kit",
+     "status": "now",
+     "ours": "identity + post tabs of the kit.",
+     "reason": "Slice 4."
+    },
+    {
+     "feature": "Nội dung: cách kể · chọn bình luận · độ dài",
+     "target": "kit",
+     "status": "now",
+     "ours": "post tab (format), channel default for comment mode, budget gate range.",
+     "reason": "Slice 4; the pool itself is on the run page (Slice 1–3)."
+    },
+    {
+     "feature": "Giọng đọc: giọng · tốc độ · ngắt · đọc thử",
+     "target": "kit",
+     "status": "now",
+     "ours": "voice tab: edge-tts voice id, rate, pause ms, test read.",
+     "reason": "Slice 4. The owner's cloned voice (bao) is a later provider."
+    },
+    {
+     "feature": "nhiều giọng theo câu",
+     "target": "engine",
+     "status": "engine",
+     "ours": "make-reel calls TTS once for the whole narration, by design (one network call).",
+     "reason": "Changing that is engine work; measured $0 path stays."
+    },
+    {
+     "feature": "Ảnh chụp bài viết: chữ · rộng · vị trí · theme",
+     "target": "kit",
+     "status": "now",
+     "ours": "card tab → the parameters /api/image/card already takes.",
+     "reason": "Slice 4. Changing a value means the card re-renders next run, same as theirs."
+    },
+    {
+     "feature": "Phụ đề: mẫu karaoke",
+     "target": "kit",
+     "status": "preset",
+     "ours": "captions tab reads deploy/assets/caption-presets.json — one file, two readers (preview + render).",
+     "reason": "Exists today; the tab adds the wall of samples."
+    },
+    {
+     "feature": "Khung hình: 3 bố cục · 531 ảnh nền",
+     "target": "kit",
+     "status": "preset",
+     "ours": "frame tab: layout presets (card-top / card-centre / continuous) + shipped background set.",
+     "reason": "Presets are content: ≥ 6 per tab or the tab is not done. Own uploads come from Assets."
+    },
+    {
+     "feature": "Nhãn dán: bộ sticker · bìa · mở đầu",
+     "target": "assets",
+     "status": "later",
+     "ours": "Sticker set from Assets, applied on cover/intro by an overlay step after the engine.",
+     "reason": "Slice 5. ffmpeg overlay beside make-reel.py, never inside it."
+    },
+    {
+     "feature": "Chữ ký trôi (DVD)",
+     "target": "engine",
+     "status": "engine",
+     "ours": "A moving overlay across the whole clip.",
+     "reason": "Renderer work; second plan."
+    },
+    {
+     "feature": "Watermark chìm",
+     "target": "assets",
+     "status": "later",
+     "ours": "Static tiled watermark by the same overlay step.",
+     "reason": "Slice 5."
+    },
+    {
+     "feature": "Ngôn ngữ + dịch",
+     "target": "kit",
+     "status": "later",
+     "ours": "VI only now.",
+     "reason": "AILP already renders EN + VI; comes when the two apps share the kit."
+    },
+    {
+     "feature": "Lấy profile TikTok · kênh đăng tự động",
+     "target": "never",
+     "status": "never",
+     "ours": "— · the publish step later, sanctioned APIs only.",
+     "reason": "No TikTok tool here; auto-post is the publish step of a later slice."
+    }
+   ]
+  },
+  {
+   "id": "D",
+   "title": "Chỉnh lớp (layer editor)",
+   "mock": "layers",
+   "features": [
+    {
+     "feature": "canvas Hook / Thân / Mở đầu · lớp · khoá · undo",
+     "target": "layer",
+     "status": "later",
+     "ours": "Frame presets are the layout system. A canvas with draggable text/image/shape layers starts only if presets fail.",
+     "reason": "Slice 7, conditional: after two weeks of use, the owner names a layout presets cannot express. Layers would live in the kit and render through the overlay step."
+    }
+   ]
+  },
+  {
+   "id": "E",
+   "title": "Chỉnh & Render lại",
+   "mock": "review",
+   "features": [
+    {
+     "feature": "CẢNH #n · likes · Text TTS · Text gốc · Nghe thoại",
+     "target": "run",
+     "status": "now",
+     "ours": "Run page scene list: post first, then each selected comment with its score, original text on hover, per-scene edit + Nghe thử.",
+     "reason": "Slice 1 (fixture) → 3 (real). Nested replies indented one level."
+    },
+    {
+     "feature": "COMMENT KHÁC · n · Ẩn không chọn",
+     "target": "run",
+     "status": "now",
+     "ours": "The comment pool under the scenes: every comment with score, checkbox to promote, hide unselected.",
+     "reason": "Sources with comments: Reddit (score), own Threads (likes), gold rows (comment_1..3)."
+    },
+    {
+     "feature": "Chỉnh tiếp & render lại",
+     "target": "run",
+     "status": "now",
+     "ours": "Re-run this step; runs resume from the failed or edited step.",
+     "reason": "Slice 1. A step writes its record on success and on failure."
+    }
+   ]
+  },
+  {
+   "id": "F",
+   "title": "Thư viện video",
+   "mock": "library",
+   "features": [
+    {
+     "feature": "tìm · sắp xếp · lưới/danh sách · hôm nay",
+     "target": "library",
+     "status": "now",
+     "ours": "Same, plus a tooltip with file name, size, status; download via /api/video/file.",
+     "reason": "Slice 5."
+    },
+    {
+     "feature": "Có thể bạn cũng thích",
+     "target": "new",
+     "status": "now",
+     "ours": "The Suggestions strip, same query as New.",
+     "reason": "Slice 0."
+    },
+    {
+     "feature": "giữ 24 giờ",
+     "target": "never",
+     "status": "never",
+     "ours": "We keep everything.",
+     "reason": "It is our disk."
+    }
+   ]
+  },
+  {
+   "id": "G",
+   "title": "Kho tài nguyên",
+   "mock": "assets",
+   "features": [
+    {
+     "feature": "ảnh nền · video nền · sticker · nhạc · 50 MB",
+     "target": "assets",
+     "status": "later",
+     "ours": "Assets page: own uploads (bg, sticker, music) with a quota bar; listed next to shipped presets in the kit tabs.",
+     "reason": "Slice 5. Uploads only — no Pinterest / MyInstants fetching (licensing)."
+    }
+   ]
+  },
+  {
+   "id": "H",
+   "title": "Tiện ích · Cài đặt · Hướng dẫn",
+   "mock": "settings",
+   "features": [
+    {
+     "feature": "Chrome extension · phiên TikTok/FB · Pinterest",
+     "target": "never",
+     "status": "never",
+     "ours": "—",
+     "reason": "Our sources are crawled, not captured from a logged-in tab; session capture and third-party asset grabbing have no route we would run."
+    },
+    {
+     "feature": "Credit · nạp credit",
+     "target": "run",
+     "status": "now",
+     "ours": "Cost in $ next to every step's button; no billing.",
+     "reason": "Slice 1. The tier seam is where billing would attach if this ever serves others."
+    },
+    {
+     "feature": "Telegram",
+     "target": "telegram",
+     "status": "later",
+     "ours": "Opt-in bot: finished reel and failed steps arrive in chat.",
+     "reason": "Slice 5b, behind can(tier, deliver); off by default."
+    },
+    {
+     "feature": "email · giới thiệu · mật khẩu · xoá tài khoản",
+     "target": "never",
+     "status": "never",
+     "ours": "—",
+     "reason": "Owner behind Cloudflare Access; SaaS account furniture."
+    },
+    {
+     "feature": "Hướng dẫn · tour 8 bước",
+     "target": "guide",
+     "status": "now",
+     "ours": "Guide hub of task cards + a tour per screen from a JSON spec, once per browser.",
+     "reason": "Slice 5."
+    }
+   ]
+  }
+ ],
+ "right": [
+  {
+   "id": "new",
+   "title": "New  /studio",
+   "sub": "S0 · S1",
+   "mock": "new"
+  },
+  {
+   "id": "run",
+   "title": "Run page  /studio/runs/[id]",
+   "sub": "S1 – S3",
+   "mock": "run"
+  },
+  {
+   "id": "kit",
+   "title": "Kit editor  /studio/kits/[id]",
+   "sub": "S4 · presets",
+   "mock": "kit"
+  },
+  {
+   "id": "assets",
+   "title": "Assets  /studio/assets",
+   "sub": "S5 · overlay step",
+   "mock": "assets"
+  },
+  {
+   "id": "library",
+   "title": "Library  /studio/library",
+   "sub": "S5",
+   "mock": "library"
+  },
+  {
+   "id": "guide",
+   "title": "Guide + tour",
+   "sub": "S5",
+   "mock": "guide"
+  },
+  {
+   "id": "telegram",
+   "title": "Telegram delivery",
+   "sub": "S5b · opt-in",
+   "mock": "telegram"
+  },
+  {
+   "id": "layer",
+   "title": "Layer editor",
+   "sub": "S7 · only if presets fail",
+   "mock": "layer"
+  },
+  {
+   "id": "engine",
+   "title": "Engine — a second plan",
+   "sub": "make-reel.py unchanged here",
+   "mock": "engine"
+  },
+  {
+   "id": "never",
+   "title": "Never",
+   "sub": "owner behind Access · no route · licensing",
+   "mock": "never"
+  }
+ ]
+}

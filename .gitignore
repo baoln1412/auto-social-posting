@@ -1,5 +1,6 @@
 # Next.js
 .next/
+.next-dev/
 out/
 
 # Dependencies
@@ -67,3 +68,6 @@ __pycache__/
 
 # code-review-graph index — regenerable with `code-review-graph build`.
 .code-review-graph/
+
+# Playwright run artefacts (traces, failure contexts). tests/shots/ IS committed.
+tests/.playwright/
