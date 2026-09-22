@@ -94,7 +94,32 @@ export interface MarketContext {
   glossary?: string;
 }
 
-export function buildPrompt(item: SourceItem, market: MarketContext): [string, string] {
+export interface PostTab {
+  format?: string;
+  length?: 'short' | 'medium' | 'long';
+  emoji?: 'none' | 'light' | 'heavy';
+  hashtags?: number;
+}
+
+const LENGTH_WORDS = { short: '250–350', medium: '400–550', long: '600–800' };
+const EMOJI_RULE = {
+  none: 'Không dùng emoji.',
+  light: 'Emoji thưa: chỉ ở tiêu đề và đầu mỗi mục.',
+  heavy: 'Emoji dày: mỗi đoạn một emoji dẫn.',
+};
+
+/** The kit's post tab as prompt lines. A tab nothing reads is a tab that does nothing. */
+export function postRules(post: PostTab): string {
+  const lines = [
+    post.format && `Dạng bài: ${post.format}.`,
+    post.length && `Độ dài thân bài: ${LENGTH_WORDS[post.length]} từ.`,
+    post.emoji && EMOJI_RULE[post.emoji],
+    post.hashtags !== undefined && `Đúng ${post.hashtags} hashtag.`,
+  ].filter(Boolean);
+  return lines.length ? `## Theo bộ nhận diện của kênh\n${lines.join('\n')}` : '';
+}
+
+export function buildPrompt(item: SourceItem, market: MarketContext, post: PostTab = {}): [string, string] {
   const extras = [
     market.writing_style && `## Giọng văn của thị trường này\n${market.writing_style}`,
     market.wording_rules && `## Quy tắc dùng từ\n${market.wording_rules}`,
@@ -105,6 +130,7 @@ export function buildPrompt(item: SourceItem, market: MarketContext): [string, s
 
   const system = [
     contentSop(),
+    postRules(post),
     extras,
     'Trả lời DUY NHẤT một đối tượng JSON với các khoá: emoji_title, body_text, hashtags ' +
       '(một chuỗi các thẻ cách nhau bởi dấu cách), comment_1, comment_2, comment_3. ' +
@@ -125,10 +151,14 @@ export function buildPrompt(item: SourceItem, market: MarketContext): [string, s
   return [system, user];
 }
 
-export async function generateDraft(item: SourceItem, market: MarketContext): Promise<Draft> {
+export async function generateDraft(
+  item: SourceItem,
+  market: MarketContext,
+  post: PostTab = {},
+): Promise<Draft> {
   const blocked = draftAvailable();
   if (blocked) throw new Error(blocked);
-  const [system, user] = buildPrompt(item, market);
+  const [system, user] = buildPrompt(item, market, post);
   const draft = parseDraftJson(await generateContent(system, user, true));
   return { ...draft, sourceUrl: item.url, source: item.source };
 }

@@ -7,7 +7,12 @@ test.setTimeout(16 * 60_000);
 
 test('one real gold post becomes a post, a card and an MP4', async ({ page, request }) => {
   const ch = await request.post('/api/studio/channels', {
-    data: { name: `US real ${Date.now()}`, kind: 'gold', config: { marketId: US }, kitId: 'demo' },
+    data: {
+      name: `US real ${Date.now()}`,
+      kind: 'gold',
+      config: { marketId: US },
+      kitId: 'desoul-posting-vi',
+    },
   });
   const { id: channelId } = (await ch.json()) as { id: string };
 

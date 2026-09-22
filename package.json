@@ -17,6 +17,7 @@
     "@duckdb/node-api": "^1.5.4-r.1",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.99.1",
+    "ajv": "^8.20.0",
     "better-sqlite3": "^12.11.1",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",

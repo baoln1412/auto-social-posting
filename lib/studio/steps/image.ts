@@ -11,6 +11,7 @@ import path from 'node:path';
 import { NextRequest } from 'next/server';
 import { GET as renderCard } from '@/app/api/image/card/route';
 import { layoutFindings, measureCard } from '../gates/layout';
+import { cardParams } from '../kits/load';
 import type { Draft } from '../gold';
 import type { RunCtx, SourceItem, Step } from './types';
 
@@ -27,14 +28,8 @@ export interface CardAsset {
 }
 
 function cardUrl(draft: Draft, ctx: RunCtx): string {
-  const kit = (ctx.kit.card ?? {}) as { ratio?: string };
   const item = ctx.outputs.fetch as SourceItem | undefined;
-  const q = new URLSearchParams({ title: draft.title, ratio: kit.ratio === '1:1' ? '1:1' : '4:5' });
-  // The first clause of the headline, painted in the highlight — the SOP's own convention.
-  const hl = draft.title.split(/[:—–]/)[1]?.trim();
-  if (hl) q.set('hl', hl);
-  if (item?.url) q.set('article', item.url);
-  return `http://127.0.0.1/api/image/card?${q}`;
+  return `http://127.0.0.1/api/image/card?${cardParams(ctx.kit, draft, item?.url)}`;
 }
 
 async function renderTo(file: string, draft: Draft, ctx: RunCtx): Promise<string> {

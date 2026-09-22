@@ -13,6 +13,7 @@ import { getJob, outputPath, startRenderJob } from '@/app/lib/videoJobs';
 import { STEP_ORDER } from '@/app/lib/videoSteps';
 import { scenesFor } from '../scenes';
 import { setRunJob } from '../progress';
+import { captionStyle, effectiveFrame, voiceId } from '../kits/load';
 import { budgetFindings, probeDuration, type BudgetKit, type DurationBand } from '../gates/budget';
 import type { Draft } from '../gold';
 import type { CardAsset } from './image';
@@ -33,11 +34,10 @@ function narrationFor(draft: Draft, ctx: RunCtx): string {
 }
 
 function budgetKit(ctx: RunCtx): BudgetKit {
-  const caps = (ctx.kit.captions ?? {}) as { maxLines?: number; size?: number; wordsPerCue?: number };
-  const band = (ctx.overrides.durationBand ?? (ctx.kit.reel as any)?.durationBand ?? 'medium') as DurationBand;
+  const caps = captionStyle(ctx.kit) as { maxLines?: number; size?: number; wordsPerCue?: number };
   // deploy/caption_style.py's DEFAULTS, which is what the renderer falls back to.
   return {
-    durationBand: band,
+    durationBand: effectiveFrame(ctx.kit, ctx.overrides).durationBand as DurationBand,
     maxLines: caps.maxLines ?? 2,
     size: caps.size ?? 72,
     wordsPerCue: caps.wordsPerCue ?? 5,
@@ -69,14 +69,29 @@ export const reelStep: Step<Draft, ReelAsset> = {
 
   async run(draft, ctx) {
     const card = ctx.outputs.image as CardAsset | undefined;
-    const jobId = startRenderJob({
-      emojiTitle: draft.title,
-      narration: narrationFor(draft, ctx),
-      media: card ? [{ url: `file://${card.path}`, kind: 'image' }] : [],
-      includeIntro: ctx.overrides.includeIntro !== false,
-      includeLayout: ctx.overrides.includeLayout !== false,
-      style: ctx.overrides.style,
-    });
+    const frame = effectiveFrame(ctx.kit, ctx.overrides);
+    const style = { ...captionStyle(ctx.kit), ...(ctx.overrides.style ? { preset: ctx.overrides.style } : {}) };
+
+    // make-reel.py reads the voice from REEL_VOICE, not a flag, and startRenderJob passes
+    // no per-job env. spawn() happens synchronously inside it, so set-call-restore in one
+    // tick cannot race another render. `rate` is hardcoded at +25% there and is not a knob.
+    const prevVoice = process.env.REEL_VOICE;
+    const wanted = voiceId(ctx.kit);
+    if (wanted) process.env.REEL_VOICE = wanted;
+    let jobId: string;
+    try {
+      jobId = startRenderJob({
+        emojiTitle: draft.title,
+        narration: narrationFor(draft, ctx),
+        media: card ? [{ url: `file://${card.path}`, kind: 'image' }] : [],
+        includeIntro: frame.includeIntro,
+        includeLayout: frame.includeLayout,
+        style: Object.keys(style).length ? JSON.stringify(style) : undefined,
+      });
+    } finally {
+      if (prevVoice === undefined) delete process.env.REEL_VOICE;
+      else process.env.REEL_VOICE = prevVoice;
+    }
     setRunJob(ctx.runId, jobId);
 
     const until = Date.now() + MAX_WAIT_MS;

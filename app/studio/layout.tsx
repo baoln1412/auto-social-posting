@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 const NAV: { href: string; label: string; soon?: boolean }[] = [
   { href: '/studio', label: 'Tạo mới' },
   { href: '/studio/channels', label: 'Kênh' },
-  { href: '/studio/kits', label: 'Bộ nhận diện', soon: true },
+  { href: '/studio/kits', label: 'Bộ nhận diện' },
   { href: '/studio/library', label: 'Thư viện', soon: true },
   { href: '/studio/assets', label: 'Kho tài nguyên', soon: true },
   { href: '/studio/guide', label: 'Hướng dẫn', soon: true },

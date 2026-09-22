@@ -7,7 +7,7 @@
  */
 import { query } from '@/app/lib/db';
 import { checkCompliance } from '../gates/compliance';
-import { draftAvailable, draftCost, generateDraft, type Draft } from '../gold';
+import { draftAvailable, draftCost, generateDraft, type Draft, type PostTab } from '../gold';
 import type { RunCtx, SourceItem, Step } from './types';
 
 function isGold(item: SourceItem): boolean {
@@ -58,7 +58,11 @@ export const draftStep: Step<SourceItem, Draft> = {
 
   async run(item, ctx: RunCtx) {
     if (isGold(item)) return passThrough(item);
-    return generateDraft(item, await marketContext(ctx.channel.market_id));
+    return generateDraft(
+      item,
+      await marketContext(ctx.channel.market_id),
+      (ctx.kit.post ?? {}) as PostTab,
+    );
   },
 
   async gate(draft) {
