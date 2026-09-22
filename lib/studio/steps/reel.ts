@@ -23,6 +23,8 @@ import type { RunCtx, SourceItem, Step } from './types';
 export interface ReelAsset {
   url: string;
   file: string;
+  /** Absolute path on disk — what delivery sends and what the library sizes. */
+  path: string;
   kind: 'mp4';
   durationSec: number;
 }
@@ -108,6 +110,7 @@ export const reelStep: Step<Draft, ReelAsset> = {
         return {
           url: `/api/video/file?f=${job.file}`,
           file: job.file,
+          path: outputPath(job.file),
           kind: 'mp4' as const,
           durationSec: await probeDuration(outputPath(job.file)).catch(() => NaN),
         };

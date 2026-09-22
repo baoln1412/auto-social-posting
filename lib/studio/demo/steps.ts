@@ -7,6 +7,7 @@
  * replace the bodies, not the shapes.
  */
 import type { GateResult, RunCtx, SourceItem, Step, StepName } from '../steps/types';
+import { join } from 'node:path';
 import { scenesFor } from '../scenes';
 
 export const DEMO_CARD_URL = '/studio-demo/card.png';
@@ -111,6 +112,7 @@ const imageStep: Step<Draft, CardAsset> = {
 
 export interface ReelAsset {
   url: string;
+  path: string;
   kind: 'mp4';
   durationSec: number;
 }
@@ -131,7 +133,12 @@ const reelStep: Step<Draft, ReelAsset> = {
   },
   async run(_draft, ctx) {
     boomIfAsked('reel', ctx);
-    return { url: DEMO_MP4_URL, kind: 'mp4' as const, durationSec: 6 };
+    return {
+      url: DEMO_MP4_URL,
+      path: join(process.cwd(), 'public', 'studio-demo', 'demo.mp4'),
+      kind: 'mp4' as const,
+      durationSec: 6,
+    };
   },
 };
 

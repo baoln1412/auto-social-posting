@@ -9,12 +9,13 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export type Tier = 'owner' | 'member' | 'demo';
-export type Feature = 'run' | 'spend' | 'edit_kit' | 'publish';
+export type Feature = 'run' | 'spend' | 'edit_kit' | 'publish' | 'deliver';
 
 const TIERS = ['owner', 'member', 'demo'] as const;
 
 const GRANTS: Record<Tier, readonly Feature[]> = {
-  owner: ['run', 'spend', 'edit_kit', 'publish'],
+  // `deliver` is owner-only: it makes a bot send a message from the owner's account.
+  owner: ['run', 'spend', 'edit_kit', 'publish', 'deliver'],
   member: ['run', 'spend', 'edit_kit'],
   demo: ['run'],
 };

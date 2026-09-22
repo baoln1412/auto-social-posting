@@ -100,6 +100,13 @@ export function ensureStudioTables(d: Database.Database): void {
       created_at TEXT DEFAULT ${NOW}
     );
 
+    -- Installation-level settings: a Telegram chat id belongs to the install, not a channel.
+    CREATE TABLE IF NOT EXISTS studio_settings (
+      key        TEXT PRIMARY KEY,
+      value      TEXT,
+      updated_at TEXT DEFAULT ${NOW}
+    );
+
     CREATE INDEX IF NOT EXISTS studio_steps_run ON studio_steps (run_id);
     CREATE INDEX IF NOT EXISTS studio_assets_run ON studio_assets (run_id);
     CREATE INDEX IF NOT EXISTS studio_runs_channel ON studio_runs (channel_id);

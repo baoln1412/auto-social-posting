@@ -16,7 +16,7 @@ const NAV: { href: string; label: string; soon?: boolean }[] = [
   { href: '/studio/library', label: 'Thư viện' },
   { href: '/studio/assets', label: 'Kho tài nguyên' },
   { href: '/studio/guide', label: 'Hướng dẫn' },
-  { href: '/studio/settings', label: 'Cài đặt', soon: true },
+  { href: '/studio/settings', label: 'Cài đặt' },
 ];
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {

@@ -27,6 +27,8 @@ import {
   type StepName,
 } from './steps/types';
 import { tierOf } from './tier-of';
+import { deliverFailure, deliverReel } from './deliver';
+import { getSetting, setSetting } from './settings';
 
 export type RunStatus = 'new' | 'running' | 'blocked' | 'done' | 'error';
 
@@ -321,7 +323,39 @@ export async function advance(
        updated_at=(strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?`,
   ).run(status, current, id);
 
-  return getRun(id)!;
+  const out = getRun(id)!;
+  await notify(out, name, status, error);
+  return out;
+}
+
+/**
+ * Telegram, if the owner switched it on. Awaited rather than fired and forgotten so a
+ * failure lands in the log next to the step that caused it — and fully guarded, because a
+ * notification is never a reason for a run to fail.
+ *
+ * The delivered marker is per run, so re-running a finished run's card does not re-send the
+ * video the owner already has.
+ */
+async function notify(
+  rec: RunRecord,
+  name: StepName,
+  status: RunStatus,
+  error: string | null,
+): Promise<void> {
+  const id = rec.run.id;
+  if (error) {
+    await deliverFailure(name, error, id);
+    return;
+  }
+  if (status !== 'done') return;
+
+  const mp4 = rec.steps.reel?.output as { path?: string } | null;
+  if (!mp4?.path) return;
+  if (getSetting(`delivered.${id}`, null)) return;
+
+  const title = (rec.steps.draft?.output as { title?: string } | null)?.title ?? 'Video mới';
+  setSetting(`delivered.${id}`, '1');
+  await deliverReel(mp4.path, title, id);
 }
 
 /** The current step's preview — what the owner sees before anything is spent. */
