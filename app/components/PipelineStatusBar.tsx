@@ -19,11 +19,18 @@ export default function PipelineStatusBar({ pageId, refreshKey }: { pageId: stri
   useEffect(() => {
     let cancelled = false;
     setStatus(null);
-    fetch(`/api/audit?marketId=${pageId}`)
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setStatus({ lastRunAt: d.lastRunAt ?? null, postsSinceLastRun: d.postsSinceLastRun ?? 0 }); })
-      .catch(() => { if (!cancelled) setStatus({ lastRunAt: null, postsSinceLastRun: 0 }); });
-    return () => { cancelled = true; };
+    const load = () =>
+      fetch(`/api/audit?marketId=${pageId}`)
+        .then((r) => r.json())
+        .then((d) => { if (!cancelled) setStatus({ lastRunAt: d.lastRunAt ?? null, postsSinceLastRun: d.postsSinceLastRun ?? 0 }); })
+        .catch(() => { if (!cancelled) setStatus({ lastRunAt: null, postsSinceLastRun: 0 }); });
+    load();
+    // Without this the bar fetches once and then only the clock moves: a tab left open
+    // across a pipeline firing kept showing "7h ago" while the run had been 1h ago.
+    // ponytail: 5 min, not 60s - /api/audit runs several aggregates over the lake and
+    // the schedule only fires 3x/day, so a tighter poll buys nothing.
+    const t = setInterval(load, 300_000);
+    return () => { cancelled = true; clearInterval(t); };
   }, [pageId, refreshKey]);
 
   if (!status) return null;
