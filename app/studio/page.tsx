@@ -9,6 +9,10 @@ export default function StudioNewPage() {
   const channels = studioDb()
     .prepare('SELECT id, name, kit_id, tier_min FROM studio_channels ORDER BY created_at')
     .all() as ChannelRow[];
+  const kits = studioDb().prepare('SELECT id, name FROM studio_kits ORDER BY name').all() as {
+    id: string;
+    name: string;
+  }[];
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8">
@@ -20,7 +24,7 @@ export default function StudioNewPage() {
         </p>
       </header>
 
-      <NewRunBox channels={channels} canSpend={can(t, 'spend')} />
+      <NewRunBox channels={channels} kits={kits} canSpend={can(t, 'spend')} />
 
       <section>
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">

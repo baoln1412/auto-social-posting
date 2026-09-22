@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { can, resolveTier, signTier } from '@/lib/studio/tier';
+import { can, mayUseChannel, resolveTier, signTier } from '@/lib/studio/tier';
 
 const SECRET = 'test-secret';
 
@@ -63,5 +63,22 @@ describe('resolveTier()', () => {
 
   it('rejects a DESOUL_TIER that is not a tier', () => {
     expect(resolveTier({ env: 'admin' })).toBe('owner');
+  });
+});
+
+describe('mayUseChannel()', () => {
+  it('lets the owner into every channel', () => {
+    for (const m of ['owner', 'member', 'demo']) expect(can('owner', 'run') && mayUseChannel('owner', m)).toBe(true);
+  });
+
+  it('keeps a demo visitor out of an owner channel — that is the path that spends', () => {
+    expect(mayUseChannel('demo', 'owner')).toBe(false);
+    expect(mayUseChannel('demo', 'member')).toBe(false);
+    expect(mayUseChannel('demo', 'demo')).toBe(true);
+  });
+
+  it('lets a member into member and demo channels only', () => {
+    expect(mayUseChannel('member', 'owner')).toBe(false);
+    expect(mayUseChannel('member', 'member')).toBe(true);
   });
 });

@@ -75,3 +75,13 @@ export function tier(): Tier {
     secret: process.env.STUDIO_COOKIE_SECRET,
   });
 }
+
+/**
+ * May this tier open this channel at all? A demo visitor reaching an owner channel is the
+ * path that would spend real money, so it is a check, not a UI decision.
+ */
+export function mayUseChannel(t: Tier, channelTierMin: string): boolean {
+  if (t === 'owner') return true;
+  if (t === 'member') return channelTierMin !== 'owner';
+  return channelTierMin === 'demo';
+}
