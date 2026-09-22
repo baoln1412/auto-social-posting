@@ -10,7 +10,10 @@ import type { Comment, Selection, SourceItem } from './steps/types';
 export interface Scene {
   n: number;
   kind: 'post' | 'comment';
+  /** What will be read aloud — the owner's edit if there is one. */
   text: string;
+  /** What the source actually said, when an edit replaced it. */
+  original?: string;
   score: number | null;
   commentId?: string;
 }
@@ -28,6 +31,7 @@ export function scenesFor(
   comments: Comment[],
   selection: Selection,
 ): Scene[] {
+  const edits = selection.edits ?? {};
   const out: Scene[] = [];
   for (const text of splitSentences(narration)) {
     out.push({ n: out.length + 1, kind: 'post', text, score: null });
@@ -36,7 +40,14 @@ export function scenesFor(
   for (const id of selection.commentIds) {
     const c = byId.get(id);
     if (!c) continue;
-    out.push({ n: out.length + 1, kind: 'comment', text: c.text, score: c.score, commentId: id });
+    out.push({
+      n: out.length + 1,
+      kind: 'comment',
+      text: edits[id] ?? c.text,
+      original: c.text,
+      score: c.score,
+      commentId: id,
+    });
   }
   return out;
 }

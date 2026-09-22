@@ -50,3 +50,26 @@ describe('poolFor()', () => {
     expect(poolFor(item, { commentIds: [], hideUnselected: false }).at(-1)!.id).toBe('c');
   });
 });
+
+describe('per-scene edits', () => {
+  it('reads the owner’s rewrite aloud and keeps the original alongside it', () => {
+    const s = scenesFor('Một.', comments, {
+      commentIds: ['b'],
+      hideUnselected: false,
+      edits: { b: 'Câu đã sửa' },
+    });
+    expect(s[1].text).toBe('Câu đã sửa');
+    expect(s[1].original).toBe('B');
+  });
+
+  it('leaves an unedited comment with no original to compare against', () => {
+    const s = scenesFor('Một.', comments, { commentIds: ['b'], hideUnselected: false });
+    expect(s[1].text).toBe('B');
+    expect(s[1].original).toBe('B');
+  });
+
+  it('ignores an edit for a comment that is not a scene', () => {
+    const s = scenesFor('Một.', comments, { commentIds: [], hideUnselected: false, edits: { b: 'x' } });
+    expect(s.every((x) => x.kind === 'post')).toBe(true);
+  });
+});

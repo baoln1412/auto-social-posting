@@ -90,6 +90,12 @@ export interface Selection {
   /** Comment ids promoted to scenes, in scene order. */
   commentIds: string[];
   hideUnselected: boolean;
+  /**
+   * Per-comment rewrites, keyed by comment id. Post scenes are not here: they come from the
+   * draft, so editing one means editing the draft, and an index key would move the moment
+   * the draft changed.
+   */
+  edits?: Record<string, string>;
 }
 
 /** A source item and the comment pool that came with it. Every source returns this. */

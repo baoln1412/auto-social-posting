@@ -70,3 +70,43 @@ export function listLibrary(
         : b.createdAt.localeCompare(a.createdAt),
   );
 }
+
+export interface Suggestion {
+  itemRef: string;
+  title: string;
+  source: string | null;
+  day: string;
+}
+
+/**
+ * Gold posts of this channel that have no reel yet — §6's "Gợi ý từ kho nguồn".
+ *
+ * "No reel" is asked of studio_assets, not of the lake's own video column: a post rendered
+ * through the old Tạo Video drawer is still a post Studio has not made a reel for.
+ */
+export function suggestionsFor(
+  items: { id: string; title: string; source?: string; pubDate?: string }[],
+  limit = 6,
+): Suggestion[] {
+  const made = new Set(
+    (
+      studioDb()
+        .prepare(
+          `SELECT r.item_ref FROM studio_assets a
+           JOIN studio_runs r ON r.id = a.run_id
+           WHERE a.kind = 'mp4' AND r.item_ref IS NOT NULL`,
+        )
+        .all() as { item_ref: string }[]
+    ).map((r) => r.item_ref),
+  );
+
+  return items
+    .filter((i) => !made.has(i.id))
+    .slice(0, limit)
+    .map((i) => ({
+      itemRef: i.id,
+      title: i.title,
+      source: i.source ?? null,
+      day: i.pubDate ? new Date(i.pubDate).toLocaleDateString('vi-VN') : '',
+    }));
+}

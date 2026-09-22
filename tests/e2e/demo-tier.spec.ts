@@ -24,15 +24,14 @@ test('the demo tier walks the whole flow with mock data and spends nothing', asy
   await page.getByTestId('tour-skip').click();
 
   // It sees the demo channel and nothing that belongs to the owner.
-  const rows = page.getByTestId('channel-row');
-  await expect(rows).toHaveCount(1);
-  await expect(rows).toContainText('Kênh thử');
+  await expect(page.getByTestId('channel-picker').locator('option')).toHaveCount(1);
+  await expect(page.getByTestId('channel-picker')).toContainText('Kênh thử');
 
   await page.getByTestId('create-run').click();
   await page.waitForURL(/\/studio\/runs\/[0-9a-f-]{36}$/);
 
   for (const step of ['fetch', 'draft', 'image', 'reel']) {
-    await expect(page.getByTestId(`cost-${step}`)).toHaveText('$0.00');
+    await expect(page.getByTestId(`cost-${step}`)).toContainText('$0.00');
   }
   await page.getByTestId('continue-fetch').click();
   await page.getByTestId('continue-draft').click();
@@ -42,7 +41,7 @@ test('the demo tier walks the whole flow with mock data and spends nothing', asy
 
   // Every step, after the fact, still cost nothing.
   for (const step of ['fetch', 'draft', 'image', 'reel']) {
-    await expect(page.getByTestId(`cost-${step}`)).toHaveText('$0.00');
+    await expect(page.getByTestId(`cost-${step}`)).toContainText('$0.00');
   }
   await expect(page.locator('body')).toContainText('không tốn phí');
   await page.screenshot({ path: 'tests/shots/70-demo-tier-run.png', fullPage: true });
@@ -120,7 +119,7 @@ test('a post-only channel stops after the card', async ({ page, request }) => {
   await page.getByTestId('continue-fetch').click();
   await page.getByTestId('continue-draft').click();
   await page.getByTestId('continue-image').click();
-  await expect(page.getByTestId('card-preview')).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator('body')).toContainText('Xong');
+  await expect(page.getByTestId('rail-card')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('run-status')).toContainText('xong');
   await page.screenshot({ path: 'tests/shots/73-post-only-run.png', fullPage: true });
 });

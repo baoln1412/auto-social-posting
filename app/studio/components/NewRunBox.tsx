@@ -36,6 +36,7 @@ export function NewRunBox({
   const [channel, setChannel] = useState<string>(channels[0]?.id ?? '');
   const [source, setSource] = useState('');
   const [overrides, setOverrides] = useState<Overrides>({});
+  const [drawer, setDrawer] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -59,11 +60,11 @@ export function NewRunBox({
     }
   }
 
-  // pen-line-static, not card-warm: card-warm lifts on hover, and a box you type into
-  // should not move under the cursor.
+  const changed = Object.keys(overrides).filter((k) => k !== 'demo').length;
+
   return (
-    <div className="pen-line-static flex flex-col gap-4 rounded-[var(--radius)] bg-card p-5">
-      <div className="flex flex-wrap gap-2">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -71,52 +72,67 @@ export function NewRunBox({
             data-testid={`mode-${m.id}`}
             aria-pressed={mode === m.id}
             onClick={() => setMode(m.id)}
-            className={`pen-line-sm rounded-md px-3 py-1.5 text-xs font-semibold ${
-              mode === m.id ? 'bg-primary text-primary-foreground' : 'bg-card'
+            className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
+              mode === m.id
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground ring-2 ring-[hsl(var(--primary))]'
+                : 'bg-secondary text-muted-foreground hover:text-foreground'
             }`}
           >
             {m.label}
           </button>
         ))}
-      </div>
-
-      <textarea
-        value={source}
-        onChange={(e) => setSource(e.target.value)}
-        rows={4}
-        placeholder="Dán đường dẫn bài viết / Reddit / Threads, hoặc viết nội dung của bạn…"
-        className="pen-line-static w-full resize-none rounded-md bg-card p-3 text-sm outline-none"
-      />
-
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={channel}
-          onChange={(e) => setChannel(e.target.value)}
-          data-testid="channel-picker"
-          className="pen-line-static rounded-md bg-card px-3 py-2 text-sm"
-        >
-          {channels.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-
         <button
           type="button"
-          disabled={busy || !channel}
-          onClick={start}
-          data-testid="create-run"
-          className="pen-line-sm rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          data-testid="ov-toggle"
+          onClick={() => setDrawer((v) => !v)}
+          className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary"
         >
-          {busy ? 'Đang tạo…' : 'Bắt đầu'}
+          ⚙ tuỳ chỉnh video này{changed > 0 ? ` · ${changed}` : ''}
         </button>
-        <span className="font-mono text-[11px] text-muted-foreground">
-          {canSpend ? '$0.00 đến giờ' : 'chế độ xem thử — không tốn phí'}
-        </span>
       </div>
 
-      <OverrideDrawer value={overrides} onChange={setOverrides} kits={kits} />
+      {/* pen-line-static, not card-warm: card-warm lifts on hover, and a box you type into
+          should not move under the cursor. */}
+      <div className="pen-line-static flex flex-col gap-2 rounded-[var(--radius)] bg-card p-3">
+        <textarea
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          rows={2}
+          placeholder="Dán link · chọn nguồn · hoặc viết nội dung…"
+          className="w-full resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={channel}
+            onChange={(e) => setChannel(e.target.value)}
+            data-testid="channel-picker"
+            className="pen-line-sm rounded-md bg-card px-2 py-1 text-xs font-semibold"
+          >
+            {channels.map((c) => (
+              <option key={c.id} value={c.id}>
+                Kênh: {c.name}
+              </option>
+            ))}
+          </select>
+
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            {canSpend ? '$0.00 đến giờ' : 'xem thử · không tốn phí'}
+          </span>
+
+          <button
+            type="button"
+            disabled={busy || !channel}
+            onClick={start}
+            data-testid="create-run"
+            className="ml-auto pen-line-sm rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {busy ? 'Đang tạo…' : 'Tạo run'}
+          </button>
+        </div>
+      </div>
+
+      {drawer && <OverrideDrawer value={overrides} onChange={setOverrides} kits={kits} open />}
 
       {err && (
         <p data-testid="new-error" className="text-sm text-[hsl(var(--destructive))]">

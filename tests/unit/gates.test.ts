@@ -223,3 +223,26 @@ describe('the default duration band', () => {
     expect(budgetFindings(92, 'một hai ba', kit)).toHaveLength(1);
   });
 });
+
+describe('the duration estimate shown in a step header', () => {
+  it('uses the measured rate, so the header and the gate agree', async () => {
+    const { CHARS_PER_SECOND, estimateSeconds } = await import('@/lib/studio/estimate');
+    expect(CHARS_PER_SECOND).toBe(20.6);
+    // The render this rate came from: 1,684 characters -> 81.7 seconds.
+    expect(estimateSeconds(1684)).toBe(82);
+  });
+
+  it('lands inside the band the same narration would be judged against', async () => {
+    const { estimateSeconds } = await import('@/lib/studio/estimate');
+    const kit = { durationBand: 'long' as const, maxLines: 2, size: 72, wordsPerCue: 5 };
+    expect(budgetFindings(estimateSeconds(1899), 'một hai', kit)).toEqual([]); // corpus median
+  });
+
+  it('formats as m:ss, which is how a video length is read', async () => {
+    const { mmss } = await import('@/lib/studio/estimate');
+    expect(mmss(82)).toBe('1:22');
+    expect(mmss(130)).toBe('2:10');
+    expect(mmss(9)).toBe('0:09');
+    expect(mmss(NaN)).toBe('—');
+  });
+});

@@ -9,6 +9,7 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { CHARS_PER_SECOND } from '../estimate';
 
 const run = promisify(execFile);
 
@@ -16,8 +17,8 @@ const run = promisify(execFile);
  * Length bands, as intent levels — "hook only", "trimmed", "the whole post".
  *
  * Measured 2026-09-22 against the lake: 10,244 gold posts, body_text length projected at
- * 20.6 chars/second (the one real render available — 1,684 chars of Vietnamese narration
- * through edge-tts at rate=+25% came out at 81.7s). p05 61s · median 92s · p95 134s.
+ * CHARS_PER_SECOND (lib/studio/estimate.ts — the one real render available, 1,684 chars of
+ * Vietnamese through edge-tts at rate=+25%, came out at 81.7s). p05 61s · median 92s · p95 134s.
  *
  * So a whole gold post IS a `long` reel, not an exception to `medium`. `long`'s floor is 45
  * rather than 60 because the measured p05 sits at 61s and this rate rests on a single
@@ -26,6 +27,8 @@ const run = promisify(execFile);
  * Crime series are not in scope here at all — market 26ffffde's median body is 13,935 chars,
  * about eleven minutes. Nobody is making that as a reel.
  */
+void CHARS_PER_SECOND; // the bands below are derived from it; keep the link visible
+
 export const DURATION_BANDS = {
   short: [12, 35],
   medium: [25, 75],

@@ -30,7 +30,7 @@ test('one real gold post becomes a post, a card and an MP4', async ({ page, requ
   await expect(page.getByTestId('step-fetch')).toHaveAttribute('data-state', 'done');
 
   // draft — the gold row passes through free, and the compliance gate names its three rules.
-  await expect(page.getByTestId('cost-draft')).toHaveText('$0.00');
+  await expect(page.getByTestId('cost-draft')).toContainText('$0.00');
   await page.getByTestId('continue-draft').click();
   await expect(page.getByTestId('step-draft')).toContainText('3 quy tắc · đạt');
   await expect(page.getByTestId('draft-text')).not.toHaveValue('');
@@ -38,9 +38,9 @@ test('one real gold post becomes a post, a card and an MP4', async ({ page, requ
 
   // image — the real card renderer, then the layout gate on the actual pixels.
   await page.getByTestId('continue-image').click();
-  await expect(page.getByTestId('card-preview')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('rail-card')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('step-image')).toContainText('3 quy tắc · đạt');
-  const card = await page.getByTestId('card-preview').getAttribute('src');
+  const card = await page.getByTestId('rail-card').getAttribute('src');
   expect(card).toMatch(/^\/studio-runs\/.*-card\.png$/);
   const png = await request.get(card!);
   expect(png.status()).toBe(200);

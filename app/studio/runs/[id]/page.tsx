@@ -43,6 +43,7 @@ export default async function RunPage({ params }: { params: { id: string } }) {
       gateDeclared={gateDeclared}
       preview={preview}
       item={(rec.steps.fetch?.output as SourceItem | undefined) ?? null}
+      itemRef={rec.run.item_ref}
       channelName={rec.channel.name}
       kitName={rec.kit.name}
       kits={kits}
