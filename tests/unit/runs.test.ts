@@ -204,3 +204,29 @@ describe('the spend guard', () => {
     expect(r.steps.fetch!.cost.usd).toBe(0.04);
   });
 });
+
+describe('step inputs', () => {
+  it('gives a step the output it declares, not whichever step happens to precede it', async () => {
+    const { resolveStep } = await import('@/lib/studio/steps/registry');
+    const { SOURCES } = await import('@/lib/studio/sources');
+    const chan = { sources_json: JSON.stringify([{ type: 'demo' }]) } as any;
+    // image and reel BOTH consume the draft (plan §3). A positional chain hands reel the
+    // card, and `draft.text` is then undefined.
+    expect(resolveStep('image', chan).from).toBe('draft');
+    expect(resolveStep('reel', chan).from).toBe('draft');
+    expect(resolveStep('draft', chan).from).toBe('fetch');
+    expect(resolveStep('fetch', chan).from).toBeUndefined();
+    expect(SOURCES.demo.kind).toBe('demo');
+  });
+
+  it('a reel run receives the draft text, so its scenes are the draft not the source', async () => {
+    const id = demoRun();
+    await advance(id); // fetch
+    await advance(id); // draft
+    await advance(id, { editDraft: 'Câu đã sửa tay.' });
+    await advance(id); // reel
+    const r = getRun(id)!;
+    expect(r.steps.reel!.status).toBe('ok');
+    expect((r.steps.draft!.output as any).text).toBe('Câu đã sửa tay.');
+  });
+});

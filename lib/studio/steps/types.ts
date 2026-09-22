@@ -27,6 +27,15 @@ export interface GateResult {
 
 export interface Step<I = any, O = any> {
   name: StepName;
+  /**
+   * Which finished step's output this one consumes. Omitted for the first step, which gets
+   * the run's item_ref.
+   *
+   * Not "the previous step in the template": `image` and `reel` both consume the draft, and
+   * chaining positionally handed `reel` the card — so `draft.text` was undefined and the
+   * scene list silently fell back to the raw source.
+   */
+  from?: StepName;
   preview(input: I, ctx: RunCtx): Promise<StepPreview>;
   gate?(output: O, ctx: RunCtx): Promise<GateResult>;
   run(input: I, ctx: RunCtx): Promise<O>;

@@ -66,6 +66,7 @@ export interface Draft {
 
 const draftStep: Step<SourceItem, Draft> = {
   name: 'draft',
+  from: 'fetch',
   async preview(item, _ctx) {
     return { kind: 'text', data: { text: item.text, title: item.title }, cost: FREE };
   },
@@ -98,6 +99,7 @@ export interface CardAsset {
 
 const imageStep: Step<Draft, CardAsset> = {
   name: 'image',
+  from: 'draft',
   async preview(_draft, _ctx) {
     return { kind: 'png', data: { url: DEMO_CARD_URL }, cost: FREE };
   },
@@ -115,12 +117,13 @@ export interface ReelAsset {
 
 const reelStep: Step<Draft, ReelAsset> = {
   name: 'reel',
+  from: 'draft',
   async preview(draft, ctx) {
     const item = (ctx.outputs.fetch as SourceItem | undefined) ?? DEMO_ITEM;
     return {
       kind: 'scenes',
       data: {
-        scenes: scenesFor(draft?.text ?? item.text, item.comments, ctx.selection),
+        scenes: scenesFor(draft.text, item.comments, ctx.selection),
         firstFrameUrl: DEMO_CARD_URL,
       },
       cost: FREE,

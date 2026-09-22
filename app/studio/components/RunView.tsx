@@ -8,7 +8,7 @@
  * a comment changes the list the renderer will receive — not a mock of it.
  */
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { poolFor, scenesFor } from '@/lib/studio/scenes';
 import {
   STEP_LABELS,
@@ -23,6 +23,7 @@ import {
   type StepName,
   type StepPreview,
 } from '@/lib/studio/steps/types';
+import { STEP_LABELS as RENDER_LABELS, STEP_ORDER as RENDER_STEPS } from '@/app/lib/videoSteps';
 import { OverrideDrawer, type KitOption } from './OverrideDrawer';
 
 export interface StepView {
@@ -86,6 +87,30 @@ export function RunView(p: RunViewProps) {
   // null = untouched. Deriving the displayed value from props keeps the editor correct across
   // router.refresh(); mirroring props into state pinned it to the first render, i.e. empty.
   const [draftEdit, setDraftEdit] = useState<string | null>(null);
+  const [render, setRender] = useState<{ step?: string; pct?: number; done: string[] } | null>(null);
+
+  // A reel takes minutes. Without this the button says "Đang chạy…" and nothing else, which
+  // is the exact opacity this page exists to remove.
+  useEffect(() => {
+    if (busy !== 'reel' && busy !== 're-reel') {
+      setRender(null);
+      return;
+    }
+    let live = true;
+    const tick = async () => {
+      const res = await fetch(`/api/studio/runs/${p.runId}/advance`).catch(() => null);
+      const b = (await res?.json().catch(() => null)) as
+        | { status: string | null; step?: string; pct?: number; done?: string[] }
+        | null;
+      if (live && b?.status) setRender({ step: b.step, pct: b.pct, done: b.done ?? [] });
+    };
+    void tick();
+    const t = setInterval(tick, 1500);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [busy, p.runId]);
   const draft = draftEdit ?? (p.steps.draft?.output?.text as string | undefined) ?? '';
 
   async function post(body: Record<string, unknown>, label: string) {
@@ -225,6 +250,29 @@ export function RunView(p: RunViewProps) {
                 )}
 
                 {isCurrent && !s && p.preview && <Preview preview={p.preview} />}
+
+                {name === 'reel' && render && (
+                  <ol data-testid="render-rail" className="mt-3 flex flex-wrap gap-1.5">
+                    {RENDER_STEPS.map((r) => (
+                      <li
+                        key={r}
+                        data-testid={`render-${r}`}
+                        data-done={render.done.includes(r) ? 'true' : 'false'}
+                        data-current={render.step === r ? 'true' : 'false'}
+                        className={`pen-line-sm rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
+                          render.done.includes(r)
+                            ? 'bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]'
+                            : render.step === r
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-card text-muted-foreground'
+                        }`}
+                      >
+                        {RENDER_LABELS[r] ?? r}
+                        {render.step === r && render.pct !== undefined ? ` ${render.pct}%` : ''}
+                      </li>
+                    ))}
+                  </ol>
+                )}
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {isCurrent && (

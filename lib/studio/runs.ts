@@ -173,11 +173,11 @@ function ctxFor(rec: RunRecord): RunCtx {
   };
 }
 
-/** A step's input is the previous step's output; the first step gets the run's item_ref. */
-function inputFor(rec: RunRecord, name: StepName): unknown {
-  const i = rec.template.indexOf(name);
-  const prev = i > 0 ? rec.template[i - 1] : null;
-  return (prev ? rec.steps[prev]?.output : null) ?? rec.run.item_ref;
+/** A step's input is the output of the step it declares; the first step gets the item_ref. */
+function inputFor(rec: RunRecord, name: StepName, step?: { from?: StepName }): unknown {
+  const from = step?.from;
+  if (!from) return rec.run.item_ref;
+  return rec.steps[from]?.output ?? rec.run.item_ref;
 }
 
 /**
@@ -231,7 +231,7 @@ export async function advance(
   const name = rec.run.current_step;
   const step = resolveStep(name, rec.channel);
   const ctx = ctxFor(rec);
-  const input = inputFor(rec, name);
+  const input = inputFor(rec, name, step);
 
   const startedAt = new Date().toISOString();
   let cost: Money = { usd: 0, note: '' };
@@ -308,7 +308,7 @@ export async function advance(
 export async function previewStep(rec: RunRecord, name: StepName) {
   try {
     const step = resolveStep(name, rec.channel);
-    return await step.preview(inputFor(rec, name), ctxFor(rec));
+    return await step.preview(inputFor(rec, name, step), ctxFor(rec));
   } catch (e) {
     return {
       kind: 'text' as const,

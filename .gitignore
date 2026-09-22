@@ -71,3 +71,6 @@ __pycache__/
 
 # Playwright run artefacts (traces, failure contexts). tests/shots/ IS committed.
 tests/.playwright/
+
+# Cards Studio renders per run (runtime, reproducible)
+public/studio-runs/

@@ -7,6 +7,11 @@ export default defineConfig({
   outputDir: 'tests/.playwright',
   timeout: 90_000,
   reporter: [['list']],
+  // One worker, deliberately. The whole suite drives a single `next dev` with one DuckDB
+  // connection and one SQLite file; parallel workers raced Next's first compile of a route
+  // and it threw "Cannot read properties of null (reading 'useContext')" out of its own
+  // error boundary. Nothing here is CPU-bound except the render, which is one test.
+  workers: 1,
   use: {
     baseURL: 'http://127.0.0.1:3001',
     viewport: { width: 1440, height: 900 },

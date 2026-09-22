@@ -5,6 +5,9 @@
 import type { Channel, Step, StepName } from './types';
 import { DEMO_STEPS } from '../demo/steps';
 import { fetchStep } from './fetch';
+import { draftStep } from './draft';
+import { imageStep } from './image';
+import { reelStep } from './reel';
 
 export function isDemoChannel(c: Channel): boolean {
   try {
@@ -16,9 +19,12 @@ export function isDemoChannel(c: Channel): boolean {
   }
 }
 
-/** Real engines. draft/image/reel land in slice 3. */
+/** The real engines. `publish` records intent only and is not wired. */
 const REAL: Partial<Record<StepName, Step>> = {
   fetch: fetchStep,
+  draft: draftStep,
+  image: imageStep,
+  reel: reelStep,
 };
 
 export function resolveStep(name: StepName, channel: Channel): Step {

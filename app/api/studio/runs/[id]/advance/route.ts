@@ -5,7 +5,9 @@
  * along in the body so neither needs a route of its own.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { getJob } from '@/app/lib/videoJobs';
 import { advance, getRun } from '@/lib/studio/runs';
+import { runJob } from '@/lib/studio/progress';
 import { can, mayUseChannel, tier } from '@/lib/studio/tier';
 import type { Overrides, Selection, StepName } from '@/lib/studio/steps/types';
 
@@ -38,4 +40,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       { status: 400 },
     );
   }
+}
+
+/**
+ * GET — the render stage this run is on, while a reel is rendering.
+ *
+ * Deliberately in THIS file rather than its own route. Next gives each route its own module
+ * graph, so a sibling route importing lib/studio/progress got a different Map: measured on a
+ * three-minute render that reported `null` from first frame to last. Sharing a file shares
+ * the instance — which is why app/api/video/render puts its POST and GET together too.
+ */
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  if (!process.env.STUDIO_ENABLED) return new NextResponse('Not found', { status: 404 });
+  const jobId = runJob(params.id);
+  const job = jobId ? getJob(jobId) : undefined;
+  return NextResponse.json(
+    job ? { status: job.status, step: job.step, pct: job.pct, done: job.done ?? [] } : { status: null },
+  );
 }
