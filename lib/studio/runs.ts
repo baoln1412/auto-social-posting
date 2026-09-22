@@ -16,6 +16,8 @@ import { resolveStep } from './steps/registry';
 import {
   TEMPLATES,
   canContinue,
+  makesOf,
+  templateFor,
   type Channel,
   type GateResult,
   type Kit,
@@ -81,8 +83,11 @@ export function createRun(opts: {
   overrides?: Overrides;
   selection?: Selection;
 }): string {
-  const template = TEMPLATES[opts.mode];
-  if (!template) throw new Error(`Chế độ không hợp lệ: ${opts.mode}`);
+  if (!TEMPLATES[opts.mode]) throw new Error(`Chế độ không hợp lệ: ${opts.mode}`);
+  const chan = studioDb()
+    .prepare('SELECT makes_json FROM studio_channels WHERE id=?')
+    .get(opts.channelId) as { makes_json: string } | undefined;
+  const template = templateFor(opts.mode, makesOf(chan?.makes_json));
   const id = randomUUID();
   studioDb()
     .prepare(
@@ -153,7 +158,9 @@ export function getRun(id: string): RunRecord | null {
       updated_at: row.updated_at,
     },
     steps,
-    template: TEMPLATES[row.mode as Mode] ?? [],
+    template: TEMPLATES[row.mode as Mode]
+      ? templateFor(row.mode as Mode, makesOf((channel as any).makes_json))
+      : [],
     channel,
     kit,
   };

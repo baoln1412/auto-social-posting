@@ -1,13 +1,18 @@
 import Link from 'next/link';
-import { studioDb } from '@/lib/studio/db';
+import { tier } from '@/lib/studio/tier';
+import { visibleChannels } from '@/lib/studio/visible';
 import { channelSource } from '@/lib/studio/sources';
 
 export const dynamic = 'force-dynamic';
 
 export default function ChannelsPage() {
-  const rows = studioDb()
-    .prepare('SELECT id, name, sources_json, makes_json, tier_min FROM studio_channels ORDER BY created_at')
-    .all() as { id: string; name: string; sources_json: string; makes_json: string; tier_min: string }[];
+  const rows = visibleChannels(tier()) as unknown as {
+    id: string;
+    name: string;
+    sources_json: string;
+    makes_json: string;
+    tier_min: string;
+  }[];
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">

@@ -106,6 +106,25 @@ describe('listLibrary()', () => {
   });
 });
 
+describe('listLibrary() channel filtering', () => {
+  it('keeps the runs whose channel is in the allowed set', async () => {
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    for (let i = 0; i < 4; i++) await advance(id);
+    expect(listLibrary({ channelIds: new Set([DEMO_CHANNEL_ID]) })).toHaveLength(1);
+  });
+
+  it('drops the runs whose channel is not', async () => {
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    for (let i = 0; i < 4; i++) await advance(id);
+    expect(listLibrary({ channelIds: new Set(['someone-else']) })).toHaveLength(0);
+  });
+
+  it('shows everything when no set is given', async () => {
+    createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    expect(listLibrary()).toHaveLength(1);
+  });
+});
+
 describe('the asset quota', () => {
   it('is the plan\'s 50 MB and 30 files', () => {
     expect(QUOTA).toEqual({ bytes: 50 * 1024 * 1024, files: 30 });

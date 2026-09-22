@@ -230,3 +230,65 @@ describe('step inputs', () => {
     expect((r.steps.draft!.output as any).text).toBe('Câu đã sửa tay.');
   });
 });
+
+describe('templateFor()', () => {
+  it('drops the reel step for a channel that only makes posts', async () => {
+    const { templateFor } = await import('@/lib/studio/steps/types');
+    expect(templateFor('read-post', ['post'])).toEqual(['fetch', 'draft', 'image']);
+  });
+
+  it('keeps the card on a post-only run — a Facebook post here is text plus its card', async () => {
+    const { templateFor } = await import('@/lib/studio/steps/types');
+    expect(templateFor('read-post', ['post'])).toContain('image');
+  });
+
+  it('skips the card when the channel only wants a video', async () => {
+    const { templateFor } = await import('@/lib/studio/steps/types');
+    expect(templateFor('read-post', ['reel'])).toEqual(['fetch', 'draft', 'reel']);
+  });
+
+  it('keeps everything when the channel makes everything', async () => {
+    const { templateFor } = await import('@/lib/studio/steps/types');
+    expect(templateFor('read-post', ['post', 'image', 'reel'])).toEqual([
+      'fetch',
+      'draft',
+      'image',
+      'reel',
+    ]);
+  });
+
+  it('always keeps fetch and draft — there is no run without text', async () => {
+    const { templateFor } = await import('@/lib/studio/steps/types');
+    expect(templateFor('read-post', [])).toEqual(['fetch', 'draft', 'image', 'reel']);
+    expect(templateFor('read-post', ['nonsense'])).toContain('draft');
+  });
+
+  it('never leaves a mode without its own first step', async () => {
+    const { templateFor, TEMPLATES } = await import('@/lib/studio/steps/types');
+    for (const mode of Object.keys(TEMPLATES) as (keyof typeof TEMPLATES)[]) {
+      for (const makes of [['post'], ['reel'], ['image'], ['post', 'reel']]) {
+        expect(templateFor(mode, makes).length, `${mode}/${makes}`).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe('a post-only channel', () => {
+  it('finishes after the card, with no reel step and no reel asset', async () => {
+    studioDb()
+      .prepare('UPDATE studio_channels SET makes_json=? WHERE id=?')
+      .run(JSON.stringify(['post']), DEMO_CHANNEL_ID);
+
+    const id = demoRun();
+    const rec0 = getRun(id)!;
+    expect(rec0.template).toEqual(['fetch', 'draft', 'image']);
+
+    for (let i = 0; i < 3; i++) await advance(id);
+    const r = getRun(id)!;
+    expect(r.run.status).toBe('done');
+    expect(r.steps.reel).toBeUndefined();
+    expect(
+      studioDb().prepare('SELECT COUNT(*) c FROM studio_assets WHERE run_id=? AND kind=?').get(id, 'mp4'),
+    ).toEqual({ c: 0 });
+  });
+});

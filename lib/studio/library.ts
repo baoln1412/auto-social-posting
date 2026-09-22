@@ -16,13 +16,15 @@ function parse<T>(raw: unknown, fallback: T): T {
   }
 }
 
-export function listLibrary(opts: { q?: string; sort?: Sort } = {}): LibraryItem[] {
+export function listLibrary(
+  opts: { q?: string; sort?: Sort; channelIds?: Set<string> } = {},
+): LibraryItem[] {
   const d = studioDb();
   // ponytail: reads every run and its steps. At tens to hundreds of runs that is a few ms;
   // add a denormalised source_url column if this ever shows up in a profile.
   const runs = d
     .prepare(
-      `SELECT r.id, r.item_ref, r.status, r.created_at, c.name AS channel_name
+      `SELECT r.id, r.channel_id, r.item_ref, r.status, r.created_at, c.name AS channel_name
        FROM studio_runs r LEFT JOIN studio_channels c ON c.id = r.channel_id
        ORDER BY r.created_at DESC`,
     )
@@ -33,7 +35,9 @@ export function listLibrary(opts: { q?: string; sort?: Sort } = {}): LibraryItem
     .prepare('SELECT run_id, kind, path, bytes, meta_json FROM studio_assets')
     .all() as any[];
 
-  const items: LibraryItem[] = runs.map((r) => {
+  const visible = opts.channelIds ? runs.filter((r) => opts.channelIds!.has(r.channel_id)) : runs;
+
+  const items: LibraryItem[] = visible.map((r) => {
     const mine = steps.filter((s) => s.run_id === r.id);
     const fetched = parse<any>(mine.find((s) => s.name === 'fetch')?.output_ref, null);
     const drafted = parse<any>(mine.find((s) => s.name === 'draft')?.output_ref, null);

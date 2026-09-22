@@ -1,4 +1,5 @@
 import { studioDb } from '@/lib/studio/db';
+import { visibleChannels } from '@/lib/studio/visible';
 import { tier, can } from '@/lib/studio/tier';
 import { NewRunBox, type ChannelRow } from './components/NewRunBox';
 import newTour from '@/lib/studio/tours/new.json';
@@ -8,9 +9,12 @@ export const dynamic = 'force-dynamic';
 
 export default function StudioNewPage() {
   const t = tier();
-  const channels = studioDb()
-    .prepare('SELECT id, name, kit_id, tier_min FROM studio_channels ORDER BY created_at')
-    .all() as ChannelRow[];
+  const channels = visibleChannels(t).map((c) => ({
+    id: c.id,
+    name: c.name,
+    kit_id: c.kit_id,
+    tier_min: c.tier_min,
+  })) as ChannelRow[];
   const kits = studioDb().prepare('SELECT id, name FROM studio_kits ORDER BY name').all() as {
     id: string;
     name: string;

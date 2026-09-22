@@ -121,6 +121,38 @@ export const TEMPLATES: Record<Mode, StepName[]> = {
   'text-to-reel': ['draft', 'reel'],
 };
 
+/**
+ * The steps this run actually needs: the mode's sequence, narrowed by what the channel is
+ * for.
+ *
+ * `makes` was collected by the wizard and stored since slice 2 with nothing reading it, so
+ * every channel ran the full sequence — a post-only channel still rendered a video nobody
+ * asked for. §6's "post-only run (stops after image)" is this.
+ *
+ * fetch and draft always survive: there is no run without text. A Facebook post here is the
+ * text AND its card, so `post` keeps the image step.
+ */
+export function templateFor(mode: Mode, makes: readonly string[]): StepName[] {
+  const wanted = new Set(makes);
+  const known = ['post', 'image', 'reel'].some((k) => wanted.has(k));
+  if (!known) return [...TEMPLATES[mode]];
+
+  return TEMPLATES[mode].filter((step) => {
+    if (step === 'image') return wanted.has('image') || wanted.has('post');
+    if (step === 'reel') return wanted.has('reel');
+    return true;
+  });
+}
+
+export function makesOf(sourceJson: string | null | undefined): string[] {
+  try {
+    const v = JSON.parse(sourceJson || '[]');
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
 export const MODE_LABELS: Record<Mode, string> = {
   'read-post': 'Đọc bài',
   'write-narration': 'Viết lời đọc',
