@@ -7,6 +7,24 @@ export const PNG_1PX = Buffer.from(
 import type { Page } from '@playwright/test';
 
 /**
+ * Wait until every <img> matching `selector` has actually decoded.
+ *
+ * A committed screenshot of half-loaded thumbnails is a screenshot of nothing — and these
+ * are composed frames, one python process each, so the first paint is genuinely later than
+ * the click that asked for them.
+ */
+export async function imagesLoaded(page: Page, selector: string): Promise<void> {
+  await page.waitForFunction(
+    (sel) => {
+      const imgs = Array.from(document.querySelectorAll<HTMLImageElement>(sel));
+      return imgs.length > 0 && imgs.every((i) => i.complete && i.naturalWidth > 0);
+    },
+    selector,
+    { timeout: 60_000 },
+  );
+}
+
+/**
  * Close the first-run tour if it is showing.
  *
  * `.click().catch()` does NOT do this: a click on a locator that is not there still waits the

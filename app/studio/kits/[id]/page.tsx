@@ -1,41 +1,51 @@
 import { notFound } from 'next/navigation';
 import fs from 'node:fs';
+import path from 'node:path';
 import { studioDb } from '@/lib/studio/db';
 import { kitSchema, listPresetFiles } from '@/lib/studio/kits/schema';
 import { listMedia, type MediaKind } from '@/lib/studio/assets';
 import type { Kit } from '@/lib/studio/steps/types';
 import { KitEditor, type FieldSpec, type TabSpec } from '../../components/KitEditor';
+import { TAB_LABELS, labelFor } from '@/lib/studio/kits/labels';
 import captionPresets from '@/deploy/assets/caption-presets.json';
 
 export const dynamic = 'force-dynamic';
 
-const LABELS: Record<string, string> = {
-  identity: 'Nhận diện',
-  post: 'Bài đăng',
-  card: 'Ảnh thẻ',
-  voice: 'Giọng đọc',
-  captions: 'Phụ đề',
-  frame: 'Khung hình',
-  stickers: 'Nhãn dán',
-  signature: 'Chữ ký',
-  music: 'Nhạc nền',
-};
+/** Tab order on the strip — the order of the reference's own tabs. */
+const TAB_ORDER = ['identity', 'post', 'voice', 'frame', 'card', 'captions', 'signature', 'stickers', 'music'];
 
-/** The schema is the field list. A tab the schema does not define cannot be edited into one. */
-function fieldsOf(def: Record<string, any>): FieldSpec[] {
+/**
+ * The schema is the field list; labels.ts is the names. A tab the schema does not define
+ * cannot be edited into one, and a field labels.ts does not name shows a ⚠ rather than its
+ * own key — tests/unit/labels.test.ts is what keeps that from happening.
+ */
+function fieldsOf(tab: string, def: Record<string, any>): FieldSpec[] {
   return Object.entries(def.properties ?? {})
     .filter(([k]) => k !== 'preset')
     .map(([key, p]: [string, any]): FieldSpec => {
-      if (p.enum) return { key, label: key, type: 'enum', options: p.enum };
-      if (p.type === 'boolean') return { key, label: key, type: 'boolean' };
-      if (p.type === 'number' || p.type === 'integer') {
-        return { key, label: key, type: 'number', min: p.minimum, max: p.maximum };
+      const { label, hint } = labelFor(tab, key);
+      const base = { key, label, hint };
+      if (p.enum) return { ...base, type: 'enum', options: p.enum };
+      if (p.type === 'boolean') return { ...base, type: 'boolean' };
+      if (p.type === 'array') return { ...base, type: 'list' };
+      // A hex pattern is a colour; a text box for "#F8EF63" is a typo waiting to happen.
+      if (typeof p.pattern === 'string' && p.pattern.includes('0-9a-fA-F')) {
+        return { ...base, type: 'color' };
       }
-      return { key, label: key, type: 'text' };
+      if (p.type === 'number' || p.type === 'integer') {
+        return { ...base, type: 'number', min: p.minimum, max: p.maximum };
+      }
+      return { ...base, type: 'text' };
     });
 }
 
-export default function KitEditorPage({ params }: { params: { id: string } }) {
+export default function KitEditorPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { run?: string };
+}) {
   const row = studioDb()
     .prepare('SELECT id, name, json FROM studio_kits WHERE id=?')
     .get(params.id) as { id: string; name: string; json: string } | undefined;
@@ -58,12 +68,11 @@ export default function KitEditorPage({ params }: { params: { id: string } }) {
     music: { kind: 'music', field: 'track' },
   };
 
-  const tabs: TabSpec[] = Object.keys(LABELS)
-    .filter((k) => defs[k])
-    .map((key) => ({
+  const tabs: TabSpec[] = TAB_ORDER.filter((k) => defs[k]).map((key) => ({
       key,
-      label: LABELS[key],
-      fields: fieldsOf(defs[key]),
+      label: TAB_LABELS[key]?.label ?? key,
+      hint: TAB_LABELS[key]?.hint,
+      fields: fieldsOf(key, defs[key]),
       media: MEDIA_FOR[key]
         ? listMedia(MEDIA_FOR[key].kind).map((m) => ({
             id: m.id,
@@ -96,7 +105,12 @@ export default function KitEditorPage({ params }: { params: { id: string } }) {
           Mỗi thẻ dưới đây là một tab của bộ nhận diện, kèm trạng thái hiện tại.
         </p>
       </header>
-      <KitEditor kit={kit} tabs={tabs} />
+      <KitEditor
+        kit={kit}
+        tabs={tabs}
+        runId={searchParams.run}
+        samplePlate={path.join(process.cwd(), 'public', 'studio-demo', 'card.png')}
+      />
     </div>
   );
 }

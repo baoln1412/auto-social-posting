@@ -14,6 +14,9 @@ export interface CardTab {
   radius?: number;
   titleSize?: number;
   highlightColor?: string;
+  width?: number;
+  y?: number;
+  comments?: 'none' | 'group';
 }
 
 /** The clause the SOP paints in the highlight colour. */
@@ -38,7 +41,11 @@ export function cardPath(kit: Kit): string {
  * a kit promising a look that route has no parameter for — the mistake that made the Brand
  * Kit smaller than it was drawn.
  */
-export function cardParams(kit: Kit, draft: { title: string }, articleUrl?: string): URLSearchParams {
+export function cardParams(
+  kit: Kit,
+  draft: { title: string; comments?: string[] },
+  articleUrl?: string,
+): URLSearchParams {
   const card = (kit.card ?? {}) as CardTab;
   const studio = cardEngine(kit) === 'studio';
   const ratio = card.ratio ?? '4:5';
@@ -58,8 +65,18 @@ export function cardParams(kit: Kit, draft: { title: string }, articleUrl?: stri
       ['radius', card.radius],
       ['titleSize', card.titleSize],
       ['highlightColor', card.highlightColor],
+      ['width', card.width],
+      ['y', card.y],
     ] as const) {
       if (v !== undefined && v !== '') q.set(k, String(v));
+    }
+    // "Chụp nhóm": the headline and the chosen comments on one card, which is what the
+    // reference's cards actually are. Sent as the text, not a flag, so the renderer needs
+    // no access to the run.
+    if ((card.comments ?? 'none') === 'group') {
+      for (const c of (draft.comments ?? []).slice(0, 3)) {
+        if (c.trim()) q.append('c', c.trim());
+      }
     }
     if (articleUrl && (card.background ?? 'none') === 'article') q.set('bg', articleUrl);
   } else if (articleUrl && (card.background ?? 'article') === 'article') {
@@ -75,15 +92,49 @@ export interface CaptionTab {
   wordsPerCue?: number;
   maxLines?: number;
   case?: 'upper' | 'none';
+  font?: string;
+  color?: string;
+  highlightMode?: 'word' | 'block' | 'none';
+  highlightColor?: string;
+  highlightBg?: string;
+  outlineWidth?: number;
+  shadow?: boolean;
+  band?: boolean;
+  bandOpacity?: number;
 }
 
-/** What goes to make-reel.py's --style. Undefined knobs are left to caption_style.py. */
+/**
+ * What goes to make-reel.py's --style. Undefined knobs are left to caption_style.py.
+ *
+ * Flat in the kit, nested here: a schema-driven form edits `highlightColor` far better than
+ * `highlight.color`, and caption_style.py's own shape is not something a kit should mirror.
+ * The nesting happens once, at the boundary.
+ */
 export function captionStyle(kit: Kit): Record<string, unknown> {
   const c = (kit.captions ?? {}) as CaptionTab;
   const out: Record<string, unknown> = {};
-  for (const k of ['preset', 'size', 'pos', 'wordsPerCue', 'maxLines', 'case'] as const) {
+  for (const k of ['preset', 'size', 'pos', 'wordsPerCue', 'maxLines', 'case', 'font', 'color'] as const) {
     if (c[k] !== undefined) out[k] = c[k];
   }
+
+  const outline: Record<string, unknown> = {};
+  if (c.outlineWidth !== undefined) outline.w = c.outlineWidth;
+  if (Object.keys(outline).length) out.outline = outline;
+
+  // caption_style.py reads dy 0 as "shadow off", so the boolean becomes an offset.
+  if (c.shadow !== undefined) out.shadow = { dy: c.shadow ? 6 : 0 };
+
+  const hl: Record<string, unknown> = {};
+  if (c.highlightMode !== undefined) hl.mode = c.highlightMode;
+  if (c.highlightColor !== undefined) hl.color = c.highlightColor;
+  if (c.highlightBg !== undefined) hl.bg = c.highlightBg;
+  if (Object.keys(hl).length) out.highlight = hl;
+
+  const band: Record<string, unknown> = {};
+  if (c.band !== undefined) band.on = c.band;
+  if (c.bandOpacity !== undefined) band.opacity = c.bandOpacity;
+  if (Object.keys(band).length) out.band = band;
+
   return out;
 }
 

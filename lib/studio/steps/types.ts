@@ -79,6 +79,8 @@ export interface Overrides {
   includeIntro?: boolean;
   includeLayout?: boolean;
   music?: 'none' | 'soft' | 'groove';
+  /** Read the post's title as the first line of narration. */
+  readTitle?: boolean;
   style?: string;
   /** Demo channels only: force a step to fail, or a gate to find something. Nothing else reads it. */
   demo?: { boom?: StepName; gateFail?: boolean; cost?: number };

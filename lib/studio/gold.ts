@@ -101,7 +101,18 @@ export interface PostTab {
   length?: 'short' | 'medium' | 'long';
   emoji?: 'none' | 'light' | 'heavy';
   hashtags?: number;
+  /** Which tags, as against `hashtags`, which is how many. */
+  tags?: string[];
+  topics?: string[];
+  language?: 'vi' | 'en';
+  narration?: 'verbatim' | 'ai';
+  commentMode?: 'auto' | 'manual';
 }
+
+const LANGUAGE_RULE = {
+  vi: 'Viết bằng tiếng Việt. Nguồn bằng tiếng khác thì dịch sang tiếng Việt trước khi viết, không chèn câu tiếng Anh.',
+  en: 'Write in English. Translate a source in another language before writing.',
+};
 
 const LENGTH_WORDS = { short: '250–350', medium: '400–550', long: '600–800' };
 const EMOJI_RULE = {
@@ -112,11 +123,15 @@ const EMOJI_RULE = {
 
 /** The kit's post tab as prompt lines. A tab nothing reads is a tab that does nothing. */
 export function postRules(post: PostTab): string {
+  const tags = (post.tags ?? []).map((t) => (t.startsWith('#') ? t : `#${t}`));
   const lines = [
     post.format && `Dạng bài: ${post.format}.`,
     post.length && `Độ dài thân bài: ${LENGTH_WORDS[post.length]} từ.`,
     post.emoji && EMOJI_RULE[post.emoji],
     post.hashtags !== undefined && `Đúng ${post.hashtags} hashtag.`,
+    tags.length > 0 && `Trong đó luôn có: ${tags.join(' ')}.`,
+    post.topics?.length && `Kênh này viết về: ${post.topics.join(' · ')}.`,
+    post.language && LANGUAGE_RULE[post.language],
   ].filter(Boolean);
   return lines.length ? `## Theo bộ nhận diện của kênh\n${lines.join('\n')}` : '';
 }

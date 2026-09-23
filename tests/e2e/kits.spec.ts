@@ -129,14 +129,20 @@ test('choosing a theme does not leave the previous highlight behind', async ({ p
 
   // The demo kit carries a yellow highlight that is invisible on the newspaper theme's white.
   await page.getByTestId('preset-card-bao').click();
-  await expect(page.getByTestId('field-card-highlightColor')).toHaveValue('');
+  // A colour input is never empty, so "unset" is carried on the control, not in its value.
+  await expect(page.getByTestId('field-card-highlightColor')).toHaveAttribute('data-unset', 'true');
   await expect(page.getByTestId('kit-contrast-warning')).toHaveCount(0);
 
-  // And if the owner types one in anyway, they are told before they save, not after.
-  await page.getByTestId('field-card-highlightColor').fill('#F8EF63');
+  // And if the owner picks one anyway, they are told before they save, not after.
+  await page.getByTestId('swatch-card-highlightColor').fill('#F8EF63');
   await expect(page.getByTestId('kit-contrast-warning')).toBeVisible();
   await expect(page.getByTestId('kit-contrast-warning')).toContainText('3:1');
   await page.screenshot({ path: 'tests/shots/34-contrast-warning.png', fullPage: true });
+
+  // ↺ puts it back to the theme's own colour — without it the first click on the swatch
+  // would pin a colour with no way to remove it.
+  await page.getByTestId('clear-card-highlightColor').click();
+  await expect(page.getByTestId('field-card-highlightColor')).toHaveAttribute('data-unset', 'true');
 
   await page.getByTestId('preset-card-toi').click();
   await expect(page.getByTestId('kit-contrast-warning')).toHaveCount(0);

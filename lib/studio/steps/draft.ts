@@ -41,9 +41,9 @@ export const draftStep: Step<SourceItem, Draft> = {
   name: 'draft',
   from: 'fetch',
 
-  async preview(item, _ctx) {
+  async preview(item, ctx) {
     if (!item || typeof item !== 'object') throw new Error('Chưa có bài nguồn để viết.');
-    if (isGold(item)) {
+    if (isGold(item) && ((ctx.kit.post ?? {}) as PostTab).narration !== 'ai') {
       return {
         kind: 'text',
         data: { title: item.title, text: item.text },
@@ -59,8 +59,11 @@ export const draftStep: Step<SourceItem, Draft> = {
   },
 
   async run(item, ctx: RunCtx) {
-    if (isGold(item)) return passThrough(item);
     const post = (ctx.kit.post ?? {}) as PostTab;
+    // A gold row is already a finished Vietnamese post written against the same SOP, so it
+    // passes through and costs nothing. `narration: 'ai'` is the owner saying they want it
+    // rewritten anyway — and then it costs what a rewrite costs.
+    if (isGold(item) && post.narration !== 'ai') return passThrough(item);
     // Keyed by everything the prompt is built from, so re-running this step after changing
     // a card colour re-uses the rewrite instead of buying it again. A control that does not
     // touch the prompt does not touch the key.

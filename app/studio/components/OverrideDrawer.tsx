@@ -5,6 +5,8 @@
  * written back — a `<details>` because the browser already has a disclosure widget.
  */
 import type { Overrides } from '@/lib/studio/steps/types';
+import { PRESETS } from '@/app/lib/captionPresets';
+import { valueLabel } from '@/lib/studio/kits/labels';
 
 export interface KitOption {
   id: string;
@@ -19,13 +21,19 @@ export function OverrideDrawer({
   onChange,
   kits,
   open,
+  runId,
+  kitId,
 }: {
   value: Overrides;
   onChange: (next: Overrides) => void;
   kits: KitOption[];
   open?: boolean;
+  /** Set on the run page: enables "Mở cấu hình đầy đủ →" and the save-choice it leads to. */
+  runId?: string;
+  kitId?: string;
 }) {
   const set = (patch: Overrides) => onChange({ ...value, ...patch });
+  const caps = (value.captions ?? {}) as Record<string, unknown>;
   const count = Object.keys(value).filter((k) => k !== 'demo').length;
 
   return (
@@ -92,11 +100,49 @@ export function OverrideDrawer({
           </select>
         </label>
 
+        <label className={ROW}>
+          <span className="text-xs">Cách kể</span>
+          <select
+            className={FIELD}
+            data-testid="ov-narration"
+            value={String((value.post as any)?.narration ?? '')}
+            onChange={(e) =>
+              set({
+                post: { ...((value.post ?? {}) as object), narration: e.target.value || undefined },
+              } as Overrides)
+            }
+          >
+            <option value="">(theo kit)</option>
+            <option value="verbatim">{valueLabel('verbatim')}</option>
+            <option value="ai">{valueLabel('ai')}</option>
+          </select>
+        </label>
+
+        <label className={ROW}>
+          <span className="text-xs">Mẫu phụ đề</span>
+          <select
+            className={FIELD}
+            data-testid="ov-caption-preset"
+            value={String(caps.preset ?? '')}
+            onChange={(e) =>
+              set({ captions: { ...caps, preset: e.target.value || undefined } } as Overrides)
+            }
+          >
+            <option value="">(theo kit)</option>
+            {Object.entries(PRESETS).map(([id, v]) => (
+              <option key={id} value={id}>
+                {String((v as { label?: string }).label ?? id)}
+              </option>
+            ))}
+          </select>
+        </label>
+
         {(
           [
             ['reviewBeforeRender', 'Duyệt trước khi dựng', true],
-            ['includeIntro', 'Có intro', true],
-            ['includeLayout', 'Có khung bài viết', true],
+            ['includeIntro', 'Cảnh mở đầu', true],
+            ['includeLayout', 'Bố cục khung hình', true],
+            ['readTitle', 'Đọc tiêu đề trước caption', false],
           ] as const
         ).map(([key, label, dflt]) => (
           <label key={key} className={ROW}>
@@ -111,15 +157,15 @@ export function OverrideDrawer({
           </label>
         ))}
 
-        <label className={ROW}>
-          <span className="text-xs">Phong cách</span>
-          <input
-            className={`${FIELD} w-32`}
-            placeholder="(mặc định)"
-            value={value.style ?? ''}
-            onChange={(e) => set({ style: e.target.value || undefined })}
-          />
-        </label>
+        {runId && kitId && (
+          <a
+            href={`/studio/kits/${kitId}?run=${runId}`}
+            data-testid="ov-full-config"
+            className="mt-1 block py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary"
+          >
+            ⚙ Mở cấu hình đầy đủ →
+          </a>
+        )}
       </div>
     </details>
   );

@@ -58,6 +58,7 @@ export interface RunViewProps {
   itemRef: string | null;
   channelName: string;
   kitName: string;
+  kitId: string;
   /** The kit's edge-tts voice, so a sample sounds like the reel will. */
   voiceId?: string;
   /** The kit's caption style, so the controls open showing what is actually set. */
@@ -469,7 +470,14 @@ export function RunView(p: RunViewProps) {
             </button>
             {drawerOpen && (
               <div className="mt-2">
-                <OverrideDrawer value={overrides} onChange={setOverrides} kits={p.kits} open />
+                <OverrideDrawer
+                value={overrides}
+                onChange={setOverrides}
+                kits={p.kits}
+                open
+                runId={p.runId}
+                kitId={p.overrides.kitId ?? p.kitId}
+              />
               </div>
             )}
           </div>

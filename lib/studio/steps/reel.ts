@@ -32,9 +32,12 @@ export interface ReelAsset {
 
 function narrationFor(draft: Draft, ctx: RunCtx): string {
   const item = ctx.outputs.fetch as SourceItem | undefined;
-  return scenesFor(draft.text, item?.comments ?? [], ctx.selection)
+  const scenes = scenesFor(draft.text, item?.comments ?? [], ctx.selection)
     .map((s) => s.text)
     .join('\n');
+  // "Đọc tiêu đề trước caption": the title is on the card either way, so reading it is a
+  // choice rather than the default.
+  return ctx.overrides.readTitle && draft.title ? `${draft.title}\n${scenes}` : scenes;
 }
 
 /** What this scene shows behind the caption: the card if it exists, else the background. */

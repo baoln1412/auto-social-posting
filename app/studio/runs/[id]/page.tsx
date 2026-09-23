@@ -59,6 +59,7 @@ export default async function RunPage({ params }: { params: { id: string } }) {
       itemRef={rec.run.item_ref}
       channelName={rec.channel.name}
       kitName={rec.kit.name}
+      kitId={rec.kit.id}
       voiceId={voiceId(rec.kit)}
       captionDefaults={captionStyle(effectiveKit(rec.kit, rec.run.overrides))}
       kits={kits}

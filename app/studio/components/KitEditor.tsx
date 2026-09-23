@@ -10,13 +10,16 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { cardParams, cardPath, captionStyle } from '@/lib/studio/kits/load';
 import { frameUrl } from '@/lib/studio/frame-url';
+import { TAB_LABELS, labelFor, valueLabel } from '@/lib/studio/kits/labels';
+import { PRESETS } from '@/app/lib/captionPresets';
 import { contrastRatio, paletteFor, type ThemeName } from '@/lib/studio/card/theme';
 import type { Kit } from '@/lib/studio/steps/types';
 
 export interface FieldSpec {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'boolean' | 'enum';
+  hint?: string;
+  type: 'text' | 'number' | 'boolean' | 'enum' | 'color' | 'list';
   options?: string[];
   min?: number;
   max?: number;
@@ -24,6 +27,7 @@ export interface FieldSpec {
 export interface TabSpec {
   key: string;
   label: string;
+  hint?: string;
   fields: FieldSpec[];
   presets: { id: string; values: Record<string, unknown> }[];
   /** The owner's own uploads for this tab, from Kho tài nguyên. */
@@ -54,7 +58,68 @@ function summarise(tab: TabSpec, values: Record<string, unknown>): string {
   return parts.length ? parts.join(' · ') : '—';
 }
 
-export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] }) {
+/**
+ * Đọc thử → Nghe thử: one sentence in the chosen voice, before a three-minute render.
+ *
+ * The sample uses make-reel.py's own rate — it hardcodes rate="+25%" and that file is never
+ * edited — so what is heard here is what the reel will sound like. That is also why there is
+ * no speed knob: a control the renderer cannot honour would be a promise Studio cannot keep.
+ */
+function VoiceTry({ voiceId }: { voiceId: string }) {
+  const [text, setText] = useState(
+    'Kiểu dân ông duy nhất mà tôi muốn cưới: một, không khí thị. Hai, tôn trọng cơ thể của người khác.',
+  );
+  const [on, setOn] = useState(false);
+  const q = new URLSearchParams({ text: text.slice(0, 300) });
+  if (voiceId) q.set('voice', voiceId);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        Đọc thử
+      </span>
+      <textarea
+        data-testid="voice-sample-text"
+        value={text}
+        rows={3}
+        onChange={(e) => {
+          setText(e.target.value);
+          setOn(false);
+        }}
+        className="pen-line-static w-full resize-y rounded-md bg-background p-2 text-xs outline-none"
+      />
+      {on ? (
+        // eslint-disable-next-line jsx-a11y/media-has-caption
+        <audio data-testid="voice-sample-audio" src={`/api/studio/tts-sample?${q}`} controls autoPlay className="h-8 w-full" />
+      ) : (
+        <button
+          type="button"
+          data-testid="voice-listen"
+          onClick={() => setOn(true)}
+          className="pen-line-sm self-start rounded-md bg-card px-2 py-1 text-xs font-semibold"
+        >
+          ▷ Nghe thử
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function KitEditor({
+  kit: initial,
+  tabs,
+  runId,
+  samplePlate,
+}: {
+  kit: Kit;
+  tabs: TabSpec[];
+  /** Set when opened from a run's drawer: saving then asks which of the two it meant. */
+  runId?: string;
+  /**
+   * The picture the frame tabs draw the caption band over. Passed from the server because
+   * make-reel.py opens a path, and a client component has no idea where the repo is.
+   */
+  samplePlate?: string;
+}) {
   const router = useRouter();
   const [kit, setKit] = useState<Kit>(initial);
   // Opens on the tab the canvas is showing. Landing on `identity` next to a card preview
@@ -76,7 +141,7 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
   const src = useMemo(
     () =>
       FRAME_TABS.has(active)
-        ? frameUrl({ text: SAMPLE_CUE, style: captionStyle(kit) })
+        ? frameUrl({ text: SAMPLE_CUE, style: captionStyle(kit), plate: samplePlate })
         : `${cardPath(kit)}?${cardParams(kit, SAMPLE)}`,
     [kit, active],
   );
@@ -125,6 +190,31 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
     }
   }
 
+  /**
+   * "Chỉ lượt này": the tab being edited becomes this run's override and the owner goes
+   * straight back. Nothing is written to the kit — that is the whole point of the choice,
+   * and overrides have never written back to a kit since slice 2.
+   */
+  async function saveToRun() {
+    if (!runId) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/studio/runs/${runId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ overrides: { [active]: values } }),
+      });
+      if (!res.ok) {
+        setErr(((await res.json().catch(() => ({}))) as any).error ?? `HTTP ${res.status}`);
+        return;
+      }
+      router.push(`/studio/runs/${runId}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-6 lg:flex-row">
@@ -141,8 +231,39 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
         <aside className="w-full shrink-0 lg:w-80">
           <div className="pen-line-static flex flex-col gap-3 rounded-[var(--radius)] bg-card p-4">
             <h2 className="text-sm font-semibold">{tab.label}</h2>
+            {tab.hint && <p className="-mt-2 text-[11px] text-muted-foreground">{tab.hint}</p>}
 
-            {tab.presets.length > 0 && (
+            {tab.presets.length > 0 && active === 'captions' ? (
+              // The reference shows a wall of rendered styles, not a list of names — a
+              // caption preset is a look, and a look is judged by looking. Each thumbnail is
+              // the same composed frame the run page draws, at this preset.
+              <div data-testid="preset-gallery" className="grid grid-cols-2 gap-1.5">
+                {tab.presets.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    data-testid={`preset-${tab.key}-${p.id}`}
+                    onClick={() => applyPreset(p.values)}
+                    className={`pen-line-sm overflow-hidden rounded-md ${
+                      values.preset === p.id ? 'ring-2 ring-[hsl(var(--primary))]' : ''
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={frameUrl({ text: SAMPLE_CUE, style: { preset: p.id }, plate: samplePlate })}
+                      alt=""
+                      loading="lazy"
+                      data-testid={`preset-thumb-${p.id}`}
+                      className="aspect-[9/16] w-full object-cover object-center"
+                      style={{ objectPosition: 'center 46%' }}
+                    />
+                    <span className="block bg-card px-1 py-0.5 text-[10px] font-semibold">
+                      {PRESETS[p.id]?.label ?? p.id}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : tab.presets.length > 0 ? (
               <div data-testid="preset-gallery" className="flex flex-wrap gap-1.5">
                 {tab.presets.map((p) => (
                   <button
@@ -158,7 +279,9 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
                   </button>
                 ))}
               </div>
-            )}
+            ) : null}
+
+            {active === 'voice' && <VoiceTry voiceId={String(values.voiceId ?? '')} />}
 
             {warn && (
               <p
@@ -194,29 +317,77 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
             )}
 
             {tab.fields.map((f) => (
-              <label key={f.key} className="flex items-center justify-between gap-3">
-                <span className="text-xs">{f.label}</span>
+              <label key={f.key} className="flex items-start justify-between gap-3">
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-xs">{f.label}</span>
+                  {f.hint && (
+                    <span className="text-[10px] leading-snug text-muted-foreground">{f.hint}</span>
+                  )}
+                </span>
                 {f.type === 'enum' ? (
                   <select
                     data-testid={`field-${tab.key}-${f.key}`}
                     value={String(values[f.key] ?? '')}
                     onChange={(e) => patch({ [f.key]: e.target.value })}
-                    className="pen-line-static rounded-md bg-background px-2 py-1 text-xs"
+                    className="pen-line-static shrink-0 rounded-md bg-background px-2 py-1 text-xs"
                   >
                     <option value="">(mặc định)</option>
                     {f.options?.map((o) => (
                       <option key={o} value={o}>
-                        {o}
+                        {valueLabel(o)}
                       </option>
                     ))}
                   </select>
+                ) : f.type === 'color' ? (
+                  // <input type="color"> has no empty state — it is always showing some
+                  // colour — so "chưa đặt, theo giao diện" is carried on data-unset and
+                  // given a way back. Without the ↺ the first click on the swatch would
+                  // pin a colour the owner could never remove.
+                  <span
+                    data-testid={`field-${tab.key}-${f.key}`}
+                    data-unset={values[f.key] === undefined ? 'true' : 'false'}
+                    data-value={String(values[f.key] ?? '')}
+                    className="flex shrink-0 items-center gap-1"
+                  >
+                    <input
+                      type="color"
+                      data-testid={`swatch-${tab.key}-${f.key}`}
+                      value={String(values[f.key] ?? '#FFFFFF')}
+                      onChange={(e) => patch({ [f.key]: e.target.value.toUpperCase() })}
+                      className="h-6 w-10 cursor-pointer rounded-md border-0 bg-transparent p-0"
+                    />
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {values[f.key] === undefined ? 'theo giao diện' : String(values[f.key])}
+                    </span>
+                    {values[f.key] !== undefined && (
+                      <button
+                        type="button"
+                        title="Bỏ, dùng màu của giao diện"
+                        data-testid={`clear-${tab.key}-${f.key}`}
+                        onClick={() => patch({ [f.key]: undefined })}
+                        className="text-[11px] text-muted-foreground hover:text-primary"
+                      >
+                        ↺
+                      </button>
+                    )}
+                  </span>
+                ) : f.type === 'list' ? (
+                  <input
+                    type="text"
+                    data-testid={`field-${tab.key}-${f.key}`}
+                    value={(Array.isArray(values[f.key]) ? (values[f.key] as string[]) : []).join(' ')}
+                    onChange={(e) =>
+                      patch({ [f.key]: e.target.value.split(/\s+/).filter(Boolean) })
+                    }
+                    className="pen-line-static w-32 shrink-0 rounded-md bg-background px-2 py-1 text-xs"
+                  />
                 ) : f.type === 'boolean' ? (
                   <input
                     type="checkbox"
                     data-testid={`field-${tab.key}-${f.key}`}
                     checked={Boolean(values[f.key])}
                     onChange={(e) => patch({ [f.key]: e.target.checked })}
-                    className="h-4 w-4 accent-[hsl(var(--primary))]"
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]"
                   />
                 ) : (
                   <input
@@ -235,13 +406,19 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
                             : e.target.value,
                       })
                     }
-                    className="pen-line-static w-32 rounded-md bg-background px-2 py-1 text-xs"
+                    className="pen-line-static w-32 shrink-0 rounded-md bg-background px-2 py-1 text-xs"
                   />
                 )}
               </label>
             ))}
 
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {runId && (
+                <p className="w-full text-[11px] leading-snug text-muted-foreground">
+                  Mở từ một lượt chạy. Lưu vào bộ nhận diện đổi mọi video sau này; chỉ lượt này
+                  thì bộ nhận diện giữ nguyên.
+                </p>
+              )}
               <button
                 type="button"
                 data-testid="kit-save"
@@ -249,8 +426,19 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
                 onClick={save}
                 className="pen-line-sm rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
               >
-                {saving ? 'Đang lưu…' : 'Lưu'}
+                {saving ? 'Đang lưu…' : runId ? 'Lưu vào bộ nhận diện' : 'Lưu'}
               </button>
+              {runId && (
+                <button
+                  type="button"
+                  data-testid="kit-save-run"
+                  disabled={saving}
+                  onClick={saveToRun}
+                  className="pen-line-sm rounded-md bg-card px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                >
+                  Chỉ lượt này
+                </button>
+              )}
               {saved && (
                 <span data-testid="kit-saved" className="font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--success))]">
                   đã lưu

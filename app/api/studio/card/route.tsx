@@ -73,6 +73,13 @@ export async function GET(req: NextRequest) {
   const bgUrl = q.get('bg');
   const bg = bgUrl ? await background(bgUrl, W, H) : null;
 
+  // How wide the text block is and where it sits. Defaults are the composition the card had
+  // before these existed: full width, bottom-aligned.
+  const width = Math.min(100, Math.max(40, Number(q.get('width')) || 100));
+  const yPct = Math.min(100, Math.max(0, Number(q.get('y') ?? 100)));
+  // "Chụp nhóm": the headline plus the comments that were chosen, on one card.
+  const comments = q.getAll('c').filter((c) => c.trim()).slice(0, 3);
+
   // The highlighted clause is matched as a run of words, so the paint follows the words
   // rather than a character offset that shifts when the title is edited.
   const words = title.split(' ');
@@ -120,13 +127,17 @@ export async function GET(req: NextRequest) {
           style={{
             position: 'relative',
             display: 'flex',
-            flexWrap: 'wrap',
+            flexDirection: 'column',
+            width: `${width}%`,
             padding: Math.round(W * 0.075),
             paddingBottom: Math.round(W * 0.09),
             borderTop: `4px solid ${pal.rule}`,
-            marginTop: 'auto',
+            // 100 keeps the block where it has always been; anything less lifts it, and
+            // `auto` above it is what pushes it down in the first place.
+            marginTop: yPct >= 100 ? 'auto' : Math.round((H * yPct) / 100),
           }}
         >
+        <div style={{ display: 'flex', flexWrap: 'wrap' }}>
           {painted.map((p, i) => (
             <span
               key={i}
@@ -141,6 +152,26 @@ export async function GET(req: NextRequest) {
               {p.w}
             </span>
           ))}
+        </div>
+
+        {comments.map((c, i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              marginTop: Math.round(size * 0.42),
+              paddingLeft: Math.round(size * 0.34),
+              borderLeft: `${Math.max(3, Math.round(size * 0.07))}px solid ${pal.hl}`,
+              color: pal.fg,
+              opacity: 0.88,
+              fontSize: Math.round(size * 0.46),
+              fontFamily: 'Kit',
+              lineHeight: 1.3,
+            }}
+          >
+            {c.length > 130 ? `${c.slice(0, 130)}…` : c}
+          </div>
+        ))}
         </div>
       </div>
     ),

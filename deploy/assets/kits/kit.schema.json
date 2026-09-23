@@ -116,6 +116,45 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 10
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 3,
+          "description": "The channel's standing subjects, added to the draft prompt."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#?[^\\s#]+$"
+          },
+          "maxItems": 6,
+          "description": "Standing hashtags. `hashtags` is how MANY to write; this is WHICH ones."
+        },
+        "language": {
+          "enum": [
+            "vi",
+            "en"
+          ],
+          "description": "The language the post is written in. A source in another language is translated first."
+        },
+        "narration": {
+          "enum": [
+            "verbatim",
+            "ai"
+          ],
+          "description": "verbatim: a gold row is already a finished post and passes through unchanged. ai: rewrite it even so."
+        },
+        "commentMode": {
+          "enum": [
+            "auto",
+            "manual"
+          ],
+          "description": "Whether the scene comments are chosen by score or by hand. The per-run drawer overrides it."
         }
       }
     },
@@ -182,6 +221,25 @@
         "highlightColor": {
           "type": "string",
           "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 40,
+          "maximum": 100,
+          "description": "How much of the frame's width the text block spans, in percent."
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Where the text block sits vertically, in percent. 100 is the bottom."
+        },
+        "comments": {
+          "enum": [
+            "none",
+            "group"
+          ],
+          "description": "none: a headline card. group: the headline plus the chosen comments on one card."
         }
       },
       "description": "engine 'classic' = GET /api/image/card (brand overlay, og:image upgrade, focal crop; reads ratio/highlight/background only). engine 'studio' = GET /api/studio/card (theme/font/radius/titleSize/highlightColor/9:16). A field the chosen engine does not read is simply not sent."
@@ -238,8 +296,52 @@
             "upper",
             "none"
           ]
+        },
+        "font": {
+          "enum": [
+            "BeVietnamPro-Black",
+            "BeVietnamPro-Bold",
+            "BeVietnamPro-Medium",
+            "BeVietnamPro-Regular"
+          ]
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "highlightMode": {
+          "enum": [
+            "word",
+            "block",
+            "none"
+          ]
+        },
+        "highlightColor": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "highlightBg": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "outlineWidth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "shadow": {
+          "type": "boolean"
+        },
+        "band": {
+          "type": "boolean"
+        },
+        "bandOpacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
         }
-      }
+      },
+      "description": "Flat here, nested in deploy/caption_style.py: kits/load.ts's captionStyle() maps between them. A schema-driven form edits flat keys far better than nested objects, and the renderer's own shape is not something a kit should have to mirror."
     },
     "frame": {
       "type": "object",
