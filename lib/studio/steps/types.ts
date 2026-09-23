@@ -8,7 +8,6 @@
 import type { Tier } from '../tier';
 
 export type StepName = 'fetch' | 'draft' | 'image' | 'reel' | 'publish';
-export type Mode = 'read-post' | 'write-narration' | 'voice-over-media' | 'text-to-reel';
 
 /** 0 is a valid, honest estimate — it is not "unknown". */
 export type Money = { usd: number; note: string };
@@ -117,33 +116,31 @@ export interface Comment {
   depth: number;
 }
 
-/** Which steps a mode runs, in order. `publish` records intent only and is not wired yet. */
-export const TEMPLATES: Record<Mode, StepName[]> = {
-  'read-post': ['fetch', 'draft', 'image', 'reel'],
-  'write-narration': ['fetch', 'draft', 'image', 'reel'],
-  // Narration over the owner's own media — there is no card to make.
-  'voice-over-media': ['fetch', 'draft', 'reel'],
-  // The owner's own text: nothing to fetch.
-  'text-to-reel': ['draft', 'reel'],
-};
+/**
+ * The rail, in order. One sequence, not four: v1's four "modes" were a misreading of the
+ * reference's `Đọc bài · Viết lời đọc · Lồng tiếng · Video dọc` chips, which are that
+ * product's step rail — what will happen to the link — and not four kinds of video.
+ *
+ * `publish` is not on it yet: it records intent only and gets its screen in a later slice.
+ */
+export const ALL_STEPS: StepName[] = ['fetch', 'draft', 'image', 'reel'];
 
 /**
- * The steps this run actually needs: the mode's sequence, narrowed by what the channel is
- * for.
+ * The steps this run actually needs: the rail, narrowed by what the channel is for.
  *
  * `makes` was collected by the wizard and stored since slice 2 with nothing reading it, so
  * every channel ran the full sequence — a post-only channel still rendered a video nobody
- * asked for. §6's "post-only run (stops after image)" is this.
+ * asked for.
  *
  * fetch and draft always survive: there is no run without text. A Facebook post here is the
  * text AND its card, so `post` keeps the image step.
  */
-export function templateFor(mode: Mode, makes: readonly string[]): StepName[] {
+export function templateFor(makes: readonly string[]): StepName[] {
   const wanted = new Set(makes);
   const known = ['post', 'image', 'reel'].some((k) => wanted.has(k));
-  if (!known) return [...TEMPLATES[mode]];
+  if (!known) return [...ALL_STEPS];
 
-  return TEMPLATES[mode].filter((step) => {
+  return ALL_STEPS.filter((step) => {
     if (step === 'image') return wanted.has('image') || wanted.has('post');
     if (step === 'reel') return wanted.has('reel');
     return true;
@@ -158,13 +155,6 @@ export function makesOf(sourceJson: string | null | undefined): string[] {
     return [];
   }
 }
-
-export const MODE_LABELS: Record<Mode, string> = {
-  'read-post': 'Đọc bài',
-  'write-narration': 'Viết lời đọc',
-  'voice-over-media': 'Lồng tiếng',
-  'text-to-reel': 'Video dọc',
-};
 
 export const STEP_LABELS: Record<StepName, string> = {
   fetch: 'Lấy nguồn',

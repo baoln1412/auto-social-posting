@@ -155,7 +155,9 @@ describe('the source registry', () => {
     expect(Object.keys(SOURCES).sort()).toEqual([
       'article',
       'demo',
+      'facebook',
       'gold',
+      'instagram',
       'reddit',
       'text',
       'threads',
@@ -166,6 +168,8 @@ describe('the source registry', () => {
     const before = process.env.THREADS_ACCESS_TOKEN;
     delete process.env.THREADS_ACCESS_TOKEN;
     expect(SOURCES.threads.blocked()).toMatch(/token/i);
+    expect(SOURCES.facebook.blocked()).toMatch(/FACEBOOK_GRAPH_TOKEN/);
+    expect(SOURCES.instagram.blocked()).toMatch(/FACEBOOK_GRAPH_TOKEN/);
     expect(SOURCES.gold.blocked()).toBeNull();
     if (before) process.env.THREADS_ACCESS_TOKEN = before;
   });

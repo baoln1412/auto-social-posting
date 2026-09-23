@@ -3,6 +3,7 @@
  * fetch step, the wizard's fetch test and the New page's picker all talk to one interface.
  */
 import type { SourceItem } from '../steps/types';
+import { SOURCE_LABELS } from './detect';
 import { DEMO_ITEM } from '../demo/steps';
 import { getGoldItem, listGold } from './gold';
 import { listArticle } from './article';
@@ -10,7 +11,15 @@ import { listReddit } from './reddit';
 import { listThreads, threadsToken } from './threads';
 import { textToItem } from './text';
 
-export type SourceKind = 'gold' | 'article' | 'text' | 'reddit' | 'threads' | 'demo';
+export type SourceKind =
+  | 'gold'
+  | 'article'
+  | 'text'
+  | 'reddit'
+  | 'threads'
+  | 'facebook'
+  | 'instagram'
+  | 'demo';
 
 export interface SourceConfig {
   marketId?: string;
@@ -36,10 +45,30 @@ function need(v: string | undefined, msg: string): string {
   return v.trim();
 }
 
+/**
+ * A source the owner can paste a link to but Studio cannot read yet. Listed, never hidden —
+ * a link that quietly became "the first gold row" is the bug this whole slice is about, and
+ * a source that quietly vanished from the list would be the same mistake one level up.
+ */
+function notWired(kind: SourceKind, why: string): SourceDef {
+  return {
+    kind,
+    label: SOURCE_LABELS[kind],
+    hint: why,
+    needs: 'url',
+    blocked: () => why,
+    list: async () => {
+      throw new Error(why);
+    },
+  };
+}
+
+const GRAPH = 'Chưa nối. Thêm FACEBOOK_GRAPH_TOKEN rồi thiết lập ở Nguồn tự động.';
+
 export const SOURCES: Record<SourceKind, SourceDef> = {
   gold: {
     kind: 'gold',
-    label: 'Kho bài của kênh',
+    label: SOURCE_LABELS.gold,
     hint: 'Bài đã sinh trong lake, theo thị trường.',
     needs: 'market',
     blocked: () => null,
@@ -48,7 +77,7 @@ export const SOURCES: Record<SourceKind, SourceDef> = {
   },
   article: {
     kind: 'article',
-    label: 'Bài báo',
+    label: SOURCE_LABELS.article,
     hint: 'Dán đường dẫn một bài viết.',
     needs: 'url',
     blocked: () => null,
@@ -56,7 +85,7 @@ export const SOURCES: Record<SourceKind, SourceDef> = {
   },
   reddit: {
     kind: 'reddit',
-    label: 'Reddit',
+    label: SOURCE_LABELS.reddit,
     hint: 'Đường dẫn một bài Reddit công khai — bình luận có điểm.',
     needs: 'url',
     blocked: () => null,
@@ -64,7 +93,7 @@ export const SOURCES: Record<SourceKind, SourceDef> = {
   },
   text: {
     kind: 'text',
-    label: 'Tự viết',
+    label: SOURCE_LABELS.text,
     hint: 'Dán nội dung của bạn, kể cả bài Threads/Facebook chép tay.',
     needs: 'text',
     blocked: () => null,
@@ -72,15 +101,26 @@ export const SOURCES: Record<SourceKind, SourceDef> = {
   },
   threads: {
     kind: 'threads',
-    label: 'Threads (tài khoản của bạn)',
+    label: SOURCE_LABELS.threads,
     hint: 'Bài của chính bạn qua Threads API; trả lời kèm lượt thích.',
     needs: 'none',
     blocked: () => (threadsToken() ? null : 'Cần THREADS_ACCESS_TOKEN trong môi trường.'),
-    list: (_cfg, limit) => listThreads(limit),
+    // A pasted threads.net link lands here, and the API cannot read somebody else's post.
+    // Returning the owner's own latest post instead would be complaint A again.
+    list: (cfg, limit) =>
+      cfg.url
+        ? Promise.reject(
+            new Error(
+              'API chỉ lấy được bài của chính bạn. Dán nội dung bài vào ô thay cho đường dẫn.',
+            ),
+          )
+        : listThreads(limit),
   },
+  facebook: notWired('facebook', GRAPH),
+  instagram: notWired('instagram', GRAPH),
   demo: {
     kind: 'demo',
-    label: 'Dữ liệu mẫu',
+    label: SOURCE_LABELS.demo,
     hint: 'Một bài mẫu với năm bình luận — không tốn phí.',
     needs: 'none',
     blocked: () => null,

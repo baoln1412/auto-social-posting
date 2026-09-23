@@ -14,14 +14,12 @@ import { statSync } from 'node:fs';
 import { studioDb } from './db';
 import { resolveStep } from './steps/registry';
 import {
-  TEMPLATES,
   canContinue,
   makesOf,
   templateFor,
   type Channel,
   type GateResult,
   type Kit,
-  type Mode,
   type Money,
   type Overrides,
   type RunCtx,
@@ -51,7 +49,6 @@ export interface RunRecord {
     id: string;
     channel_id: string;
     item_ref: string | null;
-    mode: Mode;
     status: RunStatus;
     current_step: StepName;
     overrides: Overrides;
@@ -78,28 +75,25 @@ function parse<T>(raw: unknown, fallback: T): T {
 
 export function createRun(opts: {
   channelId: string;
-  mode: Mode;
   itemRef?: string;
   overrides?: Overrides;
   selection?: Selection;
 }): string {
-  if (!TEMPLATES[opts.mode]) throw new Error(`Chế độ không hợp lệ: ${opts.mode}`);
   const chan = studioDb()
     .prepare('SELECT makes_json FROM studio_channels WHERE id=?')
     .get(opts.channelId) as { makes_json: string } | undefined;
-  const template = templateFor(opts.mode, makesOf(chan?.makes_json));
+  const template = templateFor(makesOf(chan?.makes_json));
   const id = randomUUID();
   studioDb()
     .prepare(
-      `INSERT INTO studio_runs (id, channel_id, item_ref, mode, status, current_step,
+      `INSERT INTO studio_runs (id, channel_id, item_ref, status, current_step,
                                 overrides_json, selection_json)
-       VALUES (?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?)`,
     )
     .run(
       id,
       opts.channelId,
       opts.itemRef ?? null,
-      opts.mode,
       'new',
       template[0],
       JSON.stringify(opts.overrides ?? {}),
@@ -149,7 +143,6 @@ export function getRun(id: string): RunRecord | null {
       id: row.id,
       channel_id: row.channel_id,
       item_ref: row.item_ref,
-      mode: row.mode,
       status: row.status,
       current_step: row.current_step,
       overrides,
@@ -158,9 +151,7 @@ export function getRun(id: string): RunRecord | null {
       updated_at: row.updated_at,
     },
     steps,
-    template: TEMPLATES[row.mode as Mode]
-      ? templateFor(row.mode as Mode, makesOf((channel as any).makes_json))
-      : [],
+    template: templateFor(makesOf((channel as any).makes_json)),
     channel,
     kit,
   };

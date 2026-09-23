@@ -1,3 +1,5 @@
+> **Superseded 2026-09-22 by `2026-09-22-studio-v2.md`.** Slices 0–6 here are built and stay; v2 removes the four *modes* (they were ThreadViral's step rail, misread), adds the pipeline door, the live preview contract and the full option catalogue. Read v2 first; use §3–§5 here for the contract and tables it extends.
+
 # Studio — the editorial UX for Desoul Posting (plan, 2026-09-22)
 
 **Written for:** a Claude Code session opened in `~/auto-social-posting`, any model. This is the

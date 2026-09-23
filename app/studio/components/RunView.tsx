@@ -18,11 +18,9 @@ import { estimateSeconds, mmss } from '@/lib/studio/estimate';
 import { STEP_LABELS as RENDER_LABELS, STEP_ORDER as RENDER_STEPS } from '@/app/lib/videoSteps';
 import {
   STEP_LABELS,
-  MODE_LABELS,
   canContinue,
   type GateResult,
   type Money,
-  type Mode,
   type Overrides,
   type Selection,
   type SourceItem,
@@ -41,7 +39,8 @@ export interface StepView {
 
 export interface RunViewProps {
   runId: string;
-  mode: Mode;
+  /** Which source this run reads — the thing v1 decided silently. */
+  sourceLabel: string;
   status: string;
   currentStep: StepName;
   template: StepName[];
@@ -190,7 +189,7 @@ export function RunView(p: RunViewProps) {
         <header className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <h1 className="text-xl font-bold">{p.channelName}</h1>
           <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-            {MODE_LABELS[p.mode]} · {p.kitName} · {STATUS_LABEL[p.status] ?? p.status} ·{' '}
+            {p.sourceLabel} · {p.kitName} · {STATUS_LABEL[p.status] ?? p.status} ·{' '}
             {p.runId.slice(0, 8)}
           </span>
         </header>

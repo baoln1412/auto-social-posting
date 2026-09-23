@@ -74,7 +74,7 @@ describe('groupByDay()', () => {
 
 describe('listLibrary()', () => {
   it('records an asset row for every artefact a run produced', async () => {
-    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     for (let i = 0; i < 4; i++) await advance(id);
 
     const kinds = studioDb()
@@ -85,7 +85,7 @@ describe('listLibrary()', () => {
   });
 
   it('lists the run with its assets and the source it came from', async () => {
-    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     for (let i = 0; i < 4; i++) await advance(id);
 
     const rows = listLibrary();
@@ -97,7 +97,7 @@ describe('listLibrary()', () => {
   });
 
   it('re-running a step replaces its asset instead of stacking a second one', async () => {
-    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     for (let i = 0; i < 4; i++) await advance(id);
     await advance(id, { step: 'image' });
     expect(
@@ -108,19 +108,19 @@ describe('listLibrary()', () => {
 
 describe('listLibrary() channel filtering', () => {
   it('keeps the runs whose channel is in the allowed set', async () => {
-    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     for (let i = 0; i < 4; i++) await advance(id);
     expect(listLibrary({ channelIds: new Set([DEMO_CHANNEL_ID]) })).toHaveLength(1);
   });
 
   it('drops the runs whose channel is not', async () => {
-    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     for (let i = 0; i < 4; i++) await advance(id);
     expect(listLibrary({ channelIds: new Set(['someone-else']) })).toHaveLength(0);
   });
 
   it('shows everything when no set is given', async () => {
-    createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     expect(listLibrary()).toHaveLength(1);
   });
 });

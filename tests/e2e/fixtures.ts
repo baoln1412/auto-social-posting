@@ -13,6 +13,13 @@ import type { Page } from '@playwright/test';
  * full timeout before rejecting, which killed the browser mid-test. Count first.
  */
 export async function dismissTour(page: Page): Promise<void> {
+  // Give it a moment to mount first. Counting immediately after goto() found nothing, the
+  // helper returned, and the tour then rendered itself into the screenshot the test took
+  // three lines later. waitFor is safe to catch — unlike click, it rejects at ITS timeout.
+  await page
+    .getByTestId('tour')
+    .waitFor({ state: 'visible', timeout: 2_000 })
+    .catch(() => undefined);
   if (await page.getByTestId('tour').count()) {
     await page.getByTestId('tour-skip').click();
   }

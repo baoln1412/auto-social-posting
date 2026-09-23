@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { studioDb } from '@/lib/studio/db';
 import { createRun } from '@/lib/studio/runs';
 import { can, mayUseChannel, tier } from '@/lib/studio/tier';
-import { TEMPLATES, type Mode } from '@/lib/studio/steps/types';
+import { detectSource } from '@/lib/studio/sources/detect';
+import { saveRunText, textToItem } from '@/lib/studio/sources/text';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,13 +17,12 @@ export async function POST(req: NextRequest) {
 
   const body = (await req.json().catch(() => ({}))) as {
     channelId?: string;
-    mode?: Mode;
     itemRef?: string;
     overrides?: Record<string, unknown>;
   };
 
-  if (!body.channelId || !body.mode || !TEMPLATES[body.mode]) {
-    return NextResponse.json({ error: 'Thiếu kênh hoặc chế độ.' }, { status: 400 });
+  if (!body.channelId) {
+    return NextResponse.json({ error: 'Thiếu kênh.' }, { status: 400 });
   }
 
   const channel = studioDb()
@@ -33,11 +33,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Kênh này ngoài quyền của bạn.' }, { status: 403 });
   }
 
+  // A whole pasted article would otherwise become the item_ref itself. The ref stays a
+  // short text:<sha> and the words go in their own row — which is what saveRunText was
+  // written for in slice 1 and never wired to.
+  const pasted = body.itemRef?.trim() ?? '';
+  const detected = detectSource(pasted);
+  const isOwnText = detected?.kind === 'text' && Boolean(detected.cfg.text);
+  const itemRef = isOwnText ? textToItem(pasted).id : pasted || undefined;
+
   const id = createRun({
     channelId: body.channelId,
-    mode: body.mode,
-    itemRef: body.itemRef,
+    itemRef,
     overrides: body.overrides ?? {},
   });
+  if (isOwnText) saveRunText(id, pasted);
   return NextResponse.json({ id });
 }

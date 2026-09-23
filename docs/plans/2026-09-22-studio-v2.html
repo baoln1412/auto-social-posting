@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studio v2</title>
+<style>
+:root{--paper:#f4f1ea;--ink:#16305a;--text:#2a2f3a;--soft:#8a94a8;--rule:#c9c0ae;--line:#ded7c9;--orange:#e2631b;--green:#2f6b4f;--teal:#0f8fa3;--warn:#b45309;--card:#fffdf7;--pen:#211f19;--mono:"SF Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",Inter,Roboto,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--text);font:16px/1.55 var(--sans)}
+.wrap{max-width:1100px;margin:0 auto;padding:56px 24px 96px}
+.kicker{font:12px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+h1{font-size:40px;line-height:1.1;margin:10px 0 14px;color:var(--ink)}.lede{font-size:18px;max-width:800px;color:#3a4152}
+hr.bar{border:0;border-top:3px solid var(--ink);margin:28px 0 8px}
+h2{font-size:24px;margin:44px 0 12px;color:var(--ink);display:flex;gap:12px;align-items:baseline}h2 .n{font:14px var(--mono);color:var(--orange)}
+h3{font-size:17px;margin:22px 0 8px;color:var(--ink)}p{margin:8px 0}
+.chip{display:inline-block;font:11px/1.2 var(--mono);letter-spacing:.04em;padding:3px 7px;border-radius:5px;background:#e3efe8;color:var(--green);margin:2px 4px 2px 0;white-space:nowrap}
+.chip.warn{background:#f7e8d6;color:var(--warn)}.chip.blue{background:#dfeef2;color:var(--teal)}.chip.red{background:#f6dfdf;color:#a33}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:14px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+code{font:13px var(--mono);background:#ece7dc;padding:1px 5px;border-radius:4px}
+.grid{display:grid;gap:18px}.g2{grid-template-columns:1fr 1fr}@media(max-width:820px){.g2{grid-template-columns:1fr}}
+.note{border-left:3px solid var(--orange);padding:6px 14px;background:#faf3e6;margin:14px 0}
+.wf{background:var(--card);border:2.5px solid var(--pen);border-radius:12px;box-shadow:4px 4px 0 var(--pen);padding:12px;margin:10px 0;font-size:13px}
+.wf .t{font:11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--soft);margin-bottom:8px}
+.wf img{width:100%;display:block;border-radius:6px}.wf.fig{padding:8px}
+.cap{font:12.5px/1.45 var(--sans);color:#3a4152}
+.box{border:1.5px solid var(--pen);border-radius:8px;padding:8px;background:#fff;margin:6px 0}.box.dim{border-style:dashed;color:var(--soft)}
+.btn{display:inline-block;border:1.5px solid var(--pen);border-radius:6px;padding:3px 9px;background:#fff;box-shadow:2px 2px 0 var(--pen);font-size:12px;margin:2px}.btn.go{background:var(--green);color:#fff}
+.rail{display:flex;gap:6px;margin:8px 0}.rail div{flex:1;border:1.5px solid var(--pen);border-radius:7px;padding:5px 6px;background:#fff;font-size:12px;text-align:center}.rail .on{background:#e3efe8;font-weight:600}
+.screen{display:grid;grid-template-columns:110px 1fr 150px;gap:8px;min-height:230px}.screen .side{border-right:1px dashed var(--rule);padding-right:6px;font-size:11.5px}.screen .side div{padding:4px 5px;border-radius:5px}.screen .side .on{background:#e3efe8;color:var(--green);font-weight:600}
+.phone{width:110px;height:196px;border:2px solid var(--pen);border-radius:12px;background:linear-gradient(#cfe4ec,#8fb28f);position:relative;margin:6px auto}.phone .card{position:absolute;left:7px;right:7px;top:16px;background:#fff;border-radius:5px;padding:4px;font-size:7.5px;line-height:1.25;border:1px solid #ccc}.phone .capt{position:absolute;left:0;right:0;bottom:18px;text-align:center;font-weight:800;color:#fff;text-shadow:0 1px 0 #000;font-size:9px}.phone .capt b{color:#ffd23f}
+.opts{font-size:11.5px}.opts div{border-bottom:1px solid var(--line);padding:3px 0}
+details.tab{border:1.5px solid var(--pen);border-radius:8px;background:#fff;padding:8px 12px;margin:8px 0}details.tab summary{cursor:pointer;font-size:15px}
+.tl{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:12px 0}@media(max-width:820px){.tl{grid-template-columns:repeat(2,1fr)}}
+.tl div{border:1.5px solid var(--pen);border-radius:8px;padding:8px;background:#fff;font-size:12px}.tl b{display:block;font:12px var(--mono);color:var(--orange);margin-bottom:4px}.tl .stop{font:10.5px var(--mono);color:var(--warn);margin-top:6px}
+.doors{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:820px){.doors{grid-template-columns:1fr}}
+pre{background:#ece7dc;border-radius:8px;padding:12px;font:12.5px/1.5 var(--mono);white-space:pre-wrap}
+.legend span{margin-right:6px}
+</style></head><body><div class="wrap">
+<div class="kicker">Desoul Posting · Studio · plan v2 · 2026-09-22</div>
+<h1>Studio v2</h1>
+<p class="lede">v1 was executed as written (slices 0–6, 11 commits, 228 tests) and the result was bad, because the plan was wrong in three places. This page shows each ThreadViral reference screen beside what ours becomes, every control on it, and the seven slices that get there. The handoff for the executing session is <code>docs/plans/2026-09-22-studio-v2.md</code>.</p>
+<hr class="bar">
+
+<h2><span class="n">01</span> What went wrong, in the code</h2>
+<div class="grid g2">
+<div class="wf fig"><div class="t">ours today · /studio</div><img src="ref/ours-studio-now.jpg" alt="the Studio New page as built"></div>
+<div>
+<p><span class="chip red">A · no door to the pipeline</span> The only source configuration is a one-source-per-channel wizard. No feed list, no filter, no output shape. The crawler's real config lives in the old SPA's Settings and Studio cannot see it. A pasted link on a gold channel is <em>silently ignored</em> (<code>steps/fetch.ts:cfgFor</code>) and the first listed item is used.</p>
+<p><span class="chip red">B · four selects and three checkboxes</span> <code>OverrideDrawer</code> has 8 controls; the kit editor is schema-driven with <em>labels = schema keys</em> (<code>card.engine</code> is a label). ThreadViral's configurator has 8 tabs and ~40 controls, a 12-control drawer and a layer editor. v1 marked half of them "engine" or "later" and made the layer editor conditional.</p>
+<p><span class="chip red">C · preview once per page load</span> <code>previewStep</code> runs server-side when the page opens; a changed option updates client state only; the preview refreshes after the next <code>POST advance</code>. The reference redraws the phone frame on every control.</p>
+<p><span class="chip warn">and the chips</span> <code>Đọc bài · Viết lời đọc · Lồng tiếng · Video dọc</code> on the reference New page is the pipeline's step rail, not four kinds of video. v1 made them "modes"; the executor built "Chọn kiểu video". v2 removes the modes.</p>
+</div></div>
+
+<h2><span class="n">02</span> The shape: two doors, one rail</h2>
+<div class="doors">
+<div class="wf"><div class="t">door 1 · Nguồn tự động → Gold</div>
+<div class="rail"><div class="on">Nguồn</div><div>Lọc &amp; xếp</div><div>Đầu ra</div><div>Ảnh &amp; video</div><div>Lịch</div></div>
+<div class="box">Crawled feeds of the market (on/off, weight) + <b>Thêm nguồn</b>: RSS · site · subreddit · Threads account · Facebook page · Instagram account — each passes a <b>fetch test</b> (3 real items or the error) before it can be saved.</div>
+<div class="box">Ordering, never gating: topic boosts, source weight, recency. Hard filters only where the pipeline already has them (market, language, dedupe, compliance). Preview = the ordered queue with the score breakdown.</div>
+<div class="box">Output shape: format preset · length · tone · language · title style · hashtags · CTA · citation · compliance (always on). Preview = the last 3 items drafted now, side by side, with chips.</div>
+<div class="box">Run now / schedule → <b>writes Gold</b>. Reads and writes the same feeds, context and prompt the old SPA uses.</div>
+<span class="btn">Thiết lập</span> <span class="btn go">Chạy ngay</span></div>
+<div class="wf"><div class="t">door 2 · Một bài</div>
+<div class="box dim">Dán link Threads / Reddit / Facebook / Instagram / bài báo, hoặc viết nội dung…</div>
+<span class="btn">Kênh ▾</span> <span class="btn">⚙ Tuỳ chỉnh</span> <span class="btn go">Tạo</span>
+<div class="cap" style="margin-top:8px">The link is honoured on every channel — the source type is detected from it (<code>sources/detect.ts</code>). The fetch step shows the item and its comment pool before anything is spent.</div>
+<div class="rail" style="margin-top:14px"><div class="on">Đọc bài</div><div>Viết bài</div><div>Ảnh</div><div>Video</div><div>Đăng</div></div>
+<div class="cap">The run page: one screen per step — options right, preview centre, cost + Tiếp bottom. The preview re-runs on every control change (debounced, cached, one composed frame for video).</div>
+</div></div>
+
+<h2><span class="n">03</span> The run page, step by step — reference <code>ref/tv-12</code>, <code>ref/tv-25</code></h2>
+<div class="grid g2">
+<div class="wf fig"><div class="t">reference · Chỉnh &amp; Render lại</div><img src="ref/tv-12-render-edit.jpg" alt="ThreadViral edit and re-render page"></div>
+<div class="wf"><div class="t">ours · /studio/runs/[id] · Video step</div>
+<div class="rail"><div>Đọc bài ✓</div><div>Viết bài ✓</div><div>Ảnh ✓</div><div class="on">Video</div><div>Đăng</div></div>
+<div class="screen"><div class="side"><div class="on">Cảnh (6)</div><div>CẢNH #1 · bài</div><div>CẢNH #2 · 32 likes</div><div>CẢNH #3 · 10 likes</div><div style="margin-top:6px;color:var(--soft)">COMMENT KHÁC · 7</div><div>☐ …</div><div>☐ …</div><div class="cap">Ẩn không chọn</div></div>
+<div><div class="phone"><div class="card">Visa 462 đi Úc kiếm nhiều v à mng ơi? …<br><span style="color:#c33">♥ 302</span> · 31 · 3</div><div class="capt">ly <b>cà</b> phê và ngồi</div></div><div class="cap" style="text-align:center">frame redraws on every control</div></div>
+<div class="opts"><div><b>Text TTS</b> · editable inline</div><div>Text gốc · Nghe thoại ▶</div><div>Phụ đề: Karaoke ▾</div><div>Bố cục: Nhiều khung ▾</div><div>Nhãn dán: Thỏ hồng ▾</div><div>Nhạc nền: AI chọn ▾</div><div style="margin-top:6px"><span class="btn">Chạy lại bước</span> <span class="btn go">Dựng · $0.00</span></div></div></div>
+</div></div>
+<p class="cap">The same screen component serves the four other steps and the pipeline's five. <code>Duyệt trước khi dựng</code> is what makes every step wait; off, the run walks the rail and only Video costs anything.</p>
+
+<h2><span class="n">04</span> Every control on the configurator — 8 tabs + Chỉnh lớp</h2>
+<p class="legend"><span class="chip">keep · exists</span><span class="chip blue">add · build in v2</span><span class="chip blue">overlay · ffmpeg after make-reel.py</span><span class="chip warn">engine · separate plan</span><span class="chip red">never · with the reason</span></p>
+<p class="cap">Open a tab to see the reference screen and its controls. Labels are the UI labels. The kit editor's centre canvas is the same preview the run page uses, on a sample item, so a kit change is seen on a real frame.</p>
+
+<details class="tab"><summary><b>Thương hiệu</b> <span class="cap">· 3 controls · ref <code>tv-13-new-brandkit-tip.jpg</code></span></summary>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-13-new-brandkit-tip.jpg" alt="Thương hiệu reference"></div>
+<table><tr><th>ThreadViral control</th><th>Ours</th><th>status</th></tr><tr><td>Tên kênh · avatar · logo</td><td>have: channel row</td><td><span class="chip">keep</span></td></tr><tr><td>2 chủ đề · 3 hashtag</td><td>add: kit.topics, kit.hashtags → draft step</td><td><span class="chip blue">add</span></td></tr><tr><td>Lấy profile TikTok</td><td>—</td><td><span class="chip red">never (no TikTok tool)</span></td></tr></table></div></details>
+<details class="tab"><summary><b>Nội dung</b> <span class="cap">· 4 controls · ref <code>tv-25-config-content.jpg</code></span></summary>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-25-config-content.jpg" alt="Nội dung reference"></div>
+<table><tr><th>ThreadViral control</th><th>Ours</th><th>status</th></tr><tr><td>Ngôn ngữ video (VI; EN/CN posts translated first)</td><td>have: markets are per language; add translate-to-VI in draft</td><td><span class="chip blue">add</span></td></tr><tr><td>Cách kể: Đọc nguyên văn / AI tự viết</td><td>have: gold pass-through vs lib/gold.ts rewrite</td><td><span class="chip">keep</span></td></tr><tr><td>Chọn bình luận: AI tự chọn / tự chọn</td><td>have: comment pool (v1 S1)</td><td><span class="chip">keep</span></td></tr><tr><td>Dài tối đa (2 phút)</td><td>add: duration band → budget gate</td><td><span class="chip blue">add</span></td></tr></table></div></details>
+<details class="tab"><summary><b>Giọng đọc</b> <span class="cap">· 4 controls · ref <code>tv-26-config-voice.jpg</code></span></summary>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-26-config-voice.jpg" alt="Giọng đọc reference"></div>
+<table><tr><th>ThreadViral control</th><th>Ours</th><th>status</th></tr><tr><td>Nhà cung cấp (CapCut) · Giọng (Nữ phổ thông)</td><td>have: edge-tts voices (vi-VN-HoaiMy/NamMinh); bao clone later</td><td><span class="chip">keep</span></td></tr><tr><td>Tốc độ đọc (1x) · Khoảng ngắt câu (250 ms)</td><td>have: edge-tts rate; add pause ms between sentences</td><td><span class="chip blue">add</span></td></tr><tr><td>Đọc thử + Nghe thử</td><td>add: /api/studio/tts-sample (one sentence, cached)</td><td><span class="chip blue">add</span></td></tr><tr><td>Tinh chỉnh: một giọng cho cả video / theo câu</td><td>one voice per reel by design</td><td><span class="chip warn">engine</span></td></tr></table></div></details>
+<details class="tab"><summary><b>Khung hình</b> <span class="cap">· 3 controls · ref <code>tv-27-config-frame.jpg</code></span></summary>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-27-config-frame.jpg" alt="Khung hình reference"></div>
+<table><tr><th>ThreadViral control</th><th>Ours</th><th>status</th></tr><tr><td>Bố cục: Nhiều khung hình / Một khung hình / Một khung nối tiếp</td><td>have: one layout in make-reel; add the other two as compositor modes in the overlay step</td><td><span class="chip warn">engine-lite</span></td></tr><tr><td>Kho video nền (531) · Ảnh nền</td><td>have: bg images in data/; add Assets uploads</td><td><span class="chip blue">add</span></td></tr><tr><td>Ảnh bìa riêng · tắt cảnh kết</td><td>add flags</td><td><span class="chip blue">add</span></td></tr></table></div></details>
+<details class="tab"><summary><b>Ảnh chụp bài viết</b> <span class="cap">· 4 controls · ref <code>tv-28-config-card.jpg</code></span></summary>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-28-config-card.jpg" alt="Ảnh chụp bài viết reference"></div>
+<table><tr><th>ThreadViral control</th><th>Ours</th><th>status</th></tr><tr><td>Bố cục &amp; giao diện thẻ (card sáng · chữ lớn · kẹo ngọt pastel)</td><td>have: /api/image/card bg + presets</td><td><span class="chip">keep</span></td></tr><tr><td>Cách hiện bình luận: chụp nhóm / từng ảnh</td><td>add: card variants</td><td><span class="chip blue">add</span></td></tr><tr><td>Cỡ chữ trong card (Lớn 430 px) · Độ rộng % · Vị trí dọc % · Màu nền sáng/tối · Bo góc px · Font (Roboto giống Threads)</td><td>have some (ratio, bg); add size, width, y, radius, font as card params</td><td><span class="chip blue">add</span></td></tr><tr><td>Ảnh phóng ra sau khi đọc xong</td><td>zoom-out after read</td><td><span class="chip warn">engine</span></td></tr></table></div></details>
+<details class="tab"><summary><b>Phụ đề</b> <span class="cap">· 3 controls · ref <code>tv-29-config-subtitles.jpg</code></span></summary>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-29-config-subtitles.jpg" alt="Phụ đề reference"></div>
+<table><tr><th>ThreadViral control</th><th>Ours</th><th>status</th></tr><tr><td>Hiệu ứng chữ on/off</td><td>have: captions on/off</td><td><span class="chip">keep</span></td></tr><tr><td>Mẫu có sẵn (wall of 8 styles: karaoke, coloured words, shadow…)</td><td>have: captionPresets.ts — wall UI missing</td><td><span class="chip blue">add</span></td></tr><tr><td>Tùy chỉnh: font, size, colour, highlight, position</td><td>add: preset editor fields</td><td><span class="chip blue">add</span></td></tr></table></div></details>
+<details class="tab"><summary><b>Chữ ký kênh</b> <span class="cap">· 2 controls · ref <code>tv-30-config-signature.jpg</code></span></summary>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-30-config-signature.jpg" alt="Chữ ký kênh reference"></div>
+<table><tr><th>ThreadViral control</th><th>Ours</th><th>status</th></tr><tr><td>Chữ ký trôi (DVD) — handle drifting around the frame</td><td>overlay step: drifting text via ffmpeg drawtext expression</td><td><span class="chip blue">add</span></td></tr><tr><td>Watermark chìm lặp kín — tiled faint text</td><td>overlay step: tiled PNG</td><td><span class="chip blue">add</span></td></tr></table></div></details>
+<details class="tab"><summary><b>Nhãn dán</b> <span class="cap">· 3 controls · ref <code>tv-31-config-sticker.jpg</code></span></summary>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-31-config-sticker.jpg" alt="Nhãn dán reference"></div>
+<table><tr><th>ThreadViral control</th><th>Ours</th><th>status</th></tr><tr><td>Bộ sticker (nhân vật) · AI chọn theo nội dung</td><td>Assets sticker sets + a pick step (Gemini Flash, cheap)</td><td><span class="chip blue">add</span></td></tr><tr><td>Hiện ở ảnh bìa (tĩnh) · Hiện ở mở đầu (động)</td><td>cover: overlay PNG; intro animation: fly-in via ffmpeg overlay expression</td><td><span class="chip blue">add</span></td></tr><tr><td>Tinh chỉnh: kiểu bay vào · độ thỏ nhẹ</td><td>two presets</td><td><span class="chip blue">add</span></td></tr></table></div></details>
+<details class="tab"><summary><b>Chỉnh lớp</b> <span class="cap">· 1 controls · ref <code>tv-33-layers.jpg</code></span></summary>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-33-layers.jpg" alt="Chỉnh lớp reference"></div>
+<table><tr><th>ThreadViral control</th><th>Ours</th><th>status</th></tr><tr><td>Layers list (3/20): Tên kênh, Ảnh chụp bài viết (pinned), Subtitle (pinned); drag to reorder; group; copy from Hook; zoom</td><td>a canvas over the card/frame preview; layers stored in the kit in frame-relative units; rendered by the overlay step</td><td><span class="chip blue">add (was &#x27;conditional&#x27; in v1 — owner overruled)</span></td></tr></table></div></details>
+
+<h3>Tuỳ chỉnh video — the per-run drawer · reference <code>ref/tv-24</code></h3>
+<div class="grid g2"><div class="wf fig"><img src="ref/tv-24-new-overrides.jpg" alt="ThreadViral per-video overrides drawer"></div>
+<table><tr><th>ThreadViral</th><th>Ours</th><th>status</th></tr><tr><td>Brand Kit</td><td>kit pick</td><td><span class="chip">keep</span></td></tr><tr><td>Thời lượng (Cân đối)</td><td>duration band</td><td><span class="chip">keep</span></td></tr><tr><td>Chất lượng HD 30 fps</td><td>one quality</td><td><span class="chip red">never</span></td></tr><tr><td>Bình luận: Tự động / tự pick</td><td>comment mode</td><td><span class="chip">keep</span></td></tr><tr><td>Duyệt trước khi render</td><td>auto_continue off — every step waits</td><td><span class="chip">keep</span></td></tr><tr><td>Phụ đề tự động</td><td>captions flag</td><td><span class="chip">keep</span></td></tr><tr><td>Outro kêu gọi</td><td>end card from the kit, overlay step</td><td><span class="chip blue">overlay</span></td></tr><tr><td>Che mặt trong ảnh</td><td>our images are cards, no faces</td><td><span class="chip red">never</span></td></tr><tr><td>Đọc tiêu đề trước caption</td><td>draft composes the title first</td><td><span class="chip blue">add</span></td></tr><tr><td>Âm thanh SFX</td><td>transition sound between scenes, from Assets</td><td><span class="chip blue">overlay</span></td></tr><tr><td>GIF phản ứng</td><td>—</td><td><span class="chip">later</span></td></tr><tr><td>Nhạc nền (AI chọn / pick)</td><td>music tier + pick from Assets</td><td><span class="chip">keep+add</span></td></tr><tr><td>Cách kể · Bố cục khung hình</td><td>same as kit tabs, per run</td><td><span class="chip">keep</span></td></tr><tr><td>Mở cấu hình video đầy đủ →</td><td>opens the kit editor with this run&#x27;s values</td><td><span class="chip blue">add</span></td></tr></table></div>
+
+<h2><span class="n">05</span> Seven slices, each a commit, each closed by a screenshot pair</h2>
+<div class="tl">
+<div><b>S8 · two doors</b>un-mode the New page; detect the source from the link<div class="stop">STOP · pair with tv-24</div></div>
+<div><b>S9 · preview contract</b><code>StepOptions</code>, the preview route, debounced hook, caches<div class="stop">STOP · a control changes the frame in &lt; 2 s</div></div>
+<div><b>S10 · door 1</b>five-step pipeline setup → Gold; one config with the old SPA<div class="stop">STOP · five screenshots</div></div>
+<div><b>S11 · kit editor</b>human labels; every add row; caption wall; Nghe thử; card params<div class="stop">STOP · eight pairs</div></div>
+<div><b>S12 · overlay</b>layouts 2–3, DVD signature, watermark, sticker fly-in, outro, SFX<div class="stop">STOP · six frames</div></div>
+<div><b>S13 · step screens</b>one screen per step; scene editing; Đăng<div class="stop">STOP · pairs with tv-12/25</div></div>
+<div><b>S14 · Chỉnh lớp</b>layer canvas, saved in the kit, drawn by overlay<div class="stop">STOP · pair with tv-33</div></div>
+</div>
+<div class="note"><b>The acceptance test for UX parity is a screenshot pair.</b> Every slice puts our screen beside the reference it answers in <code>tests/shots/pairs/</code>. "Looks fine to me" does not close a slice. Nothing that works today is removed: the old SPA, the Tạo Video modal, <code>deploy/make-reel.py</code>, the v1 pages.</div>
+
+<h2><span class="n">06</span> Handoff prompt</h2>
+<pre>Read docs/plans/2026-09-22-studio-v2.md fully, then CLAUDE.md, then skim
+docs/plans/2026-09-22-studio-editorial-ux.md §3–§5 for the contract and tables you are extending.
+Open docs/plans/ref/ and look at every screenshot once. You are executing Studio v2: slices 8–14 in
+order, each committed green (npm test = vitest + Playwright) before the next. Nothing that works
+today is removed: the old SPA, PostCard's Tạo Video modal, deploy/make-reel.py (never edited), the
+v1 pages. Every slice ends with a screenshot of our screen placed BESIDE the reference screenshot
+it answers, in tests/shots/pairs/&lt;slice&gt;-&lt;screen&gt;.png; that pair is the STOP artefact. Python is
+/opt/homebrew/bin/python3. Only the Next server opens data/lake*.duckdb. Use `rtk proxy curl` for any
+pipeline fetch. A gate says how many things it checked; a finding is fixed or reported, never
+shipped past. Do not ask the owner to choose between options this plan already decides.</pre>
+</div></body></html>

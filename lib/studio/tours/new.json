@@ -1,6 +1,7 @@
 [
-  { "target": "[data-testid='mode-read-post']", "title": "Chọn kiểu video", "body": "Bốn kiểu: đọc nguyên bài, tự viết lời đọc, lồng tiếng lên ảnh/video của bạn, hoặc video dọc từ chữ." },
-  { "target": "[data-testid='channel-picker']", "title": "Chọn kênh", "body": "Mỗi kênh gắn với một nguồn đã thử chạy được và một bộ nhận diện." },
+  { "target": "[data-testid='door-auto']", "title": "Hai cửa", "body": "Nguồn tự động chạy cả dây chuyền cho một thị trường. Một bài chỉ dựng đúng bài bạn dán." },
+  { "target": "[data-testid='source-box']", "title": "Dán gì cũng được", "body": "Link Threads, Reddit, Facebook, Instagram, bài báo — hoặc gõ thẳng nội dung. Dòng dưới ô nói nó đọc ra nguồn nào." },
+  { "target": "[data-testid='channel-picker']", "title": "Chọn kênh", "body": "Kênh quyết định bộ nhận diện và thị trường, không quyết định nguồn nữa." },
   { "target": "[data-testid='override-drawer']", "title": "Sửa riêng lượt này", "body": "Mọi thứ ở đây chỉ áp dụng cho lượt chạy này. Bộ nhận diện của kênh không bị đổi." },
   { "target": "[data-testid='create-run']", "title": "Bắt đầu", "body": "Từ đây mỗi bước sẽ hiện kết quả và chi phí trước khi bước sau chạy." }
 ]

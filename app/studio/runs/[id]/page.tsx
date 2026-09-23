@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { studioDb } from '@/lib/studio/db';
 import { declaresGate, getRun, previewStep } from '@/lib/studio/runs';
 import { can, tier } from '@/lib/studio/tier';
+import { sourceFor } from '@/lib/studio/steps/fetch';
 import type { SourceItem, StepName } from '@/lib/studio/steps/types';
 import { RunView, type StepView } from '../../components/RunView';
 import runTour from '@/lib/studio/tours/run.json';
@@ -35,7 +36,7 @@ export default async function RunPage({ params }: { params: { id: string } }) {
       <Tour id="run" steps={runTour} />
       <RunView
       runId={rec.run.id}
-      mode={rec.run.mode}
+      sourceLabel={sourceFor(rec.channel.sources_json, rec.run.item_ref).def.label}
       status={rec.run.status}
       currentStep={rec.run.current_step}
       template={rec.template}

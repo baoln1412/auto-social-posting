@@ -8,7 +8,7 @@ process.env.STUDIO_SQLITE_PATH = path.join(dir, 'test.db');
 
 const { studioDb, resetStudioDbForTests } = await import('@/lib/studio/db');
 const { seedDemo, DEMO_CHANNEL_ID } = await import('@/lib/studio/demo/seed');
-const { TEMPLATES, canContinue, shouldAutoContinue, effectiveKit } = await import(
+const { ALL_STEPS, canContinue, shouldAutoContinue, effectiveKit } = await import(
   '@/lib/studio/steps/types'
 );
 const { createRun, getRun, advance } = await import('@/lib/studio/runs');
@@ -19,8 +19,8 @@ beforeEach(() => {
   seedDemo();
 });
 
-const demoRun = (over: Record<string, unknown> = {}, mode = 'read-post') =>
-  createRun({ channelId: DEMO_CHANNEL_ID, mode: mode as any, itemRef: 'demo:1', overrides: over });
+const demoRun = (over: Record<string, unknown> = {}) =>
+  createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1', overrides: over });
 
 // INSERT OR REPLACE re-inserts the row, so rowid moves exactly when a step re-ran. A
 // timestamp cannot say that — two runs inside one millisecond stamp the same ISO string.
@@ -29,18 +29,13 @@ const stepRowid = (runId: string, name: string): number | undefined =>
     .prepare('SELECT rowid FROM studio_steps WHERE run_id=? AND name=?')
     .get(runId, name) as { rowid: number } | undefined)?.rowid;
 
-describe('run templates', () => {
-  it('read-post walks fetch → draft → image → reel', () => {
-    expect(TEMPLATES['read-post']).toEqual(['fetch', 'draft', 'image', 'reel']);
+describe('the rail', () => {
+  it('is one sequence — fetch → draft → image → reel', () => {
+    expect(ALL_STEPS).toEqual(['fetch', 'draft', 'image', 'reel']);
   });
 
-  it('text-to-reel has no fetch step — the owner supplied the text', () => {
-    expect(TEMPLATES['text-to-reel']).not.toContain('fetch');
-  });
-
-  it('a new run starts on the first step of its mode', () => {
-    const id = demoRun({}, 'text-to-reel');
-    expect(getRun(id)!.run.current_step).toBe(TEMPLATES['text-to-reel'][0]);
+  it('starts a new run on its first step', () => {
+    expect(getRun(demoRun())!.run.current_step).toBe('fetch');
   });
 });
 
@@ -91,7 +86,7 @@ describe('shouldAutoContinue()', () => {
 describe('advance()', () => {
   it('walks a demo run to done', async () => {
     const id = demoRun();
-    for (let i = 0; i < TEMPLATES['read-post'].length; i++) await advance(id);
+    for (let i = 0; i < ALL_STEPS.length; i++) await advance(id);
     const r = getRun(id)!;
     expect(r.run.status).toBe('done');
     expect(Object.keys(r.steps).sort()).toEqual(['draft', 'fetch', 'image', 'reel']);
@@ -175,7 +170,7 @@ describe('overrides', () => {
   it('never write back to the kit row', async () => {
     const before = studioDb().prepare('SELECT * FROM studio_kits WHERE id=?').get('demo');
     const id = demoRun({ frame: { layout: 'continuous' }, music: 'groove' });
-    for (let i = 0; i < TEMPLATES['read-post'].length; i++) await advance(id);
+    for (let i = 0; i < ALL_STEPS.length; i++) await advance(id);
     expect(studioDb().prepare('SELECT * FROM studio_kits WHERE id=?').get('demo')).toEqual(before);
   });
 });
@@ -234,22 +229,22 @@ describe('step inputs', () => {
 describe('templateFor()', () => {
   it('drops the reel step for a channel that only makes posts', async () => {
     const { templateFor } = await import('@/lib/studio/steps/types');
-    expect(templateFor('read-post', ['post'])).toEqual(['fetch', 'draft', 'image']);
+    expect(templateFor(['post'])).toEqual(['fetch', 'draft', 'image']);
   });
 
   it('keeps the card on a post-only run — a Facebook post here is text plus its card', async () => {
     const { templateFor } = await import('@/lib/studio/steps/types');
-    expect(templateFor('read-post', ['post'])).toContain('image');
+    expect(templateFor(['post'])).toContain('image');
   });
 
   it('skips the card when the channel only wants a video', async () => {
     const { templateFor } = await import('@/lib/studio/steps/types');
-    expect(templateFor('read-post', ['reel'])).toEqual(['fetch', 'draft', 'reel']);
+    expect(templateFor(['reel'])).toEqual(['fetch', 'draft', 'reel']);
   });
 
   it('keeps everything when the channel makes everything', async () => {
     const { templateFor } = await import('@/lib/studio/steps/types');
-    expect(templateFor('read-post', ['post', 'image', 'reel'])).toEqual([
+    expect(templateFor(['post', 'image', 'reel'])).toEqual([
       'fetch',
       'draft',
       'image',
@@ -259,16 +254,14 @@ describe('templateFor()', () => {
 
   it('always keeps fetch and draft — there is no run without text', async () => {
     const { templateFor } = await import('@/lib/studio/steps/types');
-    expect(templateFor('read-post', [])).toEqual(['fetch', 'draft', 'image', 'reel']);
-    expect(templateFor('read-post', ['nonsense'])).toContain('draft');
+    expect(templateFor([])).toEqual(['fetch', 'draft', 'image', 'reel']);
+    expect(templateFor(['nonsense'])).toContain('draft');
   });
 
-  it('never leaves a mode without its own first step', async () => {
-    const { templateFor, TEMPLATES } = await import('@/lib/studio/steps/types');
-    for (const mode of Object.keys(TEMPLATES) as (keyof typeof TEMPLATES)[]) {
-      for (const makes of [['post'], ['reel'], ['image'], ['post', 'reel']]) {
-        expect(templateFor(mode, makes).length, `${mode}/${makes}`).toBeGreaterThan(0);
-      }
+  it('never leaves a channel without a first step, whatever it makes', async () => {
+    const { templateFor } = await import('@/lib/studio/steps/types');
+    for (const makes of [[], ['post'], ['reel'], ['image'], ['post', 'reel'], ['nonsense']]) {
+      expect(templateFor(makes)[0], `${makes}`).toBe('fetch');
     }
   });
 });

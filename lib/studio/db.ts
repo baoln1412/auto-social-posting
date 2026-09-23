@@ -58,6 +58,8 @@ export function ensureStudioTables(d: Database.Database): void {
       id             TEXT PRIMARY KEY,
       channel_id     TEXT,
       item_ref       TEXT,
+      -- v1's run mode. Nothing writes or reads it any more: the template comes from the
+      -- channel's makes. Kept, not dropped, so the rows already in the owner's db still load.
       mode           TEXT,
       status         TEXT,
       current_step   TEXT,

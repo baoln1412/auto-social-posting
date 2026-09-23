@@ -4,7 +4,6 @@ import { channelForMarket } from '@/lib/studio/handoff';
 import { createRun } from '@/lib/studio/runs';
 import { can, mayUseChannel, tier } from '@/lib/studio/tier';
 import { studioDb } from '@/lib/studio/db';
-import { TEMPLATES, type Mode } from '@/lib/studio/steps/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export default async function NewRunHandoff({
   searchParams,
 }: {
-  searchParams: { item?: string; market?: string; mode?: string };
+  searchParams: { item?: string; market?: string };
 }) {
   const t = tier();
   if (!can(t, 'run')) notFound();
@@ -25,9 +24,6 @@ export default async function NewRunHandoff({
   const item = searchParams.item?.trim();
   const market = searchParams.market?.trim();
   if (!item || !market) notFound();
-
-  const mode = (searchParams.mode as Mode) ?? 'read-post';
-  if (!TEMPLATES[mode]) notFound();
 
   const { data } = await query('content_pages').select('name').eq('id', market).single();
   const channelId = channelForMarket(market, (data as { name?: string } | null)?.name);
@@ -37,5 +33,5 @@ export default async function NewRunHandoff({
     .get(channelId) as { tier_min: string };
   if (!mayUseChannel(t, channel.tier_min)) notFound();
 
-  redirect(`/studio/runs/${createRun({ channelId, mode, itemRef: item })}`);
+  redirect(`/studio/runs/${createRun({ channelId, itemRef: item })}`);
 }

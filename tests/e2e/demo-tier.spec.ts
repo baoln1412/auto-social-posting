@@ -108,7 +108,7 @@ test('a post-only channel stops after the card', async ({ page, request }) => {
   });
   const { id: channelId } = (await ch.json()) as { id: string };
   const run = await request.post('/api/studio/runs', {
-    data: { channelId, mode: 'read-post' },
+    data: { channelId },
   });
   const { id } = (await run.json()) as { id: string };
 

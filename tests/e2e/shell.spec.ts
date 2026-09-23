@@ -10,8 +10,9 @@ test('the studio shell shows its nav, the demo channel and the tier', async ({ p
   await expect(page.getByTestId('channel-picker')).toContainText('Kênh thử');
   await expect(page.getByTestId('ov-toggle')).toBeVisible();
 
-  await page.getByTestId('mode-text-to-reel').click();
-  await expect(page.getByTestId('mode-text-to-reel')).toHaveAttribute('aria-pressed', 'true');
+  // Two doors, not four kinds of video: the reference's four chips are a step rail.
+  await expect(page.getByTestId('door-auto')).toBeVisible();
+  await expect(page.getByTestId('door-single')).toBeVisible();
 
   await dismissTour(page);
   await page.screenshot({ path: 'tests/shots/00-shell.png', fullPage: true });

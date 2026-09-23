@@ -19,7 +19,7 @@ test('one real gold post becomes a post, a card and an MP4', async ({ page, requ
   // No band override: the default has to be the one that fits a real gold post, or every
   // hand-over starts blocked. Measured median is ~92s (see gates/budget.ts).
   const run = await request.post('/api/studio/runs', {
-    data: { channelId, mode: 'read-post' },
+    data: { channelId },
   });
   const { id: runId } = (await run.json()) as { id: string };
   await page.goto(`/studio/runs/${runId}`);

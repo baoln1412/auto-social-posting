@@ -87,7 +87,7 @@ test('a run on a real gold channel fetches the item it was pointed at', async ({
   const target = items[1];
 
   const run = await request.post('/api/studio/runs', {
-    data: { channelId, mode: 'read-post', itemRef: target.id },
+    data: { channelId, itemRef: target.id },
   });
   const { id: runId } = (await run.json()) as { id: string };
 

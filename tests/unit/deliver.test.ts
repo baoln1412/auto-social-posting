@@ -126,7 +126,7 @@ describe('delivery from a run', () => {
   }
 
   it('sends nothing at all while delivery is off', async () => {
-    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     for (let i = 0; i < 4; i++) await advance(id);
     expect(getRun(id)!.run.status).toBe('done');
     expect(calls).toHaveLength(0);
@@ -134,7 +134,7 @@ describe('delivery from a run', () => {
 
   it('sends the finished video once the owner switches it on', async () => {
     await connected();
-    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     for (let i = 0; i < 4; i++) await advance(id);
     const sent = calls.filter((c) => c.method === 'sendVideo' || c.method === 'sendDocument');
     expect(sent).toHaveLength(1);
@@ -145,7 +145,6 @@ describe('delivery from a run', () => {
     await connected();
     const id = createRun({
       channelId: DEMO_CHANNEL_ID,
-      mode: 'read-post',
       itemRef: 'demo:1',
       overrides: { demo: { boom: 'draft' } },
     });
@@ -160,14 +159,14 @@ describe('delivery from a run', () => {
   it('never lets a delivery failure break the run it was reporting on', async () => {
     await connected();
     reply = () => ({ ok: false, description: 'chat not found' });
-    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     for (let i = 0; i < 4; i++) await advance(id);
     expect(getRun(id)!.run.status).toBe('done');
   });
 
   it('does not send the same finished run twice when a later step is re-run', async () => {
     await connected();
-    const id = createRun({ channelId: DEMO_CHANNEL_ID, mode: 'read-post', itemRef: 'demo:1' });
+    const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     for (let i = 0; i < 4; i++) await advance(id);
     calls.length = 0;
     await advance(id, { step: 'image' });

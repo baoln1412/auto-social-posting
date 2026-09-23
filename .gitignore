@@ -74,3 +74,6 @@ tests/.playwright/
 
 # Cards Studio renders per run (runtime, reproducible)
 public/studio-runs/
+
+# The Playwright MCP browser profile — a tool cache, not a repo artefact.
+.playwright-mcp/
