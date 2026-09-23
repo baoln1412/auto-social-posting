@@ -12,6 +12,11 @@ export interface KitOption {
   id: string;
   name: string;
 }
+/** The owner's uploads, for the controls that pick one. */
+export interface MediaOption {
+  id: string;
+  name: string;
+}
 
 const FIELD = 'pen-line-static rounded-md bg-card px-2 py-1 text-xs';
 const ROW = 'flex items-center justify-between gap-3 py-1.5';
@@ -23,6 +28,7 @@ export function OverrideDrawer({
   open,
   runId,
   kitId,
+  sounds = [],
 }: {
   value: Overrides;
   onChange: (next: Overrides) => void;
@@ -31,6 +37,7 @@ export function OverrideDrawer({
   /** Set on the run page: enables "Mở cấu hình đầy đủ →" and the save-choice it leads to. */
   runId?: string;
   kitId?: string;
+  sounds?: MediaOption[];
 }) {
   const set = (patch: Overrides) => onChange({ ...value, ...patch });
   const caps = (value.captions ?? {}) as Record<string, unknown>;
@@ -156,6 +163,36 @@ export function OverrideDrawer({
             />
           </label>
         ))}
+
+        <label className={ROW}>
+          <span className="text-xs">Outro kêu gọi</span>
+          <input
+            className={`${FIELD} w-40`}
+            data-testid="ov-outro"
+            placeholder="(không có)"
+            title="Một thẻ kết hiện ở mấy giây cuối"
+            value={value.outro ?? ''}
+            onChange={(e) => set({ outro: e.target.value || undefined })}
+          />
+        </label>
+
+        <label className={ROW}>
+          <span className="text-xs">Âm thanh SFX</span>
+          <select
+            className={FIELD}
+            data-testid="ov-sfx"
+            title="Phát ở mỗi lần chuyển cảnh"
+            value={value.sfx ?? ''}
+            onChange={(e) => set({ sfx: e.target.value || undefined })}
+          >
+            <option value="">(không có)</option>
+            {sounds.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {runId && kitId && (
           <a

@@ -94,9 +94,20 @@ export const FIELD_LABELS: Record<string, Label> = {
 
   'stickers.set': { label: 'Bộ sticker' },
   'stickers.where': { label: 'Hiện ở đâu', hint: 'Ảnh bìa (tĩnh) hoặc mở đầu (động).' },
+  'stickers.fly': { label: 'Kiểu bay vào', hint: 'Chỉ áp dụng khi hiện ở mở đầu.' },
+  'stickers.pick': {
+    label: 'Cách chọn',
+    hint: 'AI chọn: một lượt gọi đọc lời dẫn rồi chọn trong các tệp bạn đã tải lên (~$0.001).',
+  },
 
-  'signature.handle': { label: 'Chữ ký trôi (DVD)' },
-  'signature.watermark': { label: 'Watermark chìm lặp kín' },
+  'signature.handle': {
+    label: 'Chữ ký trôi (DVD)',
+    hint: 'Handle ở tab Thương hiệu trôi quanh khung hình và bật lại ở mép.',
+  },
+  'signature.watermark': {
+    label: 'Watermark chìm lặp kín',
+    hint: 'Lưới chữ rất mờ phủ kín khung hình — chống chia sẻ lại, không che nội dung.',
+  },
 
   'music.tier': { label: 'Mức nhạc nền' },
   'music.track': { label: 'Bản nhạc của bạn' },
@@ -138,8 +149,12 @@ export const VALUE_LABELS: Record<string, string> = {
   block: 'Nền khối',
   upper: 'CHỮ HOA',
   // frame
-  'card-top': 'Thẻ ghim trên',
-  continuous: 'Trượt nối tiếp',
+  'card-top': 'Một khung hình (thẻ ghim trên)',
+  continuous: 'Một khung nối tiếp (thẻ trượt lên)',
+  multi: 'Nhiều khung hình (mỗi cảnh một thẻ)',
+  cheo: 'Bay chéo vào',
+  nay: 'Thả nhẹ, nảy một cái',
+  fixed: 'Dùng đúng tệp đã chọn',
   // music
   soft: 'Nhẹ',
   groove: 'Có nhịp',

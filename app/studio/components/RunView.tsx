@@ -63,6 +63,8 @@ export interface RunViewProps {
   voiceId?: string;
   /** The kit's caption style, so the controls open showing what is actually set. */
   captionDefaults: Record<string, unknown>;
+  /** Uploads that can be the transition sound. */
+  sounds: { id: string; name: string }[];
   kits: KitOption[];
   overrides: Overrides;
   selection: Selection;
@@ -477,6 +479,7 @@ export function RunView(p: RunViewProps) {
                 open
                 runId={p.runId}
                 kitId={p.overrides.kitId ?? p.kitId}
+                sounds={p.sounds}
               />
               </div>
             )}

@@ -158,31 +158,8 @@ describe('safeName()', () => {
   });
 });
 
-describe('the sticker overlay', () => {
-  it('covers the whole video when the kit says cover', async () => {
-    const { overlayFilter } = await import('@/lib/studio/steps/overlay');
-    expect(overlayFilter(['cover'])).toBe('[0][1]overlay=W-w-40:H-h-320');
-  });
-
-  it('limits an intro sticker to the opening seconds', async () => {
-    const { overlayFilter, INTRO_SEC } = await import('@/lib/studio/steps/overlay');
-    expect(overlayFilter(['intro'])).toContain(`between(t,0,${INTRO_SEC})`);
-  });
-
-  it('does nothing when the kit asks for nothing', async () => {
-    const { overlayFilter } = await import('@/lib/studio/steps/overlay');
-    expect(overlayFilter([])).toBeNull();
-    expect(overlayFilter(['reactions'])).toBeNull();
-  });
-
-  it('keeps the audio stream as-is — re-encoding it costs quality for nothing', async () => {
-    const { overlayArgs } = await import('@/lib/studio/steps/overlay');
-    const args = overlayArgs('in.mp4', 's.png', 'out.mp4', 'f');
-    expect(args).toContain('-c:a');
-    expect(args[args.indexOf('-c:a') + 1]).toBe('copy');
-    expect(args.at(-1)).toBe('out.mp4');
-  });
-});
+// The sticker overlay's filters moved to tests/unit/overlay.test.ts when the pass grew
+// to six of them; asserting them here as well would be two places to update.
 
 describe('an uploaded background reaches the renderer', () => {
   it('becomes a file:// media entry make-reel.py can open', async () => {

@@ -354,8 +354,10 @@
         "layout": {
           "enum": [
             "card-top",
-            "continuous"
-          ]
+            "continuous",
+            "multi"
+          ],
+          "description": "multi is what the renderer already does (one plate per scene). The other two are composed by the overlay pass, which then places the card itself."
         },
         "intro": {
           "type": "boolean"
@@ -392,6 +394,20 @@
               "reactions"
             ]
           }
+        },
+        "fly": {
+          "enum": [
+            "cheo",
+            "nay"
+          ],
+          "description": "How the intro sticker arrives."
+        },
+        "pick": {
+          "enum": [
+            "fixed",
+            "ai"
+          ],
+          "description": "fixed: the sticker named above. ai: one call chooses among your uploads by name."
         }
       }
     },

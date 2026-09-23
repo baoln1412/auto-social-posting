@@ -4,6 +4,7 @@ import { declaresGate, getRun, isStale, previewStep } from '@/lib/studio/runs';
 import { can, tier } from '@/lib/studio/tier';
 import { sourceFor } from '@/lib/studio/steps/fetch';
 import { captionStyle, voiceId } from '@/lib/studio/kits/load';
+import { listMedia } from '@/lib/studio/assets';
 import { effectiveKit } from '@/lib/studio/steps/types';
 import type { SourceItem, StepName } from '@/lib/studio/steps/types';
 import { RunView, type StepView } from '../../components/RunView';
@@ -62,6 +63,7 @@ export default async function RunPage({ params }: { params: { id: string } }) {
       kitId={rec.kit.id}
       voiceId={voiceId(rec.kit)}
       captionDefaults={captionStyle(effectiveKit(rec.kit, rec.run.overrides))}
+      sounds={listMedia('music').map((m) => ({ id: m.id, name: m.name }))}
       kits={kits}
       overrides={rec.run.overrides}
       selection={rec.run.selection}

@@ -67,6 +67,19 @@ async function renderTo(file: string, draft: Draft, ctx: RunCtx): Promise<string
   return abs;
 }
 
+/**
+ * Any card this kit can draw, as a file — the end card the overlay pass fades in over the
+ * last seconds, for instance. Same renderer as the post's own card, so an outro looks like
+ * it belongs to the same channel rather than like a second design.
+ */
+export async function renderCardTo(
+  file: string,
+  title: string,
+  ctx: RunCtx,
+): Promise<string> {
+  return renderTo(file, { title, text: '', hashtags: [], comments: [] } as Draft, ctx);
+}
+
 export const imageStep: Step<Draft, CardAsset> = {
   name: 'image',
   from: 'draft',

@@ -81,6 +81,10 @@ export interface Overrides {
   music?: 'none' | 'soft' | 'groove';
   /** Read the post's title as the first line of narration. */
   readTitle?: boolean;
+  /** A call-to-action end card, faded over the last seconds. Empty means none. */
+  outro?: string;
+  /** A media id from Kho tài nguyên, played at each scene change. */
+  sfx?: string;
   style?: string;
   /** Demo channels only: force a step to fail, or a gate to find something. Nothing else reads it. */
   demo?: { boom?: StepName; gateFail?: boolean; cost?: number };

@@ -14,7 +14,20 @@ import { STEP_ORDER } from '@/app/lib/videoSteps';
 import { scenesFor } from '../scenes';
 import { setRunJob } from '../progress';
 import { captionStyle, effectiveFrame, voiceId } from '../kits/load';
-import { applyStickers, backgroundMedia, stickerPath } from './overlay';
+import {
+  applyOverlays,
+  backgroundMedia,
+  cardIsOverlay,
+  layoutOf,
+  stickerPath,
+  watermarkPng,
+  type SignatureTab,
+  type StickerTab,
+} from './overlay';
+import { renderCardTo } from './image';
+import { pickSticker, stickerChoices } from './pick';
+import { mediaById } from '../assets';
+import type { OverlayPlan } from './overlay';
 import { frameUrl } from '../frame';
 import { budgetFindings, probeDuration, type BudgetKit, type DurationBand } from '../gates/budget';
 import type { Draft } from '../gold';
@@ -57,6 +70,53 @@ function budgetKit(ctx: RunCtx): BudgetKit {
     maxLines: caps.maxLines ?? 2,
     size: caps.size ?? 72,
     wordsPerCue: caps.wordsPerCue ?? 5,
+  };
+}
+
+/**
+ * Everything the overlay pass needs, gathered once.
+ *
+ * The sticker can be chosen by a classifier when the kit asks — one call over the narration
+ * against the names of the owner's own uploads. It is the only thing in this pass that
+ * spends, and it is skipped whenever the kit names a sticker outright.
+ */
+async function overlayPlan(
+  draft: Draft,
+  ctx: RunCtx,
+  card: CardAsset | undefined,
+  durationSec: number,
+): Promise<OverlayPlan> {
+  const st = (ctx.kit.stickers ?? {}) as StickerTab;
+  const sig = (ctx.kit.signature ?? {}) as SignatureTab;
+  const handle = String((ctx.kit.identity as { handle?: string } | undefined)?.handle ?? '');
+  const item = ctx.outputs.fetch as SourceItem | undefined;
+  const scenes = scenesFor(draft.text, item?.comments ?? [], ctx.selection);
+
+  const sticker =
+    st.pick === 'ai'
+      ? (await pickSticker(scenes.map((s) => s.text).join('\n'), stickerChoices()))?.path ?? null
+      : stickerPath(ctx.kit);
+
+  const sfxId = typeof ctx.overrides.sfx === 'string' ? ctx.overrides.sfx : undefined;
+  const sfx = sfxId ? (mediaById(sfxId)?.path ?? null) : null;
+
+  const outroText = typeof ctx.overrides.outro === 'string' ? ctx.overrides.outro.trim() : '';
+  const outro = outroText
+    ? await renderCardTo(`${ctx.runId}-outro.png`, outroText, ctx).catch(() => null)
+    : null;
+
+  return {
+    card: card?.path ?? null,
+    layout: layoutOf(ctx.kit, ctx.overrides),
+    sticker,
+    stickerWhere: st.where ?? [],
+    fly: st.fly,
+    dvd: sig.handle && handle ? handle : null,
+    watermark: sig.watermark && handle ? await watermarkPng(handle) : null,
+    outro,
+    durationSec,
+    sceneChars: scenes.map((s) => s.text.length),
+    sfx,
   };
 }
 
@@ -112,10 +172,14 @@ export const reelStep: Step<Draft, ReelAsset> = {
       jobId = startRenderJob({
         emojiTitle: draft.title,
         narration: narrationFor(draft, ctx),
-          // The owner's own background leads when the kit names one; the card follows it.
+          // The owner's own background leads when the kit names one; the card follows it —
+          // unless the layout places the card itself, in which case handing it to the
+          // renderer as well would show it twice.
         media: [
           backgroundMedia(ctx.kit),
-          card ? ({ url: `file://${card.path}`, kind: 'image' } as const) : null,
+          card && !cardIsOverlay(ctx.kit, ctx.overrides)
+            ? ({ url: `file://${card.path}`, kind: 'image' } as const)
+            : null,
         ].filter(Boolean) as { url: string; kind: 'image' | 'video' }[],
         includeIntro: frame.includeIntro,
         includeLayout: frame.includeLayout,
@@ -131,14 +195,18 @@ export const reelStep: Step<Draft, ReelAsset> = {
     for (;;) {
       const job = getJob(jobId);
       if (job?.status === 'done' && job.file) {
+        const file = outputPath(job.file);
+        // The duration is read BEFORE the overlay pass: the end card and the transition
+        // sounds are placed against the reel's real length, and the pass does not change it.
+        const durationSec = await probeDuration(file).catch(() => NaN);
         // One ffmpeg pass beside the engine, never inside it.
-        await applyStickers(outputPath(job.file), ctx.kit);
+        await applyOverlays(file, await overlayPlan(draft, ctx, card, durationSec));
         return {
           url: `/api/video/file?f=${job.file}`,
           file: job.file,
-          path: outputPath(job.file),
+          path: file,
           kind: 'mp4' as const,
-          durationSec: await probeDuration(outputPath(job.file)).catch(() => NaN),
+          durationSec,
         };
       }
       if (job?.status === 'error') throw new Error(job.error ?? 'Dựng video thất bại.');
