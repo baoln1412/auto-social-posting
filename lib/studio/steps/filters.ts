@@ -164,6 +164,49 @@ export function outroAt(durationSec: number, cw: number, ch: number): string | n
   return `overlay=${x}:${y}:enable='gte(t,${from.toFixed(2)})'`;
 }
 
+/** One owner layer, as an SVG the caller rasterises at its own pixel size. */
+export function layerSvg(
+  type: 'text' | 'shape' | 'banner',
+  w: number,
+  h: number,
+  props: {
+    text?: string;
+    color?: string;
+    bg?: string;
+    size?: number;
+    radius?: number;
+    opacity?: number;
+  },
+  frameH = H,
+): string {
+  const radius = Math.max(0, Math.round(props.radius ?? 0));
+  const opacity = Math.min(1, Math.max(0, props.opacity ?? 1));
+  // Font size is a fraction of the FRAME, not of the box: a layer resized to fit its words
+  // would change the type size every time it was nudged.
+  const fs = Math.max(8, Math.round((props.size ?? 0.035) * frameH));
+  const parts: string[] = [];
+
+  if (type !== 'text' && props.bg) {
+    parts.push(
+      `<rect x="0" y="0" width="${w}" height="${h}" rx="${radius}" ry="${radius}" ` +
+        `fill="${escapeXml(props.bg)}" fill-opacity="${opacity}"/>`,
+    );
+  }
+  if (type !== 'shape' && props.text) {
+    parts.push(
+      `<text x="${Math.round(w / 2)}" y="${Math.round(h / 2 + fs * 0.35)}" text-anchor="middle" ` +
+        `font-family="sans-serif" font-size="${fs}" font-weight="700" ` +
+        `fill="${escapeXml(props.color ?? '#FFFFFF')}">${escapeXml(props.text)}</text>`,
+    );
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${parts.join('')}</svg>`;
+}
+
+/** A layer sits where the editor put it: absolute pixels, no expression, no drift. */
+export function layerAt(left: number, top: number): string {
+  return `overlay=${Math.round(left)}:${Math.round(top)}`;
+}
+
 /**
  * Where the scenes change, as a fraction of the reel.
  *

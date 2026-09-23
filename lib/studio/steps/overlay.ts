@@ -20,6 +20,8 @@ import { hashOf } from '../hash';
 import {
   dvdAt,
   dvdSvg,
+  layerAt,
+  layerSvg,
   layoutAt,
   outroAt,
   sceneBoundaries,
@@ -31,6 +33,8 @@ import {
   type Where,
 } from './filters';
 import type { Kit, Overrides } from './types';
+import { inPaintOrder, toPixels, type Layer } from '../layers';
+import { W, H } from './filters';
 
 export { INTRO_SEC, STICKER_INSET, type Where } from './filters';
 
@@ -131,6 +135,45 @@ async function cachedPng(key: string, make: () => Promise<Buffer>): Promise<stri
   return file;
 }
 
+/** The owner's own layers for this frame, ready to composite. */
+export interface PlacedLayer {
+  file: string;
+  left: number;
+  top: number;
+}
+
+/**
+ * Rasterise each layer at exactly the pixels the editor showed.
+ *
+ * The editor multiplies the same 0..1 numbers out at canvas size; this multiplies them out
+ * at frame size. That is the whole agreement, and tests/unit/layer-render.test.ts measures
+ * it on a rendered MP4 rather than trusting it.
+ */
+export async function placeLayers(layers: Layer[]): Promise<PlacedLayer[]> {
+  const out: PlacedLayer[] = [];
+  for (const l of inPaintOrder(layers.filter((x) => !x.locked))) {
+    const box = toPixels(l, W, H);
+    let file: string | null = null;
+
+    if (l.type === 'image') {
+      const row = l.props?.media ? mediaById(l.props.media) : undefined;
+      if (!row || !fs.existsSync(row.path)) continue;
+      // Resized to the box the owner drew, so the frame and the canvas agree on its bounds
+      // even when the upload is a different shape.
+      file = await cachedPng(`ly-${hashOf(row.path, box.width, box.height)}`, async () =>
+        sharp(row.path).resize(box.width, box.height, { fit: 'fill' }).png().toBuffer(),
+      );
+    } else {
+      const svg = layerSvg(l.type, box.width, box.height, l.props ?? {}, H);
+      file = await cachedPng(`ly-${hashOf(svg)}`, async () =>
+        sharp(Buffer.from(svg)).png().toBuffer(),
+      );
+    }
+    if (file) out.push({ file, left: box.left, top: box.top });
+  }
+  return out;
+}
+
 export interface OverlayPlan {
   /** Absolute path of the card PNG, when the layout places it. */
   card?: string | null;
@@ -147,6 +190,8 @@ export interface OverlayPlan {
   /** Characters per scene, used to place the transition sounds. */
   sceneChars?: number[];
   sfx?: string | null;
+  /** The owner's own layers, already rasterised and placed. */
+  layers?: PlacedLayer[];
 }
 
 export interface Built {
@@ -196,6 +241,11 @@ export async function buildChain(plan: OverlayPlan): Promise<Built> {
   }
   if (plan.dvd) {
     await chain(await dvdPng(plan.dvd), (w, h) => dvdAt(w, h));
+  }
+  // The owner's layers last, so they sit above everything the kit put there. What the
+  // engine drew — the card, the subtitle — is burned in before this pass runs at all.
+  for (const l of plan.layers ?? []) {
+    await chain(l.file, () => layerAt(l.left, l.top));
   }
 
   let aOut: string | null = null;
@@ -253,6 +303,12 @@ export async function applyOverlays(mp4: string, plan: OverlayPlan): Promise<boo
     fs.rmSync(out, { force: true });
     return false;
   }
+}
+
+/** The layers stored on this kit for a given frame. */
+export function layersOf(kit: Kit, frame: 'hook' | 'body' = 'body'): Layer[] {
+  const all = (kit.layers ?? {}) as Record<string, Layer[]>;
+  return Array.isArray(all[frame]) ? all[frame] : [];
 }
 
 /** The tiled watermark PNG for this handle, generated once. */

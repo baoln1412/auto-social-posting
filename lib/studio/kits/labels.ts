@@ -15,6 +15,27 @@ export interface Label {
   hint?: string;
 }
 
+/**
+ * The tabs the schema-driven field form renders, in the order the reference shows them.
+ *
+ * `layers` is deliberately not one: it is a canvas, not a list of fields, and a form that
+ * tried to render an array of boxes as numeric inputs would be the worst of both.
+ */
+export const TAB_ORDER = [
+  'identity',
+  'post',
+  'voice',
+  'frame',
+  'card',
+  'captions',
+  'signature',
+  'stickers',
+  'music',
+];
+
+/** Schema definitions edited by a screen of their own. Still named, still listed. */
+export const CUSTOM_TABS = ['layers'];
+
 export const TAB_LABELS: Record<string, Label> = {
   identity: { label: 'Thương hiệu', hint: 'Tên, handle và logo hiện trên mọi video của kênh.' },
   post: { label: 'Nội dung', hint: 'Video nói gì, kể theo cách nào, dài bao nhiêu.' },
@@ -25,6 +46,7 @@ export const TAB_LABELS: Record<string, Label> = {
   stickers: { label: 'Nhãn dán', hint: 'Nhân vật dán lên khung hình.' },
   signature: { label: 'Chữ ký kênh', hint: 'Dấu của kênh trên khung hình.' },
   music: { label: 'Nhạc nền', hint: 'Nhạc chạy dưới lời đọc.' },
+  layers: { label: 'Chỉnh lớp', hint: 'Lớp của riêng bạn, đặt lên trên khung hình.' },
 };
 
 /** Keyed `<tab>.<field>`. `preset` is handled by the editor itself and never listed. */

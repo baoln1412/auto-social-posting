@@ -6,13 +6,10 @@ import { kitSchema, listPresetFiles } from '@/lib/studio/kits/schema';
 import { listMedia, type MediaKind } from '@/lib/studio/assets';
 import type { Kit } from '@/lib/studio/steps/types';
 import { KitEditor, type FieldSpec, type TabSpec } from '../../components/KitEditor';
-import { TAB_LABELS, labelFor } from '@/lib/studio/kits/labels';
+import { TAB_LABELS, TAB_ORDER, labelFor } from '@/lib/studio/kits/labels';
 import captionPresets from '@/deploy/assets/caption-presets.json';
 
 export const dynamic = 'force-dynamic';
-
-/** Tab order on the strip — the order of the reference's own tabs. */
-const TAB_ORDER = ['identity', 'post', 'voice', 'frame', 'card', 'captions', 'signature', 'stickers', 'music'];
 
 /**
  * The schema is the field list; labels.ts is the names. A tab the schema does not define

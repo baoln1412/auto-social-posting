@@ -19,6 +19,8 @@ import {
   backgroundMedia,
   cardIsOverlay,
   layoutOf,
+  layersOf,
+  placeLayers,
   stickerPath,
   watermarkPng,
   type SignatureTab,
@@ -117,6 +119,7 @@ async function overlayPlan(
     durationSec,
     sceneChars: scenes.map((s) => s.text.length),
     sfx,
+    layers: await placeLayers(layersOf(ctx.kit, 'body')),
   };
 }
 

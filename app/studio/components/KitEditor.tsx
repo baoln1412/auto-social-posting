@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { cardParams, cardPath, captionStyle } from '@/lib/studio/kits/load';
 import { frameUrl } from '@/lib/studio/frame-url';
 import { TAB_LABELS, labelFor, valueLabel } from '@/lib/studio/kits/labels';
+import { LayerEditor, type LayerMap } from './LayerEditor';
 import { PRESETS } from '@/app/lib/captionPresets';
 import { contrastRatio, paletteFor, type ThemeName } from '@/lib/studio/card/theme';
 import type { Kit } from '@/lib/studio/steps/types';
@@ -130,6 +131,8 @@ export function KitEditor({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  /** The reference's two modes: look at the frame, or arrange what is on it. */
+  const [mode, setMode] = useState<'preview' | 'layers'>('preview');
 
   const tab = tabs.find((t) => t.key === active)!;
   const values = (kit[active] ?? {}) as Record<string, unknown>;
@@ -203,7 +206,11 @@ export function KitEditor({
       const res = await fetch(`/api/studio/runs/${runId}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ overrides: { [active]: values } }),
+        // In layer mode the thing being edited is kit.layers, not the active tab — sending
+        // the tab would save something the owner was not looking at.
+        body: JSON.stringify({
+          overrides: mode === 'layers' ? { layers: kit.layers } : { [active]: values },
+        }),
       });
       if (!res.ok) {
         setErr(((await res.json().catch(() => ({}))) as any).error ?? `HTTP ${res.status}`);
@@ -217,6 +224,73 @@ export function KitEditor({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex gap-1.5">
+        {(['preview', 'layers'] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            data-testid={`kit-mode-${m}`}
+            aria-pressed={mode === m}
+            onClick={() => setMode(m)}
+            className={`pen-line-sm rounded-md px-2.5 py-1 text-xs font-semibold ${
+              mode === m ? 'bg-primary text-primary-foreground' : 'bg-card'
+            }`}
+          >
+            {m === 'preview' ? '👁 Xem trước' : '✎ Chỉnh lớp'}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'layers' ? (
+        <LayerEditor
+          frameSrc={frameUrl({ text: SAMPLE_CUE, style: captionStyle(kit), plate: samplePlate })}
+          value={(kit.layers ?? {}) as LayerMap}
+          onChange={(layers) => {
+            setKit((k) => ({ ...k, layers }));
+            setSaved(false);
+          }}
+          media={tabs
+            .flatMap((t) => t.media ?? [])
+            .map((m) => ({ id: m.id, name: m.name }))}
+        />
+      ) : null}
+
+      {mode === 'layers' && (
+        // The save row lives inside the tab panel, which this mode hides — so it gets its
+        // own. A screen that cannot save what it just edited is not a screen.
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            data-testid="kit-save"
+            disabled={saving}
+            onClick={save}
+            className="pen-line-sm rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {saving ? 'Đang lưu…' : runId ? 'Lưu vào bộ nhận diện' : 'Lưu'}
+          </button>
+          {runId && (
+            <button
+              type="button"
+              data-testid="kit-save-run"
+              disabled={saving}
+              onClick={saveToRun}
+              className="pen-line-sm rounded-md bg-card px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+            >
+              Chỉ lượt này
+            </button>
+          )}
+          {saved && (
+            <span data-testid="kit-saved" className="font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--success))]">
+              đã lưu
+            </span>
+          )}
+          {err && <span className="text-xs text-[hsl(var(--destructive))]">{err}</span>}
+        </div>
+      )}
+
+      {/* Not merely hidden: a hidden panel keeps its buttons in the DOM, and two elements
+          with the same testid is a page where "click save" has no single answer. */}
+      {mode === 'preview' && (
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="flex min-w-0 flex-1 justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -454,6 +528,9 @@ export function KitEditor({
         </aside>
       </div>
 
+      )}
+
+      {mode === 'preview' && (
       <ol data-testid="tab-strip" className="flex flex-wrap gap-2">
         {tabs.map((t) => (
           <li key={t.key}>
@@ -474,6 +551,7 @@ export function KitEditor({
           </li>
         ))}
       </ol>
+      )}
     </div>
   );
 }

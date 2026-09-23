@@ -54,6 +54,9 @@
       "type": "integer",
       "minimum": 1,
       "description": "Bumped when a SHIPPED kit changes. Seeding replaces a stored kit whose revision is lower, so a change to the pack actually reaches an install. An owner who has customised a shipped kit should duplicate it first: a bump replaces their copy."
+    },
+    "layers": {
+      "$ref": "#/definitions/layers"
     }
   },
   "definitions": {
@@ -444,6 +447,114 @@
         },
         "track": {
           "type": "string"
+        }
+      }
+    },
+    "layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Chỉnh lớp. Keyed by frame; units are 0..1 of the frame, never pixels, so a kit stays portable across frame sizes. What the engine burns in (the card, the subtitle) is not here — every layer is above it by construction.",
+      "properties": {
+        "hook": {
+          "$ref": "#/definitions/layerList"
+        },
+        "body": {
+          "$ref": "#/definitions/layerList"
+        }
+      }
+    },
+    "layerList": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "x",
+          "y",
+          "w",
+          "h",
+          "z"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "enum": [
+              "text",
+              "image",
+              "shape",
+              "banner"
+            ]
+          },
+          "x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "w": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "h": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "z": {
+            "type": "integer"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "group": {
+            "type": "string"
+          },
+          "props": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "bg": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "size": {
+                "type": "number",
+                "minimum": 0.005,
+                "maximum": 0.3
+              },
+              "radius": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 96
+              },
+              "opacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "media": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     }
