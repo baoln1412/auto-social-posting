@@ -8,11 +8,13 @@ import { DEMO_ITEM } from '../demo/steps';
 import { getGoldItem, listGold } from './gold';
 import { listArticle } from './article';
 import { listReddit } from './reddit';
+import { listRss } from './rss';
 import { listThreads, threadsToken } from './threads';
 import { textToItem } from './text';
 
 export type SourceKind =
   | 'gold'
+  | 'rss'
   | 'article'
   | 'text'
   | 'reddit'
@@ -25,6 +27,8 @@ export interface SourceConfig {
   marketId?: string;
   url?: string;
   text?: string;
+  /** rss only: what the crawler's discovery said this is — 'rss' | 'web_scrape' | 'news_sitemap'. */
+  feedType?: string;
 }
 
 export interface SourceDef {
@@ -74,6 +78,14 @@ export const SOURCES: Record<SourceKind, SourceDef> = {
     blocked: () => null,
     list: (cfg, limit) => listGold(need(cfg.marketId, 'Chưa chọn thị trường.'), limit),
     get: (ref, cfg) => getGoldItem(ref, need(cfg.marketId, 'Chưa chọn thị trường.')),
+  },
+  rss: {
+    kind: 'rss',
+    label: SOURCE_LABELS.rss,
+    hint: 'Đường dẫn RSS, hoặc một trang tin để dò tìm feed.',
+    needs: 'url',
+    blocked: () => null,
+    list: (cfg, limit) => listRss(need(cfg.url, 'Chưa có đường dẫn.'), limit, cfg.feedType),
   },
   article: {
     kind: 'article',

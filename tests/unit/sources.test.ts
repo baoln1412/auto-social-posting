@@ -159,6 +159,7 @@ describe('the source registry', () => {
       'gold',
       'instagram',
       'reddit',
+      'rss',
       'text',
       'threads',
     ]);

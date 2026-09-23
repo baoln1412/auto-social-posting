@@ -92,6 +92,8 @@ export interface MarketContext {
   writing_style?: string;
   wording_rules?: string;
   glossary?: string;
+  /** The pipeline setup's output shape, as the market's userPrompt carries it. */
+  shape?: string;
 }
 
 export interface PostTab {
@@ -124,6 +126,10 @@ export function buildPrompt(item: SourceItem, market: MarketContext, post: PostT
     market.writing_style && `## Giọng văn của thị trường này\n${market.writing_style}`,
     market.wording_rules && `## Quy tắc dùng từ\n${market.wording_rules}`,
     market.glossary && market.glossary !== '{}' && `## Từ điển\n${market.glossary}`,
+    // What the pipeline setup's "Đầu ra" step says this market's posts look like. The
+    // same string it writes into the market's userPrompt, so the three drafts previewed
+    // there are generated the way the 4-hourly run will generate them.
+    market.shape && `## Dạng bài của thị trường này\n${market.shape}`,
   ]
     .filter(Boolean)
     .join('\n\n');

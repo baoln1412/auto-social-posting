@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 // and each slice flips one flag as it lands.
 const NAV: { href: string; label: string; soon?: boolean }[] = [
   { href: '/studio', label: 'Tạo mới' },
+  { href: '/studio/pipeline', label: 'Nguồn tự động' },
   { href: '/studio/channels', label: 'Kênh' },
   { href: '/studio/kits', label: 'Bộ nhận diện' },
   { href: '/studio/library', label: 'Thư viện' },

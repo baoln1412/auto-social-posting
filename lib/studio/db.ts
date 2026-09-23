@@ -78,6 +78,16 @@ export function ensureStudioTables(d: Database.Database): void {
       created_at TEXT DEFAULT ${NOW}
     );
 
+    -- One market's pipeline setup. Only what the old app has no home for: how the queue is
+    -- ordered, what shape a post takes, which kit draws it. The feeds live in rss_feeds and
+    -- the market's prompt on its content_pages row — both edited in place, never copied.
+    CREATE TABLE IF NOT EXISTS studio_pipelines (
+      market_id   TEXT PRIMARY KEY,
+      config_json TEXT DEFAULT '{}',
+      revision    INTEGER DEFAULT 1,
+      updated_at  TEXT DEFAULT ${NOW}
+    );
+
     CREATE TABLE IF NOT EXISTS studio_media (
       id         TEXT PRIMARY KEY,
       kind       TEXT,

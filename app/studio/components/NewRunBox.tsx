@@ -45,7 +45,7 @@ export function NewRunBox({
   );
 }
 
-/** Door 1 — the crawler. Its five setup screens are the next slice; the trigger is real. */
+/** Door 1 — the crawler. Thiết lập opens its five screens; Chạy ngay starts a cycle. */
 function AutoDoor({ canRun }: { canRun: boolean }) {
   const [state, setState] = useState<{ running: boolean; since: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -98,15 +98,13 @@ function AutoDoor({ canRun }: { canRun: boolean }) {
       </p>
       {err && <p className="text-xs text-[hsl(var(--destructive))]">{err}</p>}
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
+        <a
+          href="/studio/pipeline"
           data-testid="pipeline-setup"
-          disabled
-          title="Năm bước thiết lập — slice sau"
-          className={`${BTN} bg-secondary text-muted-foreground`}
+          className={`${BTN} bg-secondary text-muted-foreground hover:text-foreground`}
         >
           Thiết lập
-        </button>
+        </a>
         <button
           type="button"
           data-testid="pipeline-run"

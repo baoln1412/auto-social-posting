@@ -22,6 +22,7 @@ export interface Detected {
  */
 export const SOURCE_LABELS: Record<SourceKind, string> = {
   gold: 'Kho bài của kênh',
+  rss: 'RSS tin',
   article: 'Bài báo',
   text: 'Tự viết',
   reddit: 'Reddit',
