@@ -33,7 +33,7 @@ test('the five screens, and the gate that will not let an empty one past', async
   await page.goto(`/studio/pipeline/${MARKET}`);
   await dismissTour(page);
 
-  await expect(page.getByTestId('pipeline-rail')).toBeVisible();
+  await expect(page.getByTestId('prail')).toBeVisible();
   await expect(page.getByTestId('prail-0')).toHaveAttribute('data-state', 'current');
 
   // 1 · Nguồn — the market's real feeds, with the weight this setup gives each one.

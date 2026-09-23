@@ -30,8 +30,9 @@ const stepRowid = (runId: string, name: string): number | undefined =>
     .get(runId, name) as { rowid: number } | undefined)?.rowid;
 
 describe('the rail', () => {
-  it('is one sequence — fetch → draft → image → reel', () => {
-    expect(ALL_STEPS).toEqual(['fetch', 'draft', 'image', 'reel']);
+  it('is one sequence, ending where the owner says where it goes', () => {
+    // Đọc bài → Viết bài → Ảnh → Video → Đăng. A run is not finished when the file exists.
+    expect(ALL_STEPS).toEqual(['fetch', 'draft', 'image', 'reel', 'publish']);
   });
 
   it('starts a new run on its first step', () => {
@@ -89,7 +90,7 @@ describe('advance()', () => {
     for (let i = 0; i < ALL_STEPS.length; i++) await advance(id);
     const r = getRun(id)!;
     expect(r.run.status).toBe('done');
-    expect(Object.keys(r.steps).sort()).toEqual(['draft', 'fetch', 'image', 'reel']);
+    expect(Object.keys(r.steps).sort()).toEqual(['draft', 'fetch', 'image', 'publish', 'reel']);
   });
 
   it('writes a studio_steps row for every step it ran', async () => {
@@ -229,7 +230,7 @@ describe('step inputs', () => {
 describe('templateFor()', () => {
   it('drops the reel step for a channel that only makes posts', async () => {
     const { templateFor } = await import('@/lib/studio/steps/types');
-    expect(templateFor(['post'])).toEqual(['fetch', 'draft', 'image']);
+    expect(templateFor(['post'])).toEqual(['fetch', 'draft', 'image', 'publish']);
   });
 
   it('keeps the card on a post-only run — a Facebook post here is text plus its card', async () => {
@@ -239,7 +240,7 @@ describe('templateFor()', () => {
 
   it('skips the card when the channel only wants a video', async () => {
     const { templateFor } = await import('@/lib/studio/steps/types');
-    expect(templateFor(['reel'])).toEqual(['fetch', 'draft', 'reel']);
+    expect(templateFor(['reel'])).toEqual(['fetch', 'draft', 'reel', 'publish']);
   });
 
   it('keeps everything when the channel makes everything', async () => {
@@ -249,12 +250,13 @@ describe('templateFor()', () => {
       'draft',
       'image',
       'reel',
+      'publish',
     ]);
   });
 
   it('always keeps fetch and draft — there is no run without text', async () => {
     const { templateFor } = await import('@/lib/studio/steps/types');
-    expect(templateFor([])).toEqual(['fetch', 'draft', 'image', 'reel']);
+    expect(templateFor([])).toEqual(['fetch', 'draft', 'image', 'reel', 'publish']);
     expect(templateFor(['nonsense'])).toContain('draft');
   });
 
@@ -274,9 +276,11 @@ describe('a post-only channel', () => {
 
     const id = demoRun();
     const rec0 = getRun(id)!;
-    expect(rec0.template).toEqual(['fetch', 'draft', 'image']);
+    expect(rec0.template).toEqual(['fetch', 'draft', 'image', 'publish']);
 
-    for (let i = 0; i < 3; i++) await advance(id);
+    // Counted off the run's own template, so adding a screen to the rail never makes this
+    // test about the wrong thing.
+    for (let i = 0; i < rec0.template.length; i++) await advance(id);
     const r = getRun(id)!;
     expect(r.run.status).toBe('done');
     expect(r.steps.reel).toBeUndefined();
@@ -325,7 +329,7 @@ describe('the preview contract', () => {
     const id = demoRun({ reviewBeforeRender: false });
     await advance(id);
     expect(getRun(id)!.run.status).toBe('done');
-    expect(Object.keys(getRun(id)!.steps).sort()).toEqual(['draft', 'fetch', 'image', 'reel']);
+    expect(Object.keys(getRun(id)!.steps).sort()).toEqual(['draft', 'fetch', 'image', 'publish', 'reel']);
   });
 
   it('an auto-walk is still not a way round the money guard', async () => {

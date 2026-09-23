@@ -45,6 +45,12 @@ const { getSetting, setSetting } = await import('@/lib/studio/settings');
 const D = await import('@/lib/studio/deliver');
 const { can } = await import('@/lib/studio/tier');
 
+/** Run every step of a demo run. The rail's length is the rail's business, not a number. */
+async function walk(id: string): Promise<void> {
+  const { ALL_STEPS } = await import('@/lib/studio/steps/types');
+  for (let i = 0; i < ALL_STEPS.length; i++) await advance(id);
+}
+
 beforeEach(() => {
   resetStudioDbForTests();
   seedDemo();
@@ -127,7 +133,7 @@ describe('delivery from a run', () => {
 
   it('sends nothing at all while delivery is off', async () => {
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    for (let i = 0; i < 4; i++) await advance(id);
+    await walk(id);
     expect(getRun(id)!.run.status).toBe('done');
     expect(calls).toHaveLength(0);
   });
@@ -135,7 +141,7 @@ describe('delivery from a run', () => {
   it('sends the finished video once the owner switches it on', async () => {
     await connected();
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    for (let i = 0; i < 4; i++) await advance(id);
+    await walk(id);
     const sent = calls.filter((c) => c.method === 'sendVideo' || c.method === 'sendDocument');
     expect(sent).toHaveLength(1);
     expect(sent[0].body).toContain('4242');
@@ -160,14 +166,14 @@ describe('delivery from a run', () => {
     await connected();
     reply = () => ({ ok: false, description: 'chat not found' });
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    for (let i = 0; i < 4; i++) await advance(id);
+    await walk(id);
     expect(getRun(id)!.run.status).toBe('done');
   });
 
   it('does not send the same finished run twice when a later step is re-run', async () => {
     await connected();
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    for (let i = 0; i < 4; i++) await advance(id);
+    await walk(id);
     calls.length = 0;
     await advance(id, { step: 'image' });
     expect(calls.filter((c) => c.method === 'sendVideo')).toHaveLength(0);

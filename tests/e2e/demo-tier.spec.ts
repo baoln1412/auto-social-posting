@@ -30,18 +30,17 @@ test('the demo tier walks the whole flow with mock data and spends nothing', asy
   await page.getByTestId('create-run').click();
   await page.waitForURL(/\/studio\/runs\/[0-9a-f-]{36}$/);
 
+  // One screen per step, so a price is checked on the screen that quotes it — and again on
+  // the rail afterwards, where every step's price stays visible at once.
   for (const step of ['fetch', 'draft', 'image', 'reel']) {
     await expect(page.getByTestId(`cost-${step}`)).toContainText('$0.00');
+    await page.getByTestId(`continue-${step}`).click();
   }
-  await page.getByTestId('continue-fetch').click();
-  await page.getByTestId('continue-draft').click();
-  await page.getByTestId('continue-image').click();
-  await page.getByTestId('continue-reel').click();
   await expect(page.getByTestId('run-player')).toBeVisible();
 
   // Every step, after the fact, still cost nothing.
   for (const step of ['fetch', 'draft', 'image', 'reel']) {
-    await expect(page.getByTestId(`cost-${step}`)).toContainText('$0.00');
+    await expect(page.getByTestId(`rail-${step}`)).toContainText('$0.00');
   }
   await expect(page.locator('body')).toContainText('không tốn phí');
   await page.screenshot({ path: 'tests/shots/70-demo-tier-run.png', fullPage: true });
@@ -113,13 +112,15 @@ test('a post-only channel stops after the card', async ({ page, request }) => {
   const { id } = (await run.json()) as { id: string };
 
   await page.goto(`/studio/runs/${id}`);
-  await expect(page.getByTestId('step-image')).toBeVisible();
-  await expect(page.getByTestId('step-reel')).toHaveCount(0);
+  // The rail is the run's shape: a channel that only makes posts has no Video screen on it.
+  await expect(page.getByTestId('rail-image')).toBeVisible();
+  await expect(page.getByTestId('rail-reel')).toHaveCount(0);
 
   await page.getByTestId('continue-fetch').click();
   await page.getByTestId('continue-draft').click();
   await page.getByTestId('continue-image').click();
   await expect(page.getByTestId('rail-card')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('continue-publish').click();
   await expect(page.getByTestId('run-status')).toContainText('xong');
   await page.screenshot({ path: 'tests/shots/73-post-only-run.png', fullPage: true });
 });

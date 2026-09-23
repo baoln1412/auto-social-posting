@@ -8,6 +8,7 @@ import { fetchStep } from './fetch';
 import { draftStep } from './draft';
 import { imageStep } from './image';
 import { reelStep } from './reel';
+import { publishStep } from './publish';
 
 export function isDemoChannel(c: Channel): boolean {
   try {
@@ -19,12 +20,12 @@ export function isDemoChannel(c: Channel): boolean {
   }
 }
 
-/** The real engines. `publish` records intent only and is not wired. */
 const REAL: Partial<Record<StepName, Step>> = {
   fetch: fetchStep,
   draft: draftStep,
   image: imageStep,
   reel: reelStep,
+  publish: publishStep,
 };
 
 export function resolveStep(name: StepName, channel: Channel): Step {

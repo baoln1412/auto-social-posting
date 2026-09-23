@@ -27,20 +27,23 @@ test('one real gold post becomes a post, a card and an MP4', async ({ page, requ
   // fetch — a real lake item, priced at nothing.
   await expect(page.getByTestId('preview-items')).toBeVisible({ timeout: 30_000 });
   await page.getByTestId('continue-fetch').click();
-  await expect(page.getByTestId('step-fetch')).toHaveAttribute('data-state', 'done');
+  // One screen per step now: what a finished step did is on the rail, not on screen.
+  await expect(page.getByTestId('rail-fetch')).toHaveAttribute('data-state', 'done');
 
   // draft — the gold row passes through free, and the compliance gate names its three rules.
   await expect(page.getByTestId('cost-draft')).toContainText('$0.00');
   await page.getByTestId('continue-draft').click();
-  await expect(page.getByTestId('step-draft')).toContainText('3 quy tắc · đạt');
+  await expect(page.getByTestId('rail-draft')).toContainText('3 quy tắc · đạt');
+  await page.getByTestId('rail-draft').click();
   await expect(page.getByTestId('draft-text')).not.toHaveValue('');
   await page.screenshot({ path: 'tests/shots/20-real-draft.png', fullPage: true });
+  await page.getByTestId('rail-image').click();
 
   // image — the real card renderer, then the layout gate on the actual pixels.
   await page.getByTestId('continue-image').click();
-  await expect(page.getByTestId('rail-card')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('step-image')).toContainText('3 quy tắc · đạt');
-  const card = await page.getByTestId('rail-card').getAttribute('src');
+  await expect(page.getByTestId('rail-image')).toContainText('3 quy tắc · đạt', { timeout: 60_000 });
+  await page.getByTestId('rail-image').click();
+  const card = await page.getByTestId('card-preview').getAttribute('src');
   expect(card).toMatch(/^\/studio-runs\/.*-card\.png$/);
   const png = await request.get(card!);
   expect(png.status()).toBe(200);
@@ -48,6 +51,7 @@ test('one real gold post becomes a post, a card and an MP4', async ({ page, requ
   await page.screenshot({ path: 'tests/shots/21-real-card.png', fullPage: true });
 
   // reel — make-reel.py for real. The stage rail has to show something while it runs.
+  await page.getByTestId('rail-reel').click();
   await page.getByTestId('continue-reel').click();
   await expect(page.getByTestId('render-rail')).toBeVisible({ timeout: 90_000 });
   // Visible is not the same as working: make-reel.py's ::step: markers have to reach the
@@ -58,7 +62,7 @@ test('one real gold post becomes a post, a card and an MP4', async ({ page, requ
   await page.screenshot({ path: 'tests/shots/22-real-rendering.png', fullPage: true });
 
   await expect(page.getByTestId('run-player')).toBeVisible({ timeout: 15 * 60_000 });
-  await expect(page.getByTestId('step-reel')).toContainText('2 quy tắc · đạt');
+  await expect(page.getByTestId('rail-reel')).toContainText('2 quy tắc · đạt');
   const mp4 = await page.getByTestId('run-player').getAttribute('src');
   const vid = await request.get(mp4!);
   expect(vid.status()).toBe(200);

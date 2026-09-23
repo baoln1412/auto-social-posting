@@ -1,12 +1,13 @@
 'use client';
 
 /**
- * The editorial run page, laid out as the HTML plan draws it.
+ * The run page: one screen per step, the rail on top.
  *
- * Dense on purpose: a numbered gutter, one-line step headers carrying their own state and
- * price, finished steps collapsed to a single row, scene actions inline, and the comment pool
- * as chips rather than a column. The first version gave every step a full-height card, which
- * pushed the scene list — the thing the owner actually works in — below the fold.
+ * The rail says where the run is and lets the owner walk back to any screen; the screen
+ * itself is the thing that step is about, with its controls beside it and its price and
+ * `Tiếp` underneath. v1 stacked all four steps as an accordion, which meant the scene
+ * list — the thing the owner actually works in — competed for height with three results
+ * they had already accepted.
  *
  * The scene list is computed with the same scenesFor() the reel engine calls, so ticking a
  * comment changes the list the renderer receives rather than a picture of it.
@@ -31,6 +32,7 @@ import {
   type StepPreview,
 } from '@/lib/studio/steps/types';
 import { OverrideDrawer, type KitOption } from './OverrideDrawer';
+import { StepRail, type RailItem } from './StepRail';
 
 export interface StepView {
   status: 'ok' | 'error';
@@ -81,18 +83,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 const money = (m?: Money) => `$${(m?.usd ?? 0).toFixed(2)}`;
 
-/** Steps whose body is editable content rather than a result to glance at. */
-const EDITABLE = new Set<StepName>(['draft', 'reel']);
-
-/** The one line a step header carries: what it is, how it went, what it cost. */
-function headline(
-  name: StepName,
-  s: StepView | undefined,
-  preview: StepPreview | null,
-  scenes: Scene[],
-  itemRef: string | null,
-  title?: string,
-): string {
+/** The one line a step carries on the rail: how it went, and what it cost. */
+function note(name: StepName, s: StepView | undefined, preview: LivePreview | null, scenes: Scene[]): string {
   const bits: string[] = [];
   if (s?.status === 'error') bits.push('lỗi');
   else if (s?.gate) {
@@ -100,24 +92,12 @@ function headline(
       s.gate.checked === 0
         ? 'cổng chưa chạy'
         : s.gate.findings.length
-          ? `${s.gate.checked} quy tắc · ${s.gate.findings.length} vấn đề`
+          ? `${s.gate.findings.length} vấn đề`
           : `${s.gate.checked} quy tắc · đạt`,
     );
   }
-  if (!s) {
-    if (name === 'fetch') bits.push(itemRef ?? 'chọn bài');
-    if (name === 'draft') bits.push('viết bài');
-    if (name === 'image') bits.push('ảnh thẻ PNG');
-    if (name === 'reel') bits.push(`${scenes.length} cảnh`);
-  } else if (name === 'fetch') bits.unshift(title ?? itemRef ?? 'đã lấy');
-  else if (name === 'image') bits.unshift('ảnh thẻ PNG');
-  else if (name === 'reel') bits.unshift(`${scenes.length} cảnh`);
-
+  if (name === 'reel') bits.push(`${scenes.length} cảnh`);
   bits.push(money(s?.cost ?? preview?.cost));
-  if (name === 'reel') {
-    const secs = s?.output?.durationSec ?? estimateSeconds(scenes.reduce((n, x) => n + x.text.length, 0));
-    bits.push(s ? mmss(secs) : `~${mmss(secs)}`);
-  }
   return bits.join(' · ');
 }
 
@@ -128,23 +108,21 @@ export function RunView(p: RunViewProps) {
   const [selection, setSelection] = useState<Selection>(p.selection);
   const [overrides, setOverrides] = useState<Overrides>(p.overrides);
   const [draftEdit, setDraftEdit] = useState<string | null>(null);
-  const [open, setOpen] = useState<StepName | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [render, setRender] = useState<{ step?: string; pct?: number; done: string[] } | null>(null);
-  // The controls this step is being previewed with, live and unsaved until something runs.
   const [opts, setOpts] = useState<StepOptions>(p.options[p.currentStep] ?? {});
 
-  // A step change brings its own stored controls; carrying the last step's over would show
-  // the Video step's caption size on the card step.
+  /** Which screen is open. Follows the run, until the owner walks back along the rail. */
+  const [view, setView] = useState<StepName>(p.currentStep);
   useEffect(() => {
+    setView(p.currentStep);
     setOpts(p.options[p.currentStep] ?? {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.currentStep]);
 
   const live = useStepPreview(p.runId, p.currentStep, opts, p.preview);
-
   const draft = draftEdit ?? (p.steps.draft?.output?.text as string | undefined) ?? '';
 
   useEffect(() => {
@@ -152,16 +130,16 @@ export function RunView(p: RunViewProps) {
       setRender(null);
       return;
     }
-    let live = true;
+    let alive = true;
     const tick = async () => {
       const res = await fetch(`/api/studio/runs/${p.runId}/advance`).catch(() => null);
       const b = (await res?.json().catch(() => null)) as any;
-      if (live && b?.status) setRender({ step: b.step, pct: b.pct, done: b.done ?? [] });
+      if (alive && b?.status) setRender({ step: b.step, pct: b.pct, done: b.done ?? [] });
     };
     void tick();
     const t = setInterval(tick, 1500);
     return () => {
-      live = false;
+      alive = false;
       clearInterval(t);
     };
   }, [busy, p.runId]);
@@ -206,6 +184,30 @@ export function RunView(p: RunViewProps) {
   const editScene = (id: string, text: string) =>
     setSelection((s) => ({ ...s, edits: { ...(s.edits ?? {}), [id]: text } }));
 
+  const done = p.status === 'done';
+  const s = p.steps[view];
+  const onCurrent = view === p.currentStep && !done;
+  const gateOk = s ? canContinue(s, Boolean(p.gateDeclared[view])) : false;
+  const secs = p.steps.reel?.output?.durationSec
+    ?? estimateSeconds(scenes.reduce((n, x) => n + x.text.length, 0));
+
+  const rail: RailItem[] = p.template.map((name) => {
+    const st = p.steps[name];
+    return {
+      id: name,
+      label: STEP_LABELS[name],
+      state:
+        st?.status === 'error'
+          ? 'error'
+          : st
+            ? 'done'
+            : name === p.currentStep && !done
+              ? 'current'
+              : 'future',
+      note: note(name, st, name === p.currentStep ? live.preview : null, scenes),
+    };
+  });
+
   const ovSummary = [
     `kit: ${p.overrides.kitId ?? p.kitName}`,
     `thời lượng: ${p.overrides.durationBand ?? 'theo kit'}`,
@@ -215,233 +217,169 @@ export function RunView(p: RunViewProps) {
   ];
 
   return (
-    <div className="flex flex-col gap-5 lg:flex-row">
-      <div className="min-w-0 flex-1">
-        <header className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h1 className="text-xl font-bold">{p.channelName}</h1>
-          <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-            {p.sourceLabel} · {p.kitName} · {STATUS_LABEL[p.status] ?? p.status} ·{' '}
-            {p.runId.slice(0, 8)}
-          </span>
-        </header>
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h1 className="text-xl font-bold">{p.channelName}</h1>
+        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+          {p.sourceLabel} · {p.kitName} · {STATUS_LABEL[p.status] ?? p.status} · {p.runId.slice(0, 8)}
+        </span>
+      </header>
 
-        {err && (
-          <p data-testid="run-error" className="pen-line-sm mb-3 rounded-md bg-card px-3 py-1.5 text-sm text-[hsl(var(--destructive))]">
-            {err}
-          </p>
-        )}
+      <StepRail items={rail} onGo={(id) => setView(id as StepName)} />
 
-        <ol className="flex flex-col gap-2">
-          {p.template.map((name, i) => {
-            const s = p.steps[name];
-            const isCurrent = name === p.currentStep && p.status !== 'done';
-            const future = !s && !isCurrent;
-            const gateOk = s ? canContinue(s, Boolean(p.gateDeclared[name])) : false;
-            // Collapsed by default, EXCEPT the two steps whose body is the thing the owner
-            // edits. The drawing has it this way too: fetch and image are one-liners, the
-            // draft and the scene list stay open. Collapsing the draft hid the editor the
-            // moment it produced anything.
-            const editable =
-              EDITABLE.has(name) && (Boolean(s) || (name === 'reel' && Boolean(p.item)));
-            const expanded = isCurrent || open === name || editable;
+      {err && (
+        <p data-testid="run-error" className="pen-line-sm rounded-md bg-card px-3 py-1.5 text-sm text-[hsl(var(--destructive))]">
+          {err}
+        </p>
+      )}
 
-            return (
-              <li
-                key={name}
-                data-testid={`step-${name}`}
-                data-state={s?.status === 'error' ? 'error' : s ? 'done' : isCurrent ? 'current' : 'future'}
-                data-open={expanded}
-                className="flex gap-2.5"
-              >
-                <span
-                  className={`mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[11px] ${
-                    s?.status === 'error'
-                      ? 'bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]'
-                      : s
-                        ? 'bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]'
-                        : isCurrent
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-secondary text-muted-foreground'
-                  }`}
-                >
-                  {i + 1}
-                </span>
+      <div
+        data-testid={`step-${view}`}
+        data-state={s?.status === 'error' ? 'error' : s ? 'done' : onCurrent ? 'current' : 'future'}
+        className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]"
+      >
+        <main className="pen-line-static min-w-0 rounded-[var(--radius)] bg-card p-3">
+          <div className="mb-2 flex flex-wrap items-baseline gap-2">
+            <h2 className="text-sm font-semibold">{STEP_LABELS[view]}</h2>
+            {s?.stale && (
+              <span data-testid={`stale-${view}`} className={CAPS}>
+                đã đổi tuỳ chọn
+              </span>
+            )}
+            {s?.error && (
+              <span className="font-mono text-[11px] text-[hsl(var(--destructive))]">{s.error}</span>
+            )}
+          </div>
 
-                <div
-                  className={`min-w-0 flex-1 rounded-[var(--radius)] px-3 py-2 ${
-                    future && !expanded
-                      ? 'border-2 border-dashed border-border bg-transparent'
-                      : 'pen-line-static bg-card'
-                  } ${future ? 'opacity-80' : ''}`}
-                >
-                  <button
-                    type="button"
-                    data-testid={`head-${name}`}
-                    onClick={() => !isCurrent && s && setOpen(open === name ? null : name)}
-                    className="flex w-full items-baseline gap-2 text-left"
-                  >
-                    <span className="text-sm font-semibold">{STEP_LABELS[name]}</span>
-                    <span
-                      data-testid={`cost-${name}`}
-                      className="min-w-0 flex-1 truncate font-mono text-[11px] uppercase tracking-wider text-muted-foreground"
-                    >
-                      {headline(name, s, isCurrent ? live.preview : null, scenes, p.itemRef, p.item?.title)}
-                    </span>
-                    {s?.stale && (
-                      <span
-                        data-testid={`stale-${name}`}
-                        className="shrink-0 rounded-md bg-secondary px-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
-                      >
-                        đã đổi tuỳ chọn
-                      </span>
-                    )}
-                  </button>
+          {s?.gate?.findings.map((f) => (
+            <p key={f} className="mb-1 text-xs text-[hsl(var(--destructive))]">
+              {f}
+            </p>
+          ))}
 
-                  {s?.error && (
-                    <p className="mt-1 font-mono text-[11px] text-[hsl(var(--destructive))]">{s.error}</p>
-                  )}
-                  {s?.gate?.findings.map((f) => (
-                    <p key={f} className="mt-1 text-xs text-[hsl(var(--destructive))]">
-                      {f}
-                    </p>
-                  ))}
-
-                  {expanded && (
-                    <div className="mt-2 flex flex-col gap-2">
-                      {name === 'fetch' && s?.status === 'ok' && p.item && (
-                        <p className="text-sm">
-                          <span className="font-medium">{p.item.title}</span>
-                          {p.item.source && (
-                            <span className="ml-2 text-xs text-muted-foreground">{p.item.source}</span>
-                          )}
-                        </p>
-                      )}
-
-                      {name === 'draft' && s?.status === 'ok' && (
-                        <textarea
-                          id="draft-editor"
-                          data-testid="draft-text"
-                          value={draft}
-                          onChange={(e) => setDraftEdit(e.target.value)}
-                          rows={4}
-                          className="pen-line-static w-full resize-y rounded-md bg-background p-2 text-sm outline-none"
-                        />
-                      )}
-
-                      {name === 'image' && card && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={card} alt="" data-testid="card-preview" className="pen-line-static w-32 rounded-md" />
-                      )}
-
-                      {name === 'reel' && (
-                        <SceneBoard
-                          scenes={scenes}
-                          pool={pool}
-                          unpicked={unpicked}
-                          selection={selection}
-                          editing={editing}
-                          showOriginal={showOriginal}
-                          onToggle={toggle}
-                          onEdit={editScene}
-                          setEditing={setEditing}
-                          setShowOriginal={setShowOriginal}
-                          onHide={(v) => setSelection((s2) => ({ ...s2, hideUnselected: v }))}
-                        />
-                      )}
-
-                      {name === 'reel' && render && (
-                        <ol data-testid="render-rail" className="flex flex-wrap gap-1.5">
-                          {RENDER_STEPS.map((r) => (
-                            <li
-                              key={r}
-                              data-testid={`render-${r}`}
-                              data-done={render.done.includes(r) ? 'true' : 'false'}
-                              data-current={render.step === r ? 'true' : 'false'}
-                              className={`rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
-                                render.done.includes(r)
-                                  ? 'bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]'
-                                  : render.step === r
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-secondary text-muted-foreground'
-                              }`}
-                            >
-                              {RENDER_LABELS[r] ?? r}
-                              {render.step === r && render.pct !== undefined ? ` ${render.pct}%` : ''}
-                            </li>
-                          ))}
-                        </ol>
-                      )}
-
-                      {isCurrent && (
-                        <StepControls
-                          step={name}
-                          opts={opts}
-                          scenes={scenes}
-                          voiceId={p.voiceId}
-                          captionDefaults={p.captionDefaults}
-                          onChange={setOpts}
-                        />
-                      )}
-
-                      {isCurrent && !s && live.preview && (
-                        <Preview preview={live.preview} stale={live.stale} />
-                      )}
-                      {isCurrent && live.error && (
-                        <p data-testid="preview-error" className="text-xs text-[hsl(var(--destructive))]">
-                          {live.error}
-                        </p>
-                      )}
-
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {isCurrent && (
-                          <button
-                            type="button"
-                            data-testid={`continue-${name}`}
-                            disabled={busy !== null || (Boolean(s) && !gateOk && s?.status !== 'error')}
-                            onClick={() => post({}, name)}
-                            className="pen-line-sm rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                          >
-                            {busy === name ? 'Đang chạy…' : s ? 'Thử lại' : 'Tiếp tục'}
-                          </button>
-                        )}
-                        {s && (
-                          <button
-                            type="button"
-                            data-testid={`rerun-${name}`}
-                            disabled={busy !== null}
-                            onClick={() => post({ step: name }, `re-${name}`)}
-                            className="pen-line-sm rounded-md bg-card px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
-                          >
-                            Chạy lại bước này
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
-      <aside className="w-full shrink-0 lg:sticky lg:top-8 lg:w-64 lg:self-start">
-        <div className="flex flex-col gap-2">
-          {video ? (
-            <video data-testid="run-player" src={video} controls className="pen-line-static w-full rounded-[var(--radius)] bg-black" />
-          ) : card ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={card} alt="" data-testid="rail-card" className="pen-line-static w-full rounded-[var(--radius)]" />
-          ) : (
-            <div className="pen-line-static grid aspect-[9/16] place-items-center rounded-[var(--radius)] bg-card text-xs text-muted-foreground">
-              Chưa có kết quả
-            </div>
+          {view === 'fetch' && (
+            <>
+              {/* What this run was pointed at. It used to ride in the step's one-line header
+                  and had nowhere to go once the headers became screens. */}
+              {p.itemRef && (
+                <p data-testid="item-ref" className={`mb-1 ${CAPS}`}>
+                  {p.sourceLabel} · {p.itemRef.length > 72 ? `${p.itemRef.slice(0, 72)}…` : p.itemRef}
+                </p>
+              )}
+              {p.item ? (
+                <p className="text-sm">
+                  <span className="font-medium">{p.item.title}</span>
+                  {p.item.source && <span className="ml-2 text-xs text-muted-foreground">{p.item.source}</span>}
+                </p>
+              ) : null}
+              {onCurrent && !s && live.preview && <Preview preview={live.preview} stale={live.stale} />}
+            </>
           )}
 
-          <p
-            data-testid="run-status"
-            className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground"
-          >
+          {view === 'draft' && (
+            <>
+              {s ? (
+                <textarea
+                  id="draft-editor"
+                  data-testid="draft-text"
+                  value={draft}
+                  onChange={(e) => setDraftEdit(e.target.value)}
+                  rows={12}
+                  className="pen-line-static w-full resize-y rounded-md bg-background p-2 text-sm outline-none"
+                />
+              ) : (
+                live.preview && <Preview preview={live.preview} stale={live.stale} />
+              )}
+            </>
+          )}
+
+          {view === 'image' && (
+            <>
+              {card ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={card} alt="" data-testid="card-preview" className="pen-line-static w-full max-w-xs rounded-md" />
+              ) : (
+                live.preview && <Preview preview={live.preview} stale={live.stale} />
+              )}
+            </>
+          )}
+
+          {view === 'reel' && (
+            <>
+              <SceneBoard
+                scenes={scenes}
+                pool={pool}
+                unpicked={unpicked}
+                selection={selection}
+                editing={editing}
+                showOriginal={showOriginal}
+                voiceId={p.voiceId}
+                onToggle={toggle}
+                onEdit={editScene}
+                setEditing={setEditing}
+                setShowOriginal={setShowOriginal}
+                onEditPost={() => setView('draft')}
+                onHide={(v) => setSelection((s2) => ({ ...s2, hideUnselected: v }))}
+              />
+              {render && (
+                <ol data-testid="render-rail" className="mt-2 flex flex-wrap gap-1.5">
+                  {RENDER_STEPS.map((r) => (
+                    <li
+                      key={r}
+                      data-testid={`render-${r}`}
+                      data-done={render.done.includes(r) ? 'true' : 'false'}
+                      data-current={render.step === r ? 'true' : 'false'}
+                      className={`rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
+                        render.done.includes(r)
+                          ? 'bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]'
+                          : render.step === r
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-secondary text-muted-foreground'
+                      }`}
+                    >
+                      {RENDER_LABELS[r] ?? r}
+                      {render.step === r && render.pct !== undefined ? ` ${render.pct}%` : ''}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
+          )}
+
+          {view === 'publish' && (
+            <PublishScreen
+              record={s?.output}
+              preview={onCurrent && !s ? live.preview : null}
+              overrides={overrides}
+              onChange={setOverrides}
+            />
+          )}
+        </main>
+
+        <aside className="flex flex-col gap-2">
+          {view === 'reel' && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <>
+              {video ? (
+                <video data-testid="run-player" src={video} controls className="pen-line-static w-full rounded-[var(--radius)] bg-black" />
+              ) : (
+                live.preview?.kind === 'scenes' && <Preview preview={live.preview} stale={live.stale} />
+              )}
+            </>
+          )}
+          {view !== 'reel' &&
+            (video ? (
+              <video data-testid="run-player" src={video} controls className="pen-line-static w-full rounded-[var(--radius)] bg-black" />
+            ) : card ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={card} alt="" data-testid="rail-card" className="pen-line-static w-full rounded-[var(--radius)]" />
+            ) : (
+              <div className="pen-line-static grid aspect-[9/16] place-items-center rounded-[var(--radius)] bg-card text-xs text-muted-foreground">
+                Chưa có kết quả
+              </div>
+            ))}
+
+          <p data-testid="run-status" className={`flex items-center gap-2 ${CAPS}`}>
             <span>{STATUS_LABEL[p.status] ?? p.status}</span>
             {video && (
               <>
@@ -453,11 +391,25 @@ export function RunView(p: RunViewProps) {
             )}
           </p>
 
+          {onCurrent && (
+            <StepControls
+              step={view}
+              opts={opts}
+              scenes={scenes}
+              voiceId={p.voiceId}
+              captionDefaults={p.captionDefaults}
+              onChange={setOpts}
+            />
+          )}
+          {live.error && onCurrent && (
+            <p data-testid="preview-error" className="text-xs text-[hsl(var(--destructive))]">
+              {live.error}
+            </p>
+          )}
+
           <div className="pen-line-static rounded-[var(--radius)] bg-card p-2.5">
-            <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              Tuỳ chỉnh video này
-            </div>
-            <ul data-testid="ov-summary" className="mb-2 flex flex-col gap-0.5 font-mono text-[10px] text-muted-foreground">
+            <div className={`mb-1 ${CAPS}`}>Tuỳ chỉnh video này</div>
+            <ul data-testid="ov-summary" className={`mb-2 flex flex-col gap-0.5 ${CAPS}`}>
               {ovSummary.map((l) => (
                 <li key={l}>· {l}</li>
               ))}
@@ -473,14 +425,14 @@ export function RunView(p: RunViewProps) {
             {drawerOpen && (
               <div className="mt-2">
                 <OverrideDrawer
-                value={overrides}
-                onChange={setOverrides}
-                kits={p.kits}
-                open
-                runId={p.runId}
-                kitId={p.overrides.kitId ?? p.kitId}
-                sounds={p.sounds}
-              />
+                  value={overrides}
+                  onChange={setOverrides}
+                  kits={p.kits}
+                  open
+                  runId={p.runId}
+                  kitId={p.overrides.kitId ?? p.kitId}
+                  sounds={p.sounds}
+                />
               </div>
             )}
           </div>
@@ -490,8 +442,134 @@ export function RunView(p: RunViewProps) {
               Chế độ xem thử — mọi bước dùng dữ liệu mẫu và không tốn phí.
             </p>
           )}
-        </div>
-      </aside>
+        </aside>
+      </div>
+
+      <footer className="pen-line-static flex flex-wrap items-center gap-2 rounded-[var(--radius)] bg-card px-3 py-2">
+        <span data-testid={`cost-${view}`} className={CAPS}>
+          {/* note() already ends with the price; printing money() first said it twice. */}
+          {note(view, s, onCurrent ? live.preview : null, scenes)}
+          {view === 'reel' && ` · ${s ? mmss(secs) : `~${mmss(secs)}`}`}
+        </span>
+
+        {s && (
+          <button
+            type="button"
+            data-testid={`rerun-${view}`}
+            disabled={busy !== null}
+            onClick={() => post({ step: view }, `re-${view}`)}
+            className="ml-auto pen-line-sm rounded-md bg-card px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+          >
+            {view === 'reel' ? 'Chỉnh tiếp & render lại' : 'Chạy lại bước này'}
+          </button>
+        )}
+
+        {onCurrent && (
+          <button
+            type="button"
+            data-testid={`continue-${view}`}
+            disabled={busy !== null || (Boolean(s) && !gateOk && s?.status !== 'error')}
+            onClick={() => post({}, view)}
+            className={`${s ? '' : 'ml-auto'} pen-line-sm rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50`}
+          >
+            {busy === view ? 'Đang chạy…' : s ? 'Thử lại' : 'Tiếp tục'}
+          </button>
+        )}
+      </footer>
+    </div>
+  );
+}
+
+const CAPS = 'font-mono text-[10px] uppercase tracking-wider text-muted-foreground';
+
+/**
+ * Đăng — where the finished run goes.
+ *
+ * The library is stated, not offered: every run is already in it. "Đăng sau" records a time
+ * and says plainly that nothing will act on it, because nothing will — a scheduler this repo
+ * does not have is not something a button should imply.
+ */
+function PublishScreen({
+  record,
+  preview,
+  overrides,
+  onChange,
+}: {
+  record: any;
+  preview: LivePreview | null;
+  overrides: Overrides;
+  onChange: (o: Overrides) => void;
+}) {
+  const d = (preview?.data ?? {}) as {
+    title?: string;
+    assets?: { kind: string; url?: string }[];
+    destinations?: { id: string; label: string; blocked: string | null }[];
+  };
+  const to = overrides.publishTo ?? ['library'];
+  const set = (id: 'library' | 'telegram', on: boolean) =>
+    onChange({
+      ...overrides,
+      publishTo: on ? Array.from(new Set([...to, id])) : to.filter((x) => x !== id),
+    });
+
+  if (record) {
+    return (
+      <div data-testid="publish-done" className="flex flex-col gap-1 text-sm">
+        <p>Đã lưu vào thư viện.</p>
+        <p className={CAPS}>
+          telegram: {record.telegram}
+          {record.telegramNote ? ` — ${record.telegramNote}` : ''}
+        </p>
+        {record.scheduledAt && <p className={CAPS}>hẹn giờ ghi nhận: {record.scheduledAt}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="publish-screen" className="flex flex-col gap-2">
+      {d.title && <p className="text-sm font-medium">{d.title}</p>}
+      <div className="flex flex-col gap-1">
+        {(d.destinations ?? []).map((dest) => (
+          <label key={dest.id} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              data-testid={`pub-${dest.id}`}
+              disabled={dest.id === 'library' || Boolean(dest.blocked)}
+              checked={dest.id === 'library' || to.includes(dest.id as 'telegram')}
+              onChange={(e) => set(dest.id as 'library' | 'telegram', e.target.checked)}
+              className="h-4 w-4 accent-[hsl(var(--primary))]"
+            />
+            {dest.label}
+            {dest.blocked && (
+              <span data-testid={`pub-blocked-${dest.id}`} className={CAPS}>
+                {dest.blocked}
+              </span>
+            )}
+          </label>
+        ))}
+      </div>
+
+      <label className={`flex items-center gap-2 ${CAPS}`}>
+        đăng sau
+        <input
+          type="datetime-local"
+          data-testid="pub-at"
+          value={overrides.publishAt ?? ''}
+          onChange={(e) => onChange({ ...overrides, publishAt: e.target.value || undefined })}
+          className="pen-line-sm rounded-md bg-background px-1.5 py-0.5 font-sans text-xs text-foreground"
+        />
+      </label>
+      <p className={CAPS}>
+        giờ hẹn chỉ được ghi lại — chưa có bộ đặt lịch nào chạy nó
+      </p>
+
+      <ul className="flex flex-wrap gap-2">
+        {(d.assets ?? []).map((a) => (
+          <li key={a.url} data-testid="publish-asset" className={CAPS}>
+            {a.kind}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -587,17 +665,27 @@ function StepControls({
  * per scene would fire a request to Microsoft for every scene of every run just by opening
  * the page.
  */
-function Listen({ text, voice, testId }: { text: string; voice?: string; testId: string }) {
+function Listen({
+  text,
+  voice,
+  testId,
+  label = 'nghe thử',
+}: {
+  text: string;
+  voice?: string;
+  testId: string;
+  label?: string;
+}) {
   const [on, setOn] = useState(false);
   if (!text) return null;
   const q = new URLSearchParams({ text: text.slice(0, 300) });
   if (voice) q.set('voice', voice);
   return on ? (
     // eslint-disable-next-line jsx-a11y/media-has-caption
-    <audio data-testid={`${testId}-audio`} src={`/api/studio/tts-sample?${q}`} controls autoPlay className="h-7" />
+    <audio data-testid={`${testId}-audio`} src={`/api/studio/tts-sample?${q}`} controls autoPlay className="h-7 align-middle" />
   ) : (
     <button type="button" data-testid={testId} onClick={() => setOn(true)} className={ACT}>
-      ▷ nghe thử
+      ▷ {label}
     </button>
   );
 }
@@ -673,10 +761,12 @@ function SceneBoard({
   selection,
   editing,
   showOriginal,
+  voiceId,
   onToggle,
   onEdit,
   setEditing,
   setShowOriginal,
+  onEditPost,
   onHide,
 }: {
   scenes: Scene[];
@@ -685,10 +775,13 @@ function SceneBoard({
   selection: Selection;
   editing: string | null;
   showOriginal: string | null;
+  voiceId?: string;
   onToggle: (id: string) => void;
   onEdit: (id: string, text: string) => void;
   setEditing: (v: string | null) => void;
   setShowOriginal: (v: string | null) => void;
+  /** A post scene's words come from the draft, so editing one means going there. */
+  onEditPost: () => void;
   onHide: (v: boolean) => void;
 }) {
   return (
@@ -741,12 +834,17 @@ function SceneBoard({
                   >
                     sửa
                   </button>
+                  {/* Nghe thoại — this scene's own line, in the voice that will read it. */}
+                  <Listen text={s.text} voice={voiceId} testId={`hear-${s.commentId}`} label="Nghe thoại" />
                 </>
               )}
               {s.kind === 'post' && (
-                <a href="#draft-editor" data-testid={`edit-post-${s.n}`} className={ACT}>
-                  sửa
-                </a>
+                <>
+                  <button type="button" data-testid={`edit-post-${s.n}`} onClick={onEditPost} className={ACT}>
+                    sửa
+                  </button>
+                  <Listen text={s.text} voice={voiceId} testId={`hear-post-${s.n}`} label="Nghe thoại" />
+                </>
               )}
             </span>
           </li>

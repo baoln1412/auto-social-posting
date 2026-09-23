@@ -12,6 +12,12 @@ const { createRun, advance } = await import('@/lib/studio/runs');
 const { listLibrary, groupByDay, matches } = await import('@/lib/studio/library');
 const { QUOTA, quotaOf, safeName } = await import('@/lib/studio/assets');
 
+/** Run every step of a demo run. The rail's length is the rail's business, not a number. */
+async function walk(id: string): Promise<void> {
+  const { ALL_STEPS } = await import('@/lib/studio/steps/types');
+  for (let i = 0; i < ALL_STEPS.length; i++) await advance(id);
+}
+
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 beforeEach(() => {
   resetStudioDbForTests();
@@ -75,7 +81,7 @@ describe('groupByDay()', () => {
 describe('listLibrary()', () => {
   it('records an asset row for every artefact a run produced', async () => {
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    for (let i = 0; i < 4; i++) await advance(id);
+    await walk(id);
 
     const kinds = studioDb()
       .prepare('SELECT kind FROM studio_assets WHERE run_id=? ORDER BY kind')
@@ -86,7 +92,7 @@ describe('listLibrary()', () => {
 
   it('lists the run with its assets and the source it came from', async () => {
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    for (let i = 0; i < 4; i++) await advance(id);
+    await walk(id);
 
     const rows = listLibrary();
     expect(rows).toHaveLength(1);
@@ -98,7 +104,7 @@ describe('listLibrary()', () => {
 
   it('re-running a step replaces its asset instead of stacking a second one', async () => {
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    for (let i = 0; i < 4; i++) await advance(id);
+    await walk(id);
     await advance(id, { step: 'image' });
     expect(
       studioDb().prepare('SELECT COUNT(*) c FROM studio_assets WHERE run_id=? AND kind=?').get(id, 'png'),
@@ -109,13 +115,13 @@ describe('listLibrary()', () => {
 describe('listLibrary() channel filtering', () => {
   it('keeps the runs whose channel is in the allowed set', async () => {
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    for (let i = 0; i < 4; i++) await advance(id);
+    await walk(id);
     expect(listLibrary({ channelIds: new Set([DEMO_CHANNEL_ID]) })).toHaveLength(1);
   });
 
   it('drops the runs whose channel is not', async () => {
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    for (let i = 0; i < 4; i++) await advance(id);
+    await walk(id);
     expect(listLibrary({ channelIds: new Set(['someone-else']) })).toHaveLength(0);
   });
 

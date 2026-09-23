@@ -93,7 +93,9 @@ test('a run on a real gold channel fetches the item it was pointed at', async ({
 
   await page.goto(`/studio/runs/${runId}`);
   await page.getByTestId('continue-fetch').click();
-  await expect(page.getByTestId('step-fetch')).toHaveAttribute('data-state', 'done');
+  // One screen per step: the rail carries the state, and the screen itself is one click back.
+  await expect(page.getByTestId('rail-fetch')).toHaveAttribute('data-state', 'done');
+  await page.getByTestId('rail-fetch').click();
   await expect(page.getByTestId('step-fetch')).toContainText(target.title);
   await page.screenshot({ path: 'tests/shots/16-run-real-gold.png', fullPage: true });
 });

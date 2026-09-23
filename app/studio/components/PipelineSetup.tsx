@@ -16,8 +16,9 @@
  * to drift. Studio's own half — ordering, output shape, which kit — is what studio_pipelines
  * holds.
  *
- * S13 turns the run page into step screens; when it does, this rail and that one should
- * become one component. They are deliberately the same shape already.
+ * The rail is the same StepRail the run page uses: both flows are one idea — where am I,
+ * what is behind me, what is ahead — and two copies of it would drift the first time either
+ * grew a state.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { TOPICS } from '@/app/lib/topics';
@@ -25,6 +26,7 @@ import { FORMATS, LENGTH_BANDS, TITLE_STYLES, outputPrompt } from '@/lib/studio/
 import type { PipelineConfig } from '@/lib/studio/pipeline/config';
 import { upsertBlock } from '@/lib/studio/pipeline/prompt';
 import { detectSource, SOURCE_LABELS } from '@/lib/studio/sources/detect';
+import { StepRail } from './StepRail';
 import type { SourceKind } from '@/lib/studio/sources';
 
 export interface Feed {
@@ -139,27 +141,15 @@ export function PipelineSetup({
 
   return (
     <div className="flex flex-col gap-4">
-      <ol data-testid="pipeline-rail" className="flex flex-wrap gap-1.5">
-        {STEPS.map((s, i) => (
-          <li key={s}>
-            <button
-              type="button"
-              data-testid={`prail-${i}`}
-              data-state={i === step ? 'current' : i < step ? 'done' : 'future'}
-              onClick={() => setStep(i)}
-              className={`${BTN} ${
-                i === step
-                  ? 'bg-primary text-primary-foreground'
-                  : i < step
-                    ? 'bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]'
-                    : 'bg-secondary text-muted-foreground'
-              }`}
-            >
-              {i + 1}. {s}
-            </button>
-          </li>
-        ))}
-      </ol>
+      <StepRail
+        testId="prail"
+        items={STEPS.map((label, i) => ({
+          id: String(i),
+          label,
+          state: i === step ? 'current' : i < step ? 'done' : 'future',
+        }))}
+        onGo={(_id, i) => setStep(i)}
+      />
 
       {err && (
         <p data-testid="pipeline-error" className="text-sm text-[hsl(var(--destructive))]">

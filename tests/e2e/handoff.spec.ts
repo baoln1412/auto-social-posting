@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { dismissTour } from './fixtures';
 
 test.setTimeout(180_000);
 
@@ -21,11 +22,13 @@ test('a post card opens in Studio, and the old Tạo Video modal still works', a
   expect(href).toMatch(/^\/studio\/runs\/new\?item=gold:[^&]+&market=/);
   await link.click();
   await page.waitForURL(/\/studio\/runs\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+  await dismissTour(page);
 
   // It is a real run on a real channel, ready at its first step.
   await expect(page.getByTestId('step-fetch')).toHaveAttribute('data-state', 'current');
   await page.getByTestId('continue-fetch').click();
-  await expect(page.getByTestId('step-fetch')).toHaveAttribute('data-state', 'done');
+  await expect(page.getByTestId('rail-fetch')).toHaveAttribute('data-state', 'done');
+  await page.getByTestId('rail-fetch').click();
 
   // …and it fetched the post the link named, not merely the newest one.
   const goldId = decodeURIComponent(href!.split('item=gold:')[1].split('&')[0]);

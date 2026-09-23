@@ -85,6 +85,10 @@ export interface Overrides {
   outro?: string;
   /** A media id from Kho tài nguyên, played at each scene change. */
   sfx?: string;
+  /** Where the finished run goes. The library is always one of them. */
+  publishTo?: ('library' | 'telegram')[];
+  /** Recorded only — this repo has no scheduler, and the screen says so. */
+  publishAt?: string;
   style?: string;
   /** Demo channels only: force a step to fail, or a gate to find something. Nothing else reads it. */
   demo?: { boom?: StepName; gateFail?: boolean; cost?: number };
@@ -139,9 +143,10 @@ export interface Comment {
  * reference's `Đọc bài · Viết lời đọc · Lồng tiếng · Video dọc` chips, which are that
  * product's step rail — what will happen to the link — and not four kinds of video.
  *
- * `publish` is not on it yet: it records intent only and gets its screen in a later slice.
+ * `publish` is the last screen and always on the rail: a run is not finished when the file
+ * exists, it is finished when the owner has said where it goes.
  */
-export const ALL_STEPS: StepName[] = ['fetch', 'draft', 'image', 'reel'];
+export const ALL_STEPS: StepName[] = ['fetch', 'draft', 'image', 'reel', 'publish'];
 
 /**
  * The steps this run actually needs: the rail, narrowed by what the channel is for.
@@ -175,10 +180,10 @@ export function makesOf(sourceJson: string | null | undefined): string[] {
 }
 
 export const STEP_LABELS: Record<StepName, string> = {
-  fetch: 'Lấy nguồn',
+  fetch: 'Đọc bài',
   draft: 'Viết bài',
-  image: 'Ảnh thẻ',
-  reel: 'Dựng video',
+  image: 'Ảnh',
+  reel: 'Video',
   publish: 'Đăng',
 };
 

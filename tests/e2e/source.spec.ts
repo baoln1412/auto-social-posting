@@ -66,7 +66,8 @@ test('a paragraph typed on a gold channel becomes the item, not the first gold r
   await expect(page.getByTestId('preview-items')).toContainText('Một người Việt ở Texas');
 
   await page.getByTestId('continue-fetch').click();
-  await expect(page.getByTestId('step-fetch')).toHaveAttribute('data-state', 'done');
+  await expect(page.getByTestId('rail-fetch')).toHaveAttribute('data-state', 'done');
+  await page.getByTestId('rail-fetch').click();
   await expect(page.getByTestId('step-fetch')).toContainText('Một người Việt ở Texas');
   await page.screenshot({ path: 'tests/shots/81-paste-wins.png', fullPage: true });
 });
@@ -99,6 +100,6 @@ test('a long paste is kept beside the run, not stuffed into the ref', async ({ p
 
   // The ref stays a short text:<sha>; the words live in their own row. saveRunText was
   // written in slice 1 and never called, so item_ref used to hold the whole article.
-  await expect(page.getByTestId('cost-fetch')).toContainText(/text:[0-9a-f]{12}/);
+  await expect(page.getByTestId('item-ref')).toContainText(/text:[0-9a-f]{12}/);
   await expect(page.getByTestId('preview-items')).toContainText('Đoạn mở đầu của bài dài.');
 });

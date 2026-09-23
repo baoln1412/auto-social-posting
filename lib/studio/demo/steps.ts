@@ -155,9 +155,35 @@ const reelStep: Step<Draft, ReelAsset> = {
   },
 };
 
+/** The demo tier publishes to the library and nowhere else — it is not allowed to deliver. */
+const publishStep: Step<Draft, { library: boolean; telegram: string; at: string }> = {
+  name: 'publish',
+  from: 'draft',
+  async preview(draft, _ctx) {
+    return {
+      kind: 'text',
+      data: {
+        title: draft?.title ?? '',
+        text: draft?.text ?? '',
+        assets: [{ kind: 'mp4', url: DEMO_MP4_URL }],
+        destinations: [
+          { id: 'library', label: 'Thư viện', blocked: null },
+          { id: 'telegram', label: 'Telegram', blocked: 'Chế độ xem thử không gửi đi đâu cả.' },
+        ],
+      },
+      cost: FREE,
+    };
+  },
+  async run(_draft, ctx) {
+    boomIfAsked('publish', ctx);
+    return { library: true, telegram: 'off', at: new Date().toISOString() };
+  },
+};
+
 export const DEMO_STEPS: Partial<Record<StepName, Step>> = {
   fetch: fetchStep,
   draft: draftStep,
   image: imageStep,
   reel: reelStep,
+  publish: publishStep,
 };
