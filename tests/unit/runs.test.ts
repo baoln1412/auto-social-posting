@@ -285,3 +285,66 @@ describe('a post-only channel', () => {
     ).toEqual({ c: 0 });
   });
 });
+
+describe('the preview contract', () => {
+  it('books exactly what the preview quoted — one function, one number', async () => {
+    const { previewStep } = await import('@/lib/studio/runs');
+    // A demo cost the fixture states, so this is not a test that 0 === 0.
+    const id = demoRun({ demo: { cost: 0.42 } });
+    const quoted = (await previewStep(getRun(id)!, 'fetch')).cost.usd;
+    await advance(id);
+    expect(getRun(id)!.steps.fetch!.cost.usd).toBe(quoted);
+    expect(quoted).toBe(0.42);
+  });
+
+  it('previews with the options the screen is holding, without saving them', async () => {
+    const { previewStep } = await import('@/lib/studio/runs');
+    const id = demoRun();
+    await advance(id); // fetch
+    await advance(id); // draft
+    const before = getRun(id)!;
+    const a = await previewStep(before, 'reel', { captions: { preset: 'dam' } });
+    const b = await previewStep(before, 'reel', { captions: { preset: 'karaoke' } });
+    expect((a.data as any).firstFrameUrl).not.toBe((b.data as any).firstFrameUrl);
+    // Nothing was written: a preview is a question, not a decision.
+    expect(getRun(id)!.run.options.reel).toBeUndefined();
+  });
+
+  it('marks a finished step stale once its options move', async () => {
+    const { isStale, saveOptions } = await import('@/lib/studio/runs');
+    const id = demoRun();
+    await advance(id);
+    expect(isStale(getRun(id)!, 'fetch')).toBe(false);
+    saveOptions(id, 'fetch', { captions: { size: 120 } });
+    expect(isStale(getRun(id)!, 'fetch')).toBe(true);
+  });
+
+  it('walks the whole rail on its own when review is off', async () => {
+    // auto_continue has been a column since slice 0 with nothing reading it, so every
+    // channel stopped at every step however it was configured.
+    const id = demoRun({ reviewBeforeRender: false });
+    await advance(id);
+    expect(getRun(id)!.run.status).toBe('done');
+    expect(Object.keys(getRun(id)!.steps).sort()).toEqual(['draft', 'fetch', 'image', 'reel']);
+  });
+
+  it('an auto-walk is still not a way round the money guard', async () => {
+    const id = demoRun({ reviewBeforeRender: false, demo: { cost: 0.5 } });
+    await advance(id, { allowSpend: false });
+    const r = getRun(id)!;
+    expect(r.run.status).toBe('error');
+    expect(r.steps.fetch!.error).toMatch(/không được phép chi/);
+  });
+
+  it('stops at every step when review is on, whatever the channel says', async () => {
+    studioDb().prepare('UPDATE studio_channels SET auto_continue=1 WHERE id=?').run(DEMO_CHANNEL_ID);
+    try {
+      const id = demoRun({ reviewBeforeRender: true });
+      await advance(id);
+      expect(getRun(id)!.run.current_step).toBe('draft');
+      expect(getRun(id)!.run.status).toBe('running');
+    } finally {
+      studioDb().prepare('UPDATE studio_channels SET auto_continue=0 WHERE id=?').run(DEMO_CHANNEL_ID);
+    }
+  });
+});

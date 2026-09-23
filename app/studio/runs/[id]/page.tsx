@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation';
 import { studioDb } from '@/lib/studio/db';
-import { declaresGate, getRun, previewStep } from '@/lib/studio/runs';
+import { declaresGate, getRun, isStale, previewStep } from '@/lib/studio/runs';
 import { can, tier } from '@/lib/studio/tier';
 import { sourceFor } from '@/lib/studio/steps/fetch';
+import { captionStyle, voiceId } from '@/lib/studio/kits/load';
+import { effectiveKit } from '@/lib/studio/steps/types';
 import type { SourceItem, StepName } from '@/lib/studio/steps/types';
 import { RunView, type StepView } from '../../components/RunView';
 import runTour from '@/lib/studio/tours/run.json';
@@ -23,7 +25,16 @@ export default async function RunPage({ params }: { params: { id: string } }) {
   for (const name of rec.template) {
     gateDeclared[name] = declaresGate(rec, name);
     const s = rec.steps[name];
-    if (s) steps[name] = { status: s.status, output: s.output, cost: s.cost, gate: s.gate, error: s.error };
+    if (s) {
+      steps[name] = {
+        status: s.status,
+        output: s.output,
+        cost: s.cost,
+        gate: s.gate,
+        error: s.error,
+        stale: isStale(rec, name),
+      };
+    }
   }
 
   const kits = studioDb().prepare('SELECT id, name FROM studio_kits ORDER BY name').all() as {
@@ -43,10 +54,13 @@ export default async function RunPage({ params }: { params: { id: string } }) {
       steps={steps}
       gateDeclared={gateDeclared}
       preview={preview}
+      options={rec.run.options}
       item={(rec.steps.fetch?.output as SourceItem | undefined) ?? null}
       itemRef={rec.run.item_ref}
       channelName={rec.channel.name}
       kitName={rec.kit.name}
+      voiceId={voiceId(rec.kit)}
+      captionDefaults={captionStyle(effectiveKit(rec.kit, rec.run.overrides))}
       kits={kits}
       overrides={rec.run.overrides}
       selection={rec.run.selection}

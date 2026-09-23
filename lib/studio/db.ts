@@ -69,6 +69,15 @@ export function ensureStudioTables(d: Database.Database): void {
       updated_at     TEXT DEFAULT ${NOW}
     );
 
+    -- Anything expensive that is a pure function of its inputs: a draft rewrite, a voice
+    -- sample. Keyed by a hash of those inputs, so a preview that changes nothing relevant
+    -- re-uses the answer instead of re-buying it.
+    CREATE TABLE IF NOT EXISTS studio_cache (
+      key        TEXT PRIMARY KEY,
+      value      TEXT,
+      created_at TEXT DEFAULT ${NOW}
+    );
+
     CREATE TABLE IF NOT EXISTS studio_media (
       id         TEXT PRIMARY KEY,
       kind       TEXT,
@@ -118,6 +127,12 @@ export function ensureStudioTables(d: Database.Database): void {
   // machine from slice 0.
   ensureColumn(d, 'studio_channels', 'makes_json', `TEXT DEFAULT '["post","reel"]'`);
   ensureColumn(d, 'studio_assets', 'bytes', 'INTEGER');
+  // The controls each step was last previewed with, keyed by step name. Read back on page
+  // load so a screen returns with the knobs where they were left.
+  ensureColumn(d, 'studio_runs', 'options_json', `TEXT DEFAULT '{}'`);
+  // Which options the stored result was produced from. A step whose hash no longer matches
+  // the current options is shown as out of date instead of passing for fresh.
+  ensureColumn(d, 'studio_steps', 'preview_hash', 'TEXT');
 }
 
 function ensureColumn(d: Database.Database, table: string, name: string, def: string): void {

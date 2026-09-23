@@ -8,7 +8,8 @@
  */
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { cardParams, cardPath } from '@/lib/studio/kits/load';
+import { cardParams, cardPath, captionStyle } from '@/lib/studio/kits/load';
+import { frameUrl } from '@/lib/studio/frame-url';
 import { contrastRatio, paletteFor, type ThemeName } from '@/lib/studio/card/theme';
 import type { Kit } from '@/lib/studio/steps/types';
 
@@ -32,6 +33,10 @@ export interface TabSpec {
 const SAMPLE = {
   title: 'MỸ: CỤ BÀ 82 TUỔI Ở POMONA BỊ LỪA MẤT 2.500 ĐÔ VÌ CHIÊU VÉ SỐ TRÚNG THƯỞNG',
 };
+/** One line of narration, so the caption band has something of the right shape to draw. */
+const SAMPLE_CUE = 'CỤ BÀ 82 TUỔI BỊ LỪA MẤT 2.500 ĐÔ';
+/** Tabs whose change is only visible on a whole frame, not on the card alone. */
+const FRAME_TABS = new Set(['captions', 'frame', 'stickers', 'signature', 'voice']);
 
 /** One line per tab, so the strip says what each tab is currently set to. */
 function summarise(tab: TabSpec, values: Record<string, unknown>): string {
@@ -63,7 +68,18 @@ export function KitEditor({ kit: initial, tabs }: { kit: Kit; tabs: TabSpec[] })
 
   const tab = tabs.find((t) => t.key === active)!;
   const values = (kit[active] ?? {}) as Record<string, unknown>;
-  const src = useMemo(() => `${cardPath(kit)}?${cardParams(kit, SAMPLE)}`, [kit]);
+  /**
+   * The canvas is the real thing, not a schema form: the card for the card tabs, and the
+   * composed reel frame — the same one the run page shows — for the tabs whose effect is
+   * only visible with a caption band and a sticker on it.
+   */
+  const src = useMemo(
+    () =>
+      FRAME_TABS.has(active)
+        ? frameUrl({ text: SAMPLE_CUE, style: captionStyle(kit) })
+        : `${cardPath(kit)}?${cardParams(kit, SAMPLE)}`,
+    [kit, active],
+  );
 
   const patch = (next: Record<string, unknown>) => {
     setKit((k) => ({ ...k, [active]: { ...((k[active] ?? {}) as object), ...next } }));

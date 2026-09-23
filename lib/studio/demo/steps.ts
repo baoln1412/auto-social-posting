@@ -9,8 +9,11 @@
 import type { GateResult, RunCtx, SourceItem, Step, StepName } from '../steps/types';
 import { join } from 'node:path';
 import { scenesFor } from '../scenes';
+import { frameUrl } from '../frame-url';
+import { captionStyle } from '../kits/load';
 
 export const DEMO_CARD_URL = '/studio-demo/card.png';
+export const DEMO_CARD_PATH = join(process.cwd(), 'public', 'studio-demo', 'card.png');
 export const DEMO_MP4_URL = '/studio-demo/demo.mp4';
 
 const FREE = { usd: 0, note: 'dữ liệu mẫu — không tốn phí' };
@@ -122,11 +125,21 @@ const reelStep: Step<Draft, ReelAsset> = {
   from: 'draft',
   async preview(draft, ctx) {
     const item = (ctx.outputs.fetch as SourceItem | undefined) ?? DEMO_ITEM;
+    const scenes = scenesFor(draft.text, item.comments, ctx.selection);
+    const i = Math.max(0, Math.min(Number(ctx.overrides.sceneIndex ?? 0) || 0, scenes.length - 1));
     return {
       kind: 'scenes',
       data: {
-        scenes: scenesFor(draft.text, item.comments, ctx.selection),
-        firstFrameUrl: DEMO_CARD_URL,
+        scenes,
+        sceneIndex: i,
+        // Composed, not a fixed picture: the demo tier is what a stranger judges Studio on,
+        // and a still PNG where the real thing redraws would be showing them something else.
+        // Drawing a frame is local and free, so the "spends nothing" promise is kept.
+        firstFrameUrl: frameUrl({
+          text: scenes[i]?.text ?? draft.title,
+          style: captionStyle(ctx.kit),
+          plate: DEMO_CARD_PATH,
+        }),
       },
       cost: FREE,
     };

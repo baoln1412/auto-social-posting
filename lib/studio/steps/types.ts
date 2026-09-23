@@ -85,6 +85,18 @@ export interface Overrides {
   [tab: string]: unknown;
 }
 
+/**
+ * The controls a step is being previewed with — the kit, the run's drawer, and whatever the
+ * screen is holding unsaved.
+ *
+ * Overrides-shaped on purpose, and merged over the run's own overrides for the length of one
+ * preview call, never written back. That is what lets `advance` book its price from the same
+ * `preview()` the screen just drew: one function, one set of options, so the number shown and
+ * the number charged cannot drift apart. A separate third argument would have been a second
+ * channel for the same thing.
+ */
+export type StepOptions = Partial<Overrides>;
+
 export interface Selection {
   /** Comment ids promoted to scenes, in scene order. */
   commentIds: string[];
@@ -181,9 +193,18 @@ export function canContinue(
   return step.gate.findings.length === 0;
 }
 
-/** auto_continue skips the button only where the preview costs nothing. Spending always stops. */
-export function shouldAutoContinue(channel: Channel, cost: Money): boolean {
-  return channel.auto_continue === 1 && cost.usd === 0;
+/**
+ * May the run walk past this step on its own?
+ *
+ * Spending always stops, whatever anything else says — that is the promise the whole preview
+ * contract rests on. Otherwise the per-run drawer's `Duyệt trước khi dựng` wins where it was
+ * set, and the channel's standing `auto_continue` decides where it was not.
+ */
+export function shouldAutoContinue(channel: Channel, cost: Money, ov: Overrides = {}): boolean {
+  if (cost.usd !== 0) return false;
+  if (ov.reviewBeforeRender === false) return true;
+  if (ov.reviewBeforeRender === true) return false;
+  return channel.auto_continue === 1;
 }
 
 /** Kit + this run's drawer, one tab deep. Returns a copy; the kit argument is not touched. */

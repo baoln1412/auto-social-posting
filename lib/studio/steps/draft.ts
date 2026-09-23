@@ -6,6 +6,8 @@
  * it worse. Every other source goes through lib/studio/gold.ts.
  */
 import { query } from '@/app/lib/db';
+import { cached } from '../cache';
+import { hashOf } from '../hash';
 import { checkCompliance } from '../gates/compliance';
 import { draftAvailable, draftCost, generateDraft, type Draft, type PostTab } from '../gold';
 import type { RunCtx, SourceItem, Step } from './types';
@@ -58,10 +60,12 @@ export const draftStep: Step<SourceItem, Draft> = {
 
   async run(item, ctx: RunCtx) {
     if (isGold(item)) return passThrough(item);
-    return generateDraft(
-      item,
-      await marketContext(ctx.channel.market_id),
-      (ctx.kit.post ?? {}) as PostTab,
+    const post = (ctx.kit.post ?? {}) as PostTab;
+    // Keyed by everything the prompt is built from, so re-running this step after changing
+    // a card colour re-uses the rewrite instead of buying it again. A control that does not
+    // touch the prompt does not touch the key.
+    return cached(hashOf('draft', item.id, item.text, post, ctx.channel.market_id), async () =>
+      generateDraft(item, await marketContext(ctx.channel.market_id), post),
     );
   },
 

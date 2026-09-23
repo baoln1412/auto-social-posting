@@ -77,3 +77,6 @@ public/studio-runs/
 
 # The Playwright MCP browser profile — a tool cache, not a repo artefact.
 .playwright-mcp/
+
+# Preview caches: frames and voice samples, rebuildable from their inputs.
+data/studio-cache/

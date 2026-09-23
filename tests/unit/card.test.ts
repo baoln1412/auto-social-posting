@@ -12,6 +12,7 @@ import {
 } from '@/lib/studio/card/theme';
 import { contrastRatio } from '@/lib/studio/gates/layout';
 import fs from 'node:fs';
+import path from 'node:path';
 
 const NAMES = Object.keys(THEMES) as ThemeName[];
 
@@ -110,5 +111,37 @@ describe('distinguishable()', () => {
 
   it('accepts a pair that differs in brightness alone', () => {
     expect(distinguishable('#000000', '#BBBBBB', contrastRatio)).toBe(true);
+  });
+});
+
+describe('the card preview redraws when a card control moves', () => {
+  it('names the preview file after the parameters that drew it', async () => {
+    process.env.STUDIO_ENABLED = '1';
+    const { imageStep } = await import('@/lib/studio/steps/image');
+    const draft = { title: 'MỸ: MỘT TIN', text: 'Nội dung.', hashtags: [], comments: [] };
+    const ctx = (card: Record<string, unknown>) =>
+      ({
+        runId: 'r1',
+        channel: {} as never,
+        kit: { id: 'k', name: 'k', card: { engine: 'studio', ...card } },
+        tier: 'owner',
+        overrides: {},
+        selection: { commentIds: [], hideUnselected: false },
+        outputs: {},
+      }) as never;
+
+    // v1 cached one filename per run, so a theme change redrew nothing at all — the picture
+    // on screen stayed the first one rendered for the whole life of the run.
+    const a = (await imageStep.preview(draft, ctx({ theme: 'sang' }))).data as { url: string };
+    const b = (await imageStep.preview(draft, ctx({ theme: 'toi' }))).data as { url: string };
+    expect(a.url).not.toBe(b.url);
+    const again = (await imageStep.preview(draft, ctx({ theme: 'sang' }))).data as { url: string };
+    expect(again.url).toBe(a.url);
+
+    // And only one survives: a slider dragged across a colour wheel is a file per pixel.
+    const dir = path.join(process.cwd(), 'public', 'studio-runs');
+    const left = fs.readdirSync(dir).filter((f) => f.startsWith('r1-card-'));
+    expect(left).toHaveLength(1);
+    for (const f of left) fs.rmSync(path.join(dir, f), { force: true });
   });
 });

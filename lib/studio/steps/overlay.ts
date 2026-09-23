@@ -20,13 +20,22 @@ export type Where = 'cover' | 'intro' | 'reactions';
 export const INTRO_SEC = 3;
 
 /**
- * Bottom-right, clear of the caption band. Pure, so the filter can be asserted without
- * spending a render to find out ffmpeg rejected it.
+ * Bottom-right, clear of the caption band. One definition: the MP4 pass builds an ffmpeg
+ * filter from it and the still preview composites at the same point, so the frame the owner
+ * picked a sticker on is where the sticker lands.
+ */
+export const STICKER_INSET = { right: 40, bottom: 320 };
+
+const AT = `W-w-${STICKER_INSET.right}:H-h-${STICKER_INSET.bottom}`;
+
+/**
+ * Pure, so the filter can be asserted without spending a render to find out ffmpeg
+ * rejected it.
  */
 export function overlayFilter(where: Where[]): string | null {
-  if (where.includes('cover')) return '[0][1]overlay=W-w-40:H-h-320';
+  if (where.includes('cover')) return `[0][1]overlay=${AT}`;
   if (where.includes('intro')) {
-    return `[0][1]overlay=W-w-40:H-h-320:enable='between(t,0,${INTRO_SEC})'`;
+    return `[0][1]overlay=${AT}:enable='between(t,0,${INTRO_SEC})'`;
   }
   return null;
 }
@@ -53,14 +62,12 @@ export interface StickerTab {
 export async function applyStickers(mp4: string, kit: Kit): Promise<boolean> {
   const tab = (kit.stickers ?? {}) as StickerTab;
   const filter = overlayFilter(tab.where ?? []);
-  if (!filter || !tab.set) return false;
-
-  const sticker = mediaById(tab.set);
-  if (!sticker || !fs.existsSync(sticker.path)) return false;
+  const sticker = stickerPath(kit);
+  if (!filter || !sticker) return false;
 
   const out = `${mp4}.stickered.mp4`;
   try {
-    await run('/opt/homebrew/bin/ffmpeg', overlayArgs(mp4, sticker.path, out, filter), {
+    await run('/opt/homebrew/bin/ffmpeg', overlayArgs(mp4, sticker, out, filter), {
       env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH ?? ''}` },
       maxBuffer: 8 * 1024 * 1024,
     });
@@ -72,6 +79,14 @@ export async function applyStickers(mp4: string, kit: Kit): Promise<boolean> {
     fs.rmSync(out, { force: true });
     return false;
   }
+}
+
+/** The sticker PNG this kit composites, or null. Shared by the MP4 pass and the preview. */
+export function stickerPath(kit: Kit): string | null {
+  const tab = (kit.stickers ?? {}) as StickerTab;
+  if (!overlayFilter(tab.where ?? []) || !tab.set) return null;
+  const row = mediaById(tab.set);
+  return row && fs.existsSync(row.path) ? row.path : null;
 }
 
 /** The owner's uploaded background, as media make-reel.py can fetch. */

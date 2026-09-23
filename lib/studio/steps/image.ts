@@ -14,6 +14,7 @@ import { GET as renderStudio } from '@/app/api/studio/card/route';
 import { layoutFindings, measureCard } from '../gates/layout';
 import { cardParams, cardEngine, cardPath } from '../kits/load';
 import { paletteFor } from '../card/theme';
+import { hashOf } from '../hash';
 import type { Draft } from '../gold';
 import type { RunCtx, SourceItem, Step } from './types';
 
@@ -34,6 +35,28 @@ function cardUrl(draft: Draft, ctx: RunCtx): string {
   return `http://127.0.0.1${cardPath(ctx.kit)}?${cardParams(ctx.kit, draft, item?.url)}`;
 }
 
+/**
+ * Preview cards are named by a hash of the parameters that drew them, so changing any card
+ * control changes the <img> src and the browser fetches a different picture. v1 reused one
+ * filename per run and cached it on disk — a theme change redrew nothing at all.
+ */
+function previewFile(draft: Draft, ctx: RunCtx): string {
+  return `${ctx.runId}-card-${hashOf(cardPath(ctx.kit), cardUrl(draft, ctx))}.png`;
+}
+
+/** Keep one preview card per run: the knobs move a lot and each move is a file. */
+function sweepPreviews(ctx: RunCtx, keep: string): void {
+  try {
+    for (const f of fs.readdirSync(OUT_DIR)) {
+      if (f.startsWith(`${ctx.runId}-card-`) && f !== keep) {
+        fs.rmSync(path.join(OUT_DIR, f), { force: true });
+      }
+    }
+  } catch {
+    /* a preview that cannot be swept is still a preview */
+  }
+}
+
 async function renderTo(file: string, draft: Draft, ctx: RunCtx): Promise<string> {
   const render = cardEngine(ctx.kit) === 'studio' ? renderStudio : renderClassic;
   const res = await render(new NextRequest(cardUrl(draft, ctx)));
@@ -52,10 +75,11 @@ export const imageStep: Step<Draft, CardAsset> = {
     if (!draft?.title) throw new Error('Chưa có bài để dựng ảnh.');
     // The preview IS the card. Satori composition is local, so showing the real thing costs
     // the same as describing one — and a preview of a card is a card.
-    // ponytail: rendered once and left on disk, so a page reload does not re-render. run()
-    // always re-renders, which is what makes an edited draft show up.
-    const file = `${ctx.runId}-card.png`;
-    if (!fs.existsSync(path.join(OUT_DIR, file))) await renderTo(file, draft, ctx);
+    const file = previewFile(draft, ctx);
+    if (!fs.existsSync(path.join(OUT_DIR, file))) {
+      await renderTo(file, draft, ctx);
+      sweepPreviews(ctx, file);
+    }
     return {
       kind: 'png',
       data: { url: `/studio-runs/${file}` },

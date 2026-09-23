@@ -14,7 +14,8 @@ import { STEP_ORDER } from '@/app/lib/videoSteps';
 import { scenesFor } from '../scenes';
 import { setRunJob } from '../progress';
 import { captionStyle, effectiveFrame, voiceId } from '../kits/load';
-import { applyStickers, backgroundMedia } from './overlay';
+import { applyStickers, backgroundMedia, stickerPath } from './overlay';
+import { frameUrl } from '../frame';
 import { budgetFindings, probeDuration, type BudgetKit, type DurationBand } from '../gates/budget';
 import type { Draft } from '../gold';
 import type { CardAsset } from './image';
@@ -34,6 +35,15 @@ function narrationFor(draft: Draft, ctx: RunCtx): string {
   return scenesFor(draft.text, item?.comments ?? [], ctx.selection)
     .map((s) => s.text)
     .join('\n');
+}
+
+/** What this scene shows behind the caption: the card if it exists, else the background. */
+function plateFor(ctx: RunCtx): string | null {
+  const card = ctx.outputs.image as CardAsset | undefined;
+  if (card?.path) return card.path;
+  const bg = backgroundMedia(ctx.kit);
+  // A video background has no still to show; the neutral plate is the honest answer.
+  return bg && bg.kind === 'image' ? bg.url.replace(/^file:\/\//, '') : null;
 }
 
 function budgetKit(ctx: RunCtx): BudgetKit {
@@ -57,12 +67,23 @@ export const reelStep: Step<Draft, ReelAsset> = {
   async preview(draft, ctx) {
     if (!draft?.text) throw new Error('Chưa có lời đọc để dựng video.');
     const item = ctx.outputs.fetch as SourceItem | undefined;
-    const card = ctx.outputs.image as CardAsset | undefined;
+    const scenes = scenesFor(draft.text, item?.comments ?? [], ctx.selection);
+    const i = Math.max(0, Math.min(Number(ctx.overrides.sceneIndex ?? 0) || 0, scenes.length - 1));
     return {
       kind: 'scenes',
       data: {
-        scenes: scenesFor(draft.text, item?.comments ?? [], ctx.selection),
-        firstFrameUrl: card?.url ?? null,
+        scenes,
+        sceneIndex: i,
+        // Not the bare card: the frame as the reel will show it, caption band and sticker
+        // included, so choosing a preset is choosing something the owner can see. One
+        // composed still, never an ffmpeg pass over the whole reel — a preview that costs
+        // three minutes is a preview nobody waits for.
+        firstFrameUrl: frameUrl({
+          text: scenes[i]?.text ?? draft.title,
+          style: captionStyle(ctx.kit),
+          plate: plateFor(ctx),
+          sticker: stickerPath(ctx.kit),
+        }),
         steps: STEP_ORDER,
       },
       // make-reel.py is the measured $0 path: local edge-tts, local whisper, local ffmpeg.
@@ -73,7 +94,9 @@ export const reelStep: Step<Draft, ReelAsset> = {
   async run(draft, ctx) {
     const card = ctx.outputs.image as CardAsset | undefined;
     const frame = effectiveFrame(ctx.kit, ctx.overrides);
-    const style = { ...captionStyle(ctx.kit), ...(ctx.overrides.style ? { preset: ctx.overrides.style } : {}) };
+    // ctx.kit already carries the drawer (effectiveKit in ctxFor), so the style the frame
+    // preview drew and the style the renderer is handed come from the same place.
+    const style = captionStyle(ctx.kit);
 
     // make-reel.py reads the voice from REEL_VOICE, not a flag, and startRenderJob passes
     // no per-job env. spawn() happens synchronously inside it, so set-call-restore in one

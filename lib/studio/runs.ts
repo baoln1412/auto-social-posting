@@ -15,7 +15,9 @@ import { studioDb } from './db';
 import { resolveStep } from './steps/registry';
 import {
   canContinue,
+  effectiveKit,
   makesOf,
+  shouldAutoContinue,
   templateFor,
   type Channel,
   type GateResult,
@@ -25,7 +27,9 @@ import {
   type RunCtx,
   type Selection,
   type StepName,
+  type StepOptions,
 } from './steps/types';
+import { hashOf } from './hash';
 import { tierOf } from './tier-of';
 import { deliverFailure, deliverReel } from './deliver';
 import { getSetting, setSetting } from './settings';
@@ -40,6 +44,8 @@ export interface StepRecord {
   cost: Money;
   gate: GateResult | null;
   error: string | null;
+  /** The options hash this result came from; compared with the live one to spot staleness. */
+  previewHash: string | null;
   started_at: string | null;
   finished_at: string | null;
 }
@@ -53,6 +59,8 @@ export interface RunRecord {
     current_step: StepName;
     overrides: Overrides;
     selection: Selection;
+    /** Per-step controls as last previewed, so a screen returns with its knobs in place. */
+    options: Partial<Record<StepName, StepOptions>>;
     created_at: string;
     updated_at: string;
   };
@@ -133,6 +141,7 @@ export function getRun(id: string): RunRecord | null {
       cost: { usd: s.cost_usd ?? 0, note: parse<{ note?: string }>(s.input_ref, {}).note ?? '' },
       gate: parse<GateResult | null>(s.gate_json, null),
       error: s.error ?? null,
+      previewHash: s.preview_hash ?? null,
       started_at: s.started_at,
       finished_at: s.finished_at,
     };
@@ -147,6 +156,7 @@ export function getRun(id: string): RunRecord | null {
       current_step: row.current_step,
       overrides,
       selection: parse<Selection>(row.selection_json, EMPTY_SELECTION),
+      options: parse<Partial<Record<StepName, StepOptions>>>(row.options_json, {}),
       created_at: row.created_at,
       updated_at: row.updated_at,
     },
@@ -157,21 +167,44 @@ export function getRun(id: string): RunRecord | null {
   };
 }
 
-/** Build the ctx a step sees. `outputs` carries what earlier steps produced this run. */
-function ctxFor(rec: RunRecord): RunCtx {
+/**
+ * Build the ctx a step sees. `outputs` carries what earlier steps produced this run, and
+ * `opts` is whatever the screen is holding unsaved — merged for this call only.
+ */
+function ctxFor(rec: RunRecord, opts: StepOptions = {}): RunCtx {
   const outputs: Partial<Record<StepName, unknown>> = {};
   for (const [name, s] of Object.entries(rec.steps)) {
     if (s && s.status === 'ok') outputs[name as StepName] = s.output;
   }
+  const overrides = { ...rec.run.overrides, ...opts };
   return {
     runId: rec.run.id,
     channel: rec.channel,
-    kit: rec.kit,
+    // The drawer reaches every step through the kit it hands them, rather than each step
+    // remembering to merge it. effectiveKit() was written in slice 2 and had no caller, so
+    // a caption chosen in the drawer never reached the renderer at all.
+    kit: effectiveKit(rec.kit, overrides),
     tier: tierOf(rec.channel),
-    overrides: rec.run.overrides,
+    overrides,
     selection: rec.run.selection,
     outputs,
   };
+}
+
+/** The options a step runs with: what was stored for it, plus anything passed in now. */
+export function optionsFor(rec: RunRecord, name: StepName, opts?: StepOptions): StepOptions {
+  return { ...(rec.run.options[name] ?? {}), ...(opts ?? {}) };
+}
+
+/** What the screen last previewed this step with, written by the preview route. */
+export function saveOptions(runId: string, name: StepName, opts: StepOptions): void {
+  const d = studioDb();
+  const row = d.prepare('SELECT options_json FROM studio_runs WHERE id=?').get(runId) as
+    | { options_json: string }
+    | undefined;
+  const all = parse<Record<string, StepOptions>>(row?.options_json, {});
+  all[name] = opts;
+  d.prepare('UPDATE studio_runs SET options_json=? WHERE id=?').run(JSON.stringify(all), runId);
 }
 
 /** A step's input is the output of the step it declares; the first step gets the item_ref. */
@@ -194,6 +227,8 @@ export async function advance(
     overrides?: Overrides;
     /** The owner's edit of the draft text, applied to the stored draft before the next step. */
     editDraft?: string;
+    /** The controls the screen is showing, saved before the step runs on them. */
+    options?: StepOptions;
     /** False for a tier that may not spend: a step whose preview costs money refuses to run. */
     allowSpend?: boolean;
   } = {},
@@ -218,6 +253,7 @@ export async function advance(
     if (!rec.template.includes(opts.step)) throw new Error(`"${opts.step}" không có trong chế độ này.`);
     d.prepare('UPDATE studio_runs SET current_step=? WHERE id=?').run(opts.step, id);
   }
+  if (opts.options) saveOptions(id, opts.step ?? rec.run.current_step, opts.options);
   if (opts.editDraft !== undefined && rec.steps.draft) {
     const edited = { ...(rec.steps.draft.output as object), text: opts.editDraft };
     d.prepare('UPDATE studio_steps SET output_ref=? WHERE id=?').run(
@@ -225,13 +261,17 @@ export async function advance(
       `${id}:draft`,
     );
   }
-  if (opts.selection || opts.overrides || opts.step || opts.editDraft !== undefined) {
+  if (opts.selection || opts.overrides || opts.step || opts.options || opts.editDraft !== undefined) {
     rec = getRun(id)!;
   }
 
   const name = rec.run.current_step;
   const step = resolveStep(name, rec.channel);
-  const ctx = ctxFor(rec);
+  // The same options the screen previewed with, so the price quoted and the price booked
+  // come from one call to one function.
+  const stepOpts = optionsFor(rec, name);
+  const previewHash = hashOf(stepOpts, rec.run.overrides, rec.run.selection);
+  const ctx = ctxFor(rec, stepOpts);
   const input = inputFor(rec, name, step);
 
   const startedAt = new Date().toISOString();
@@ -265,8 +305,9 @@ export async function advance(
   // run+step rather than accumulating a row per attempt.
   d.prepare(
     `INSERT OR REPLACE INTO studio_steps
-       (id, run_id, name, status, input_ref, output_ref, cost_usd, gate_json, error, started_at, finished_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+       (id, run_id, name, status, input_ref, output_ref, cost_usd, gate_json, error,
+        preview_hash, started_at, finished_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     `${id}:${name}`,
     id,
@@ -277,6 +318,7 @@ export async function advance(
     cost.usd,
     gate ? JSON.stringify(gate) : null,
     error,
+    previewHash,
     startedAt,
     new Date().toISOString(),
   );
@@ -323,6 +365,16 @@ export async function advance(
 
   const out = getRun(id)!;
   await notify(out, name, status, error);
+
+  // `Duyệt trước khi dựng` off: walk the rail without asking, and stop at the first step
+  // that would cost something. auto_continue has been a column since slice 0 with nothing
+  // reading it, so every channel stopped at every step however it was configured.
+  if (status === 'running') {
+    const nextCost = (await previewStep(out, out.run.current_step)).cost;
+    if (shouldAutoContinue(out.channel, nextCost, out.run.overrides)) {
+      return advance(id, { allowSpend: opts.allowSpend });
+    }
+  }
   return out;
 }
 
@@ -356,18 +408,32 @@ async function notify(
   await deliverReel(mp4.path, title, id);
 }
 
-/** The current step's preview — what the owner sees before anything is spent. */
-export async function previewStep(rec: RunRecord, name: StepName) {
+/**
+ * A step's preview — what the owner sees before anything is spent, with whatever the screen
+ * is currently holding. Never writes: the options are merged for this call only.
+ */
+export async function previewStep(rec: RunRecord, name: StepName, opts?: StepOptions) {
+  const merged = optionsFor(rec, name, opts);
+  const hash = hashOf(merged, rec.run.overrides, rec.run.selection);
   try {
     const step = resolveStep(name, rec.channel);
-    return await step.preview(inputFor(rec, name, step), ctxFor(rec));
+    const out = await step.preview(inputFor(rec, name, step), ctxFor(rec, merged));
+    return { ...out, hash };
   } catch (e) {
     return {
       kind: 'text' as const,
       data: { text: e instanceof Error ? e.message : String(e), error: true },
       cost: { usd: 0, note: '' },
+      hash,
     };
   }
+}
+
+/** True when a finished step's result no longer matches the options now on screen. */
+export function isStale(rec: RunRecord, name: StepName): boolean {
+  const s = rec.steps[name];
+  if (!s?.previewHash) return false;
+  return s.previewHash !== hashOf(optionsFor(rec, name), rec.run.overrides, rec.run.selection);
 }
 
 /** Does this step declare a gate? The run page needs it to apply the checked===0 rule. */

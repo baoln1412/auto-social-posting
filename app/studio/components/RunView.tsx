@@ -13,7 +13,9 @@
  */
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { PRESETS } from '@/app/lib/captionPresets';
 import { poolFor, scenesFor, type Scene } from '@/lib/studio/scenes';
+import { useStepPreview, type LivePreview } from './useStepPreview';
 import { estimateSeconds, mmss } from '@/lib/studio/estimate';
 import { STEP_LABELS as RENDER_LABELS, STEP_ORDER as RENDER_STEPS } from '@/app/lib/videoSteps';
 import {
@@ -25,6 +27,7 @@ import {
   type Selection,
   type SourceItem,
   type StepName,
+  type StepOptions,
   type StepPreview,
 } from '@/lib/studio/steps/types';
 import { OverrideDrawer, type KitOption } from './OverrideDrawer';
@@ -35,6 +38,8 @@ export interface StepView {
   cost: Money;
   gate: GateResult | null;
   error: string | null;
+  /** True when the stored result came from options that have since changed. */
+  stale?: boolean;
 }
 
 export interface RunViewProps {
@@ -46,11 +51,17 @@ export interface RunViewProps {
   template: StepName[];
   steps: Partial<Record<StepName, StepView>>;
   gateDeclared: Partial<Record<StepName, boolean>>;
-  preview: StepPreview | null;
+  preview: LivePreview | null;
+  /** Per-step controls as last previewed, so the screen returns with its knobs in place. */
+  options: Partial<Record<StepName, StepOptions>>;
   item: SourceItem | null;
   itemRef: string | null;
   channelName: string;
   kitName: string;
+  /** The kit's edge-tts voice, so a sample sounds like the reel will. */
+  voiceId?: string;
+  /** The kit's caption style, so the controls open showing what is actually set. */
+  captionDefaults: Record<string, unknown>;
   kits: KitOption[];
   overrides: Overrides;
   selection: Selection;
@@ -119,6 +130,17 @@ export function RunView(p: RunViewProps) {
   const [showOriginal, setShowOriginal] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [render, setRender] = useState<{ step?: string; pct?: number; done: string[] } | null>(null);
+  // The controls this step is being previewed with, live and unsaved until something runs.
+  const [opts, setOpts] = useState<StepOptions>(p.options[p.currentStep] ?? {});
+
+  // A step change brings its own stored controls; carrying the last step's over would show
+  // the Video step's caption size on the card step.
+  useEffect(() => {
+    setOpts(p.options[p.currentStep] ?? {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.currentStep]);
+
+  const live = useStepPreview(p.runId, p.currentStep, opts, p.preview);
 
   const draft = draftEdit ?? (p.steps.draft?.output?.text as string | undefined) ?? '';
 
@@ -148,7 +170,13 @@ export function RunView(p: RunViewProps) {
       const res = await fetch(`/api/studio/runs/${p.runId}/advance`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ selection, overrides, editDraft: draftEdit ?? undefined, ...body }),
+        body: JSON.stringify({
+          selection,
+          overrides,
+          options: opts,
+          editDraft: draftEdit ?? undefined,
+          ...body,
+        }),
       });
       if (!res.ok) setErr(((await res.json().catch(() => ({}))) as any).error ?? `HTTP ${res.status}`);
       router.refresh();
@@ -254,8 +282,16 @@ export function RunView(p: RunViewProps) {
                       data-testid={`cost-${name}`}
                       className="min-w-0 flex-1 truncate font-mono text-[11px] uppercase tracking-wider text-muted-foreground"
                     >
-                      {headline(name, s, isCurrent ? p.preview : null, scenes, p.itemRef, p.item?.title)}
+                      {headline(name, s, isCurrent ? live.preview : null, scenes, p.itemRef, p.item?.title)}
                     </span>
+                    {s?.stale && (
+                      <span
+                        data-testid={`stale-${name}`}
+                        className="shrink-0 rounded-md bg-secondary px-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+                      >
+                        đã đổi tuỳ chọn
+                      </span>
+                    )}
                   </button>
 
                   {s?.error && (
@@ -333,7 +369,25 @@ export function RunView(p: RunViewProps) {
                         </ol>
                       )}
 
-                      {isCurrent && !s && p.preview && <Preview preview={p.preview} />}
+                      {isCurrent && (
+                        <StepControls
+                          step={name}
+                          opts={opts}
+                          scenes={scenes}
+                          voiceId={p.voiceId}
+                          captionDefaults={p.captionDefaults}
+                          onChange={setOpts}
+                        />
+                      )}
+
+                      {isCurrent && !s && live.preview && (
+                        <Preview preview={live.preview} stale={live.stale} />
+                      )}
+                      {isCurrent && live.error && (
+                        <p data-testid="preview-error" className="text-xs text-[hsl(var(--destructive))]">
+                          {live.error}
+                        </p>
+                      )}
 
                       <div className="flex flex-wrap items-center gap-1.5">
                         {isCurrent && (
@@ -431,7 +485,116 @@ export function RunView(p: RunViewProps) {
   );
 }
 
-function Preview({ preview }: { preview: StepPreview }) {
+/**
+ * The controls that redraw this step, beside the thing they redraw.
+ *
+ * v1 put every knob in one drawer that only took effect on the next advance. These write to
+ * the preview's options, so the picture answers within a debounce — the whole point of the
+ * step screens.
+ */
+function StepControls({
+  step,
+  opts,
+  scenes,
+  voiceId,
+  captionDefaults,
+  onChange,
+}: {
+  step: StepName;
+  opts: StepOptions;
+  scenes: Scene[];
+  voiceId?: string;
+  captionDefaults: Record<string, unknown>;
+  onChange: (o: StepOptions) => void;
+}) {
+  // Seeded from the kit, not from a constant: a control showing "classic" over a kit set to
+  // "dam" tells the owner the wrong thing, and picking the value it already claimed to have
+  // then changes nothing at all.
+  const caps = { ...captionDefaults, ...((opts.captions ?? {}) as Record<string, unknown>) };
+  const set = (tab: 'captions', patch: Record<string, unknown>) =>
+    onChange({ ...opts, [tab]: { ...((opts[tab] ?? {}) as object), ...patch } });
+
+  if (step === 'reel') {
+    return (
+      <div data-testid="controls-reel" className="flex flex-wrap items-center gap-2">
+        <label className={CTRL}>
+          mẫu phụ đề
+          <select
+            data-testid="ctl-caption-preset"
+            value={String(caps.preset ?? 'classic')}
+            onChange={(e) => set('captions', { preset: e.target.value })}
+            className={SEL}
+          >
+            {Object.entries(PRESETS).map(([id, v]) => (
+              <option key={id} value={id}>
+                {String((v as { label?: string }).label ?? id)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={CTRL}>
+          cỡ chữ
+          <input
+            data-testid="ctl-caption-size"
+            type="number"
+            min={24}
+            max={160}
+            value={Number(caps.size ?? 64)}
+            onChange={(e) => set('captions', { size: Number(e.target.value) })}
+            className={`${SEL} w-16`}
+          />
+        </label>
+        <label className={CTRL}>
+          cảnh
+          <select
+            data-testid="ctl-scene"
+            value={String(opts.sceneIndex ?? 0)}
+            onChange={(e) => onChange({ ...opts, sceneIndex: Number(e.target.value) })}
+            className={SEL}
+          >
+            {scenes.map((_, i) => (
+              <option key={i} value={i}>
+                #{i + 1}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Listen
+          text={scenes[Number(opts.sceneIndex ?? 0)]?.text ?? ''}
+          voice={voiceId}
+          testId="ctl-listen"
+        />
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/**
+ * One sentence through the same edge-tts the render uses. Mounted only on click: an <audio>
+ * per scene would fire a request to Microsoft for every scene of every run just by opening
+ * the page.
+ */
+function Listen({ text, voice, testId }: { text: string; voice?: string; testId: string }) {
+  const [on, setOn] = useState(false);
+  if (!text) return null;
+  const q = new URLSearchParams({ text: text.slice(0, 300) });
+  if (voice) q.set('voice', voice);
+  return on ? (
+    // eslint-disable-next-line jsx-a11y/media-has-caption
+    <audio data-testid={`${testId}-audio`} src={`/api/studio/tts-sample?${q}`} controls autoPlay className="h-7" />
+  ) : (
+    <button type="button" data-testid={testId} onClick={() => setOn(true)} className={ACT}>
+      ▷ nghe thử
+    </button>
+  );
+}
+
+const CTRL = 'flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground';
+const SEL = 'pen-line-sm rounded-md bg-card px-1.5 py-0.5 font-sans text-xs font-semibold text-foreground';
+
+function Preview({ preview, stale }: { preview: StepPreview; stale?: boolean }) {
   const d = preview.data as any;
   if (preview.kind === 'items') {
     return (
@@ -446,15 +609,47 @@ function Preview({ preview }: { preview: StepPreview }) {
     );
   }
   if (preview.kind === 'png') {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={d.url} alt="" data-testid="preview-png" className="pen-line-static w-32 rounded-md" />;
+    return (
+      <Veil stale={stale}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={d.url} alt="" data-testid="preview-png" className="pen-line-static w-32 rounded-md" />
+      </Veil>
+    );
   }
-  if (preview.kind === 'scenes') return null;
+  if (preview.kind === 'scenes') {
+    if (!d.firstFrameUrl) return null;
+    return (
+      <Veil stale={stale}>
+        {/* The frame as the reel will show it: plate, caption band, sticker. Every control
+            is in the URL, so a changed preset is a different picture, not a re-render. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={d.firstFrameUrl}
+          alt=""
+          data-testid="preview-frame"
+          className="pen-line-static w-28 rounded-md"
+        />
+      </Veil>
+    );
+  }
   return (
     <p data-testid="preview-text" className={`text-sm ${d.error ? 'text-[hsl(var(--destructive))]' : ''}`}>
       {d.title && <span className="mr-2 font-semibold">{d.title}</span>}
       {d.text}
     </p>
+  );
+}
+
+/** The last good picture stays up while the next one is in flight, dimmed rather than gone. */
+function Veil({ stale, children }: { stale?: boolean; children: React.ReactNode }) {
+  return (
+    <div
+      data-testid="preview-veil"
+      data-stale={stale ? 'true' : 'false'}
+      className={stale ? 'w-fit animate-pulse opacity-50 transition-opacity' : 'w-fit transition-opacity'}
+    >
+      {children}
+    </div>
   );
 }
 
