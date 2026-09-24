@@ -1,16 +1,17 @@
 'use client';
 
 /**
- * The two doors of the New page.
+ * The create page's two doors, drawn as the reference draws them (mock-v3/01-create).
  *
- * NGUỒN TỰ ĐỘNG is the pipeline this repo already runs — crawl, filter, order, draft, write
- * Gold. MỘT BÀI is one link or one paste, all the way to a reel. There are no "kinds of
- * video" any more: v1 read the reference's `Đọc bài · Viết lời đọc · Lồng tiếng · Video dọc`
- * chips as four modes, when they are that product's step rail. The rail lives on the run
- * page; what varies here is only where the words come from.
+ * MỘT BÀI is the one box: paste a link or write, and the bottom bar says what was read
+ * (`nguồn: …`), which channel, and what is overridden. NGUỒN TỰ ĐỘNG is the crawler this
+ * repo already runs; it is a status strip under the box — a fact about the channel with two
+ * actions, not a second form beside the first. There are still no "kinds of video": the
+ * five chips above the box are the run page's step rail, drawn idle.
  */
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { List, Rss, Video } from 'lucide-react';
 import type { Overrides } from '@/lib/studio/steps/types';
 import { SOURCE_LABELS, detectSource } from '@/lib/studio/sources/detect';
 import { OverrideDrawer, type KitOption } from './OverrideDrawer';
@@ -24,30 +25,45 @@ export interface ChannelRow {
   tier_min: string;
 }
 
-const CARD = 'pen-line-static flex flex-col gap-2 rounded-[var(--radius)] bg-card p-3';
-const CAPS = 'st-label text-muted-foreground';
-const BTN = 'pen-line-sm rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50';
+export interface PipelineFacts {
+  /** The gold channel's market, or null when the visible tier has none. */
+  market: { id: string; name: string } | null;
+  /** Read off the launchd plist on the server. */
+  schedule: string;
+  /** Gold posts with no reel yet — the count the suggestions list is cut from. */
+  pending: number;
+}
 
 export function NewRunBox({
   channels,
   kits,
   canSpend,
+  pipeline,
 }: {
   channels: ChannelRow[];
   kits: KitOption[];
   canSpend: boolean;
+  pipeline: PipelineFacts;
 }) {
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      <AutoDoor canRun={canSpend} />
+    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-3.5">
       <SingleDoor channels={channels} kits={kits} canSpend={canSpend} />
+      <AutoDoor canRun={canSpend} facts={pipeline} />
     </div>
   );
 }
 
-/** Door 1 — the crawler. Thiết lập opens its five screens; Chạy ngay starts a cycle. */
-function AutoDoor({ canRun }: { canRun: boolean }) {
+const ago = (iso: string) => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+  if (m < 60) return `${m} phút trước`;
+  const h = Math.round(m / 60);
+  return h < 48 ? `${h} giờ trước` : `${Math.round(h / 24)} ngày trước`;
+};
+
+/** Door 1 — the crawler as a strip. Thiết lập opens its five screens; Chạy ngay starts a cycle. */
+function AutoDoor({ canRun, facts }: { canRun: boolean; facts: PipelineFacts }) {
   const [state, setState] = useState<{ running: boolean; since: string | null } | null>(null);
+  const [last, setLast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -57,6 +73,12 @@ function AutoDoor({ canRun }: { canRun: boolean }) {
       try {
         const r = await fetch('/api/pipeline/run');
         if (alive) setState(await r.json());
+        if (facts.market) {
+          // The old app's own "last run" line, from the same endpoint it reads.
+          const a = await fetch(`/api/audit?marketId=${facts.market.id}`);
+          const d = (await a.json()) as { lastRunAt?: string | null };
+          if (alive) setLast(d.lastRunAt ?? null);
+        }
       } catch {
         /* the pipeline being unreachable is not a reason to break the New page */
       }
@@ -67,7 +89,7 @@ function AutoDoor({ canRun }: { canRun: boolean }) {
       alive = false;
       clearInterval(t);
     };
-  }, []);
+  }, [facts.market]);
 
   async function runNow() {
     setBusy(true);
@@ -82,39 +104,42 @@ function AutoDoor({ canRun }: { canRun: boolean }) {
     }
   }
 
+  const stateText =
+    state === null
+      ? '…'
+      : state.running
+        ? `đang chạy · từ ${new Date(state.since ?? Date.now()).toLocaleTimeString('vi-VN')}`
+        : last
+          ? `lần cuối ${ago(last)}`
+          : 'không chạy';
+
   return (
-    <section data-testid="door-auto" className={CARD}>
-      <h2 className={CAPS}>Nguồn tự động</h2>
-      <p className="text-[13px] leading-snug text-muted-foreground">
-        Thu thập từ các nguồn của thị trường → lọc &amp; xếp → dạng bài → duyệt thử ba bài →
-        lịch chạy. Kết quả ghi vào kho bài.
-      </p>
-      <p data-testid="pipeline-state" className={`${CAPS} mt-auto`}>
-        {state === null
-          ? '…'
-          : state.running
-            ? `đang chạy · từ ${new Date(state.since ?? Date.now()).toLocaleTimeString('vi-VN')}`
-            : 'không chạy'}
-      </p>
-      {err && <p className="text-xs text-[hsl(var(--destructive))]">{err}</p>}
-      <div className="flex flex-wrap items-center gap-2">
-        <a
-          href="/studio/pipeline"
-          data-testid="pipeline-setup"
-          className={`${BTN} bg-secondary text-muted-foreground hover:text-foreground`}
-        >
-          Thiết lập
-        </a>
-        <button
-          type="button"
-          data-testid="pipeline-run"
-          disabled={busy || !canRun || Boolean(state?.running)}
-          onClick={runNow}
-          className={`${BTN} bg-primary text-primary-foreground`}
-        >
-          {busy ? 'Đang gọi…' : 'Chạy ngay'}
-        </button>
+    <section data-testid="door-auto" className="st-quiet flex items-center gap-3 px-3.5 py-2.5">
+      <span className="grid h-[34px] w-[34px] flex-none place-items-center rounded-lg border-2 border-foreground bg-sidebar-accent text-primary">
+        <Rss size={17} strokeWidth={2.25} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <b className="block text-sm">Nguồn tự động{facts.market ? ` · ${facts.market.name}` : ''}</b>
+        <span className="block text-xs text-muted-foreground">
+          <span data-testid="pipeline-schedule">{facts.schedule}</span>{' '}
+          <span data-testid="pipeline-state">{stateText}</span>
+          {' · '}
+          <span className="st-num">{facts.pending}</span> bài mới chưa có video
+        </span>
+        {err && <span className="block text-xs text-[hsl(var(--destructive))]">{err}</span>}
       </div>
+      <a href="/studio/pipeline" data-testid="pipeline-setup" className="st-btn st-sm">
+        Thiết lập
+      </a>
+      <button
+        type="button"
+        data-testid="pipeline-run"
+        disabled={busy || !canRun || Boolean(state?.running)}
+        onClick={runNow}
+        className="st-btn st-sm st-primary"
+      >
+        {busy ? 'Đang gọi…' : 'Chạy ngay'}
+      </button>
     </section>
   );
 }
@@ -164,43 +189,33 @@ function SingleDoor({
   const changed = Object.keys(overrides).filter((k) => k !== 'demo').length;
 
   return (
-    <section data-testid="door-single" className="flex flex-col gap-2">
-      <div className="flex items-baseline gap-2">
-        <h2 className={CAPS}>Một bài</h2>
-        <button
-          type="button"
-          data-testid="ov-toggle"
-          onClick={() => setDrawer((v) => !v)}
-          className={`ml-auto ${CAPS} hover:text-primary`}
-        >
-          ⚙ tuỳ chỉnh video này{changed > 0 ? ` · ${changed}` : ''}
-        </button>
-      </div>
-
-      {/* pen-line-static, not card-warm: card-warm lifts on hover, and a box you type into
-          should not move under the cursor. */}
-      <div className={CARD}>
+    <>
+      {/* st-card, not card-warm: card-warm lifts on hover, and a box you type into should
+          not move under the cursor. */}
+      <section data-testid="door-single" className="st-card flex flex-col">
         <textarea
           value={source}
           onChange={(e) => setSource(e.target.value)}
           rows={3}
           data-testid="source-box"
-          placeholder="Dán link Threads / Reddit / Facebook / Instagram / bài báo, hoặc viết nội dung…"
-          className="w-full resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          placeholder="Dán link Threads / Reddit / Facebook / Instagram / bài báo vào đây, hoặc viết nội dung…"
+          className="h-24 w-full resize-none bg-transparent px-[18px] py-4 text-base outline-none placeholder:text-muted-foreground"
         />
 
-        <p data-testid="detected" className={CAPS}>
-          {detected
-            ? `nguồn: ${SOURCE_LABELS[detected.kind]}`
-            : 'nguồn: theo kênh — để trống thì lấy bài mới nhất của kênh'}
-        </p>
+        <div data-testid="create-bar" className="flex flex-wrap items-center gap-2 border-t-2 border-border px-3 py-2.5">
+          <span className="st-btn st-ghost st-icon text-muted-foreground" title="Bài trong kho">
+            <List strokeWidth={2.25} />
+          </span>
 
-        <div className="flex flex-wrap items-center gap-2">
+          <span data-testid="detected" className="st-chip st-soft">
+            {detected ? `nguồn: ${SOURCE_LABELS[detected.kind]}` : 'nguồn: theo kênh'}
+          </span>
+
           <select
             value={channel}
             onChange={(e) => setChannel(e.target.value)}
             data-testid="channel-picker"
-            className="pen-line-sm rounded-md bg-card px-2 py-1 text-xs font-semibold"
+            className="max-w-[200px] truncate rounded-lg border-2 border-foreground bg-card px-2 py-1 text-[13px] font-semibold"
           >
             {channels.map((c) => (
               <option key={c.id} value={c.id}>
@@ -209,19 +224,37 @@ function SingleDoor({
             ))}
           </select>
 
-          <span className={CAPS}>{canSpend ? '$0.00 đến giờ' : 'xem thử · không tốn phí'}</span>
+          {!canSpend && <span className="ml-auto text-xs text-muted-foreground">xem thử · không tốn phí</span>}
+          <span className={canSpend ? 'ml-auto' : ''} />
+
+          <button
+            type="button"
+            data-testid="ov-toggle"
+            onClick={() => setDrawer((v) => !v)}
+            className="st-btn st-sm"
+          >
+            {changed > 0 ? (
+              <>
+                Tuỳ chỉnh · <span className="st-num">{changed}</span>
+              </>
+            ) : (
+              'Tuỳ chỉnh: mặc định'
+            )}
+          </button>
 
           <button
             type="button"
             disabled={busy || !channel}
             onClick={start}
             data-testid="create-run"
-            className={`ml-auto ${BTN} bg-primary text-primary-foreground`}
+            aria-label="Tạo run"
+            title="Tạo run"
+            className="st-btn st-primary st-icon"
           >
-            {busy ? 'Đang tạo…' : 'Tạo run'}
+            <Video strokeWidth={2.25} />
           </button>
         </div>
-      </div>
+      </section>
 
       {drawer && <OverrideDrawer value={overrides} onChange={setOverrides} kits={kits} open />}
 
@@ -230,6 +263,6 @@ function SingleDoor({
           {err}
         </p>
       )}
-    </section>
+    </>
   );
 }

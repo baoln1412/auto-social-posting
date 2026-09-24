@@ -1,6 +1,4 @@
 import Link from 'next/link';
-import fs from 'node:fs';
-import path from 'node:path';
 import { notFound } from 'next/navigation';
 import { query } from '@/app/lib/db';
 import { studioDb } from '@/lib/studio/db';
@@ -9,30 +7,10 @@ import { can, tier } from '@/lib/studio/tier';
 import { PipelineSetup, type MarketRow } from '../../components/PipelineSetup';
 
 import { PageHeader } from '@/app/studio/components/PageHeader';
+import { scheduleText } from '@/lib/studio/pipeline/schedule';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * When the crawler runs by itself, read off the launchd plist that actually schedules it.
- * Printing a remembered cadence would be a second source of truth for the one fact this
- * screen exists to state.
- */
-function scheduleText(): string {
-  try {
-    const xml = fs.readFileSync(
-      path.join(process.cwd(), 'deploy', 'com.immigration.pipeline.plist'),
-      'utf8',
-    );
-    const times = [...xml.matchAll(/<key>Hour<\/key>\s*<integer>(\d+)<\/integer>\s*<key>Minute<\/key>\s*<integer>(\d+)<\/integer>/g)]
-      .map((m) => `${m[1].padStart(2, '0')}:${m[2].padStart(2, '0')}`);
-    if (times.length) return `Tự chạy ${times.length} lần mỗi ngày — ${times.join(' · ')}.`;
-    const every = /<key>StartInterval<\/key>\s*<integer>(\d+)<\/integer>/.exec(xml);
-    if (every) return `Tự chạy mỗi ${Math.round(Number(every[1]) / 3600)} giờ.`;
-  } catch {
-    /* no plist on this machine is a fact worth saying, not a crash */
-  }
-  return 'Chưa tìm thấy lịch tự chạy trên máy này.';
-}
 
 export default async function PipelinePage({ params }: { params: { market: string } }) {
   if (!can(tier(), 'run')) notFound();
