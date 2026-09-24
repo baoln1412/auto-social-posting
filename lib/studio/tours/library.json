@@ -1,4 +1,22 @@
 [
-  { "target": "[data-testid='lib-search']", "title": "Tìm bằng link", "body": "Gõ chính đường dẫn bạn đã dán — hoặc tên kênh, tiêu đề, mã lượt chạy." },
-  { "target": "[data-testid='lib-view']", "title": "Lưới hay bảng", "body": "Lưới để nhìn ảnh, bảng để rà nhanh trạng thái." }
+  {
+    "target": "[data-testid='lake-toolbar']",
+    "title": "Tìm bằng chính link bạn đã dán",
+    "body": "Ô tìm đọc cả tiêu đề, nguồn và đường dẫn. Sắp xếp và bộ lọc nằm ngay bên cạnh."
+  },
+  {
+    "target": "[data-testid='lake-tabs']",
+    "title": "Mỗi thị trường một tab",
+    "body": "Tab đọc từ danh sách thị trường trong kho, không phải danh sách gõ tay — thêm thị trường là có tab."
+  },
+  {
+    "target": "[data-testid='lake-filters']",
+    "title": "Lọc theo việc còn thiếu",
+    "body": "Bài chưa có ảnh, chưa có video, chưa đăng. Đây là cách tìm việc cần làm thay vì lướt hết kho."
+  },
+  {
+    "target": "[data-testid='lake-card']",
+    "title": "Một bài là một thẻ",
+    "body": "Thẻ vẽ đúng như trang Desoul Posting vẽ. Dải trên thẻ là phần của Studio: trạng thái, và nút mở thẳng bước Ảnh hay Video."
+  }
 ]

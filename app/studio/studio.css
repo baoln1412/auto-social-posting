@@ -97,3 +97,9 @@
 .st-group { display: flex; flex-direction: column; gap: 6px; }
 .st-group .st-gt { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13.5px; }
 .st-group .st-gt svg { width: 14px; height: 14px; color: hsl(var(--primary)); }
+
+/* ── guide hub (tv-17): an icon tile, and steps numbered in a box ── */
+.st-tile { width: 34px; height: 34px; border-radius: 8px; border: 2px solid hsl(var(--foreground)); background: hsl(var(--sidebar-accent)); display: grid; place-items: center; color: hsl(var(--primary)); flex: none; }
+.st-tile svg { width: 17px; height: 17px; }
+.st-stepn { width: 22px; height: 22px; border: 2px solid var(--st-pen2); border-radius: 6px; display: grid; place-items: center; font-size: 11px; color: hsl(var(--muted-foreground)); flex: none; }
+.st-guide { border-top: 2px solid hsl(var(--border)); padding-top: 16px; }

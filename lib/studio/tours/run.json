@@ -1,5 +1,22 @@
 [
-  { "target": "[data-testid='step-fetch']", "title": "Từng bước một", "body": "Mỗi bước hiện kết quả và giá của nó. Không bước nào tiêu tiền trước khi bạn thấy nó sẽ làm gì." },
-  { "target": "[data-testid='scene-list']", "title": "Danh sách cảnh", "body": "Bài viết tách thành từng cảnh. Bình luận bạn chọn được chèn vào cuối, kèm số lượt thích." },
-  { "target": "[data-testid='comment-pool']", "title": "Kho bình luận", "body": "Tích một bình luận để biến nó thành cảnh. Danh sách cảnh đổi ngay, trước khi dựng." }
+  {
+    "target": "[data-testid='rail']",
+    "title": "Năm bước, chạy từng bước",
+    "body": "Đọc bài · Viết bài · Ảnh · Video · Đăng. Bấm một bước để xem nó; không bước nào tiêu tiền trước khi bạn thấy nó sẽ làm gì."
+  },
+  {
+    "target": "[data-testid='rail-image']",
+    "title": "Bước Ảnh sửa được ảnh bài",
+    "body": "Tỉ lệ, ảnh nền, ảnh tròn, dòng nhấn mạnh. Lưu vào bài ghi thẳng vào bài trong kho — cùng một ảnh đi ra bài Facebook, ảnh bìa và thẻ trong video."
+  },
+  {
+    "target": "[data-testid='rail-reel']",
+    "title": "Bước Video sửa được từng cảnh",
+    "body": "Bài tách thành cảnh, mỗi cảnh giữ text gốc và text đã sửa. Tích một bình luận là nó thành cảnh cuối, kèm số lượt thích."
+  },
+  {
+    "target": "[data-testid='run-status']",
+    "title": "Kết quả nằm ở đây",
+    "body": "Trạng thái lượt chạy, video dựng xong và nút tải về. Video giữ trên đĩa của bạn, không hết hạn."
+  }
 ]

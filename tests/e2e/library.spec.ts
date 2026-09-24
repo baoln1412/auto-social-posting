@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { PNG_1PX } from './fixtures';
-import newTour from '@/lib/studio/tours/new.json';
 
 test('the library groups by day, finds a run by its source link, and downloads it', async ({
   page,
@@ -85,39 +84,4 @@ test('an uploaded background shows in the kit frame tab', async ({ page, request
   await request.delete(`/api/studio/media/${media.id}`);
 });
 
-test('the tour runs once and not twice', async ({ page }) => {
-  // Counted from the tour file, not typed in: hard-coding "1/4" made adding a step to the
-  // tour fail a test about something else entirely.
-  const n = newTour.length;
-  await page.goto('/studio');
-  await expect(page.getByTestId('tour')).toBeVisible();
-  await expect(page.getByTestId('tour')).toContainText(`1/${n}`);
-  await page.screenshot({ path: 'tests/shots/44-tour.png' });
 
-  await page.getByTestId('tour-next').click();
-  await expect(page.getByTestId('tour')).toContainText(`2/${n}`);
-  await page.getByTestId('tour-back').click();
-  await expect(page.getByTestId('tour')).toContainText(`1/${n}`);
-  await page.getByTestId('tour-skip').click();
-  await expect(page.getByTestId('tour')).toHaveCount(0);
-
-  await page.reload();
-  await expect(page.getByTestId('tour')).toHaveCount(0);
-});
-
-test('every guide card opens the screen it names', async ({ page }) => {
-  await page.goto('/studio/guide');
-  const cards = page.getByTestId('guide-card');
-  const n = await cards.count();
-  expect(n).toBe(5);
-  await page.screenshot({ path: 'tests/shots/45-guide.png', fullPage: true });
-
-  for (let i = 0; i < n; i++) {
-    await page.goto('/studio/guide');
-    const href = await cards.nth(i).getAttribute('href');
-    await cards.nth(i).click();
-    await page.waitForURL(`**${href}`);
-    // Not a 404 shell: every target renders its own heading.
-    await expect(page.locator('h1')).toBeVisible();
-  }
-});

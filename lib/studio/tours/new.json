@@ -1,7 +1,42 @@
 [
-  { "target": "[data-testid='door-auto']", "title": "Hai cửa", "body": "Nguồn tự động chạy cả dây chuyền cho một thị trường. Một bài chỉ dựng đúng bài bạn dán." },
-  { "target": "[data-testid='source-box']", "title": "Dán gì cũng được", "body": "Link Threads, Reddit, Facebook, Instagram, bài báo — hoặc gõ thẳng nội dung. Dòng dưới ô nói nó đọc ra nguồn nào." },
-  { "target": "[data-testid='channel-picker']", "title": "Chọn kênh", "body": "Kênh quyết định bộ nhận diện và thị trường, không quyết định nguồn nữa." },
-  { "target": "[data-testid='override-drawer']", "title": "Sửa riêng lượt này", "body": "Mọi thứ ở đây chỉ áp dụng cho lượt chạy này. Bộ nhận diện của kênh không bị đổi." },
-  { "target": "[data-testid='create-run']", "title": "Bắt đầu", "body": "Từ đây mỗi bước sẽ hiện kết quả và chi phí trước khi bước sau chạy." }
+  {
+    "target": "[data-testid='door-single']",
+    "title": "Bắt đầu tại Tạo video",
+    "body": "Dán một link — Threads, Reddit, Facebook, Instagram hay bài báo — hoặc gõ thẳng nội dung. Dòng dưới ô nói nó đọc ra nguồn nào, trước khi có gì được tạo."
+  },
+  {
+    "target": "[data-testid='door-auto']",
+    "title": "Nguồn tự động chạy sẵn",
+    "body": "Dây chuyền crawl của kênh, theo lịch. Thiết lập mở năm màn hình cấu hình; Chạy ngay gọi một vòng ngay bây giờ."
+  },
+  {
+    "target": "[data-testid='suggestions']",
+    "title": "Gợi ý từ kho nguồn",
+    "body": "Bài Gold mới nhất chưa có video. Bấm nút video trên thẻ là bắt đầu đúng bài đó — không phải dán lại link."
+  },
+  {
+    "target": "[data-testid='recent']",
+    "title": "Kết quả gần đây",
+    "body": "Video nằm trên đĩa của bạn, không hết hạn. Thẻ chưa có ảnh ghi luôn nó đang ở trạng thái nào."
+  },
+  {
+    "target": ".st-nav a[href='/studio/library']",
+    "title": "Thư viện là kho bài",
+    "body": "Toàn bộ bài đã đăng, mỗi bài một thẻ, kèm dấu cho biết bài nào đã có ảnh, có video, đã đăng."
+  },
+  {
+    "target": ".st-nav a[href='/studio/kits']",
+    "title": "Bộ nhận diện quyết định diện mạo",
+    "body": "Màu, phông, khung, nhạc và giọng đọc của kênh nằm ở đây. Sửa một tab, khung xem bên cạnh đổi ngay."
+  },
+  {
+    "target": ".st-nav a[href='/studio/assets']",
+    "title": "Kho tài nguyên là tệp của bạn",
+    "body": "Ảnh nền, nhãn dán, nhạc tải lên một lần rồi chọn lại trong Bộ nhận diện. Giới hạn 50 MB / 30 tệp."
+  },
+  {
+    "target": "[data-testid='studio-tip']",
+    "title": "Nhận video qua Telegram",
+    "body": "Kết nối một lần trong Cài đặt: video render xong tự về chat của bạn, kèm cảnh báo khi một bước hỏng."
+  }
 ]

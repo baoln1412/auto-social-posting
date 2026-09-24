@@ -42,7 +42,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
         <StudioNav counts={{ '/studio/library': weekRuns() }} />
 
-        <div className="st-tip pen-line-static">
+        <div data-testid="studio-tip" className="st-tip pen-line-static">
           <b>
             <Send strokeWidth={2.25} />
             Nhận video qua Telegram
