@@ -10,6 +10,7 @@ import { TAB_LABELS, TAB_ORDER, labelFor } from '@/lib/studio/kits/labels';
 import captionPresets from '@/deploy/assets/caption-presets.json';
 
 import { PageHeader } from '@/app/studio/components/PageHeader';
+import { backgroundMedia } from '@/lib/studio/steps/overlay';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,12 +101,18 @@ export default function KitEditorPage({
     <>
       <PageHeader title="Cấu hình video" sub={row.name} />
       <div className="st-content">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <KitEditor
         kit={kit}
         tabs={tabs}
         runId={searchParams.run}
-        samplePlate={path.join(process.cwd(), 'public', 'studio-demo', 'card.png')}
+        kits={studioDb().prepare('SELECT id, name FROM studio_kits ORDER BY name').all() as { id: string; name: string }[]}
+        // The kit's own background, for the composed frame — a path, because make-reel.py
+        // opens files and a client component has no idea where the repo is.
+        background={(() => {
+          const bg = backgroundMedia(kit);
+          return bg && bg.kind === 'image' ? bg.url.replace(/^file:\/\//, '') : null;
+        })()}
       />
     </div>
       </div>

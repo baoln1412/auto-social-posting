@@ -35,7 +35,8 @@ test('the editor changes a kit through the preview and the tab strip', async ({ 
 
   // Every tab the schema defines, each showing what it is set to.
   await expect(page.getByTestId('tab-card')).toContainText('9:16');
-  await expect(page.getByTestId('tab-captions')).toContainText('dam');
+  // v3: the strip says the preset's NAME, never its schema key — 'dam' is not a word.
+  await expect(page.getByTestId('tab-captions')).toContainText('Đậm');
   await page.screenshot({ path: 'tests/shots/31-kit-editor.png', fullPage: true });
 
   const before = await page.getByTestId('kit-canvas').getAttribute('src');

@@ -13,6 +13,7 @@
  * construction. Drawing them as movable would be a control that cannot work.
  */
 import { useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, Copy, Flag, Image as ImageIcon, Lock, Minus, Plus, Square, Type, Undo2, X } from 'lucide-react';
 import {
   ENGINE_LAYERS,
   FRAME_LABELS,
@@ -31,7 +32,10 @@ import {
 } from '@/lib/studio/layers';
 
 const CAPS = 'st-label text-muted-foreground';
-const BTN = 'pen-line-sm rounded-md px-2 py-1 text-xs font-semibold disabled:opacity-40';
+const BTN = 'st-btn st-sm';
+const TOOL_ICONS = { text: Type, image: ImageIcon, shape: Square, banner: Flag } as const;
+/** Canvas widths the zoom pills step through, in rem. */
+const ZOOMS = [12, 16, 20];
 
 export type LayerMap = Partial<Record<FrameKey, Layer[]>>;
 
@@ -50,6 +54,7 @@ export function LayerEditor({
   const [frame, setFrame] = useState<FrameKey>('body');
   const [picked, setPicked] = useState<string | null>(null);
   const [history, setHistory] = useState<LayerMap[]>([]);
+  const [zoom, setZoom] = useState(1);
   const canvas = useRef<HTMLDivElement>(null);
 
   const layers = value[frame] ?? [];
@@ -107,27 +112,34 @@ export function LayerEditor({
 
   return (
     <div data-testid="layer-editor" className="flex flex-col gap-3 lg:flex-row">
-      <div className="flex shrink-0 flex-row gap-1.5 lg:flex-col">
-        {(Object.keys(LAYER_LABELS) as LayerType[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            data-testid={`layer-add-${t}`}
-            disabled={!canAdd(layers)}
-            onClick={() => add(t)}
-            className={`${BTN} bg-card`}
-          >
-            {LAYER_LABELS[t]}
-          </button>
-        ))}
+      {/* One outlined strip, not a stack of shadowed buttons: the reference's toolbar. */}
+      <div className="st-card flex shrink-0 flex-row gap-0.5 self-start p-1 lg:flex-col">
+        {(Object.keys(LAYER_LABELS) as LayerType[]).map((t) => {
+          const Icon = TOOL_ICONS[t];
+          return (
+            <button
+              key={t}
+              type="button"
+              data-testid={`layer-add-${t}`}
+              disabled={!canAdd(layers)}
+              onClick={() => add(t)}
+              className="flex w-14 flex-col items-center gap-0.5 rounded-md px-1 py-1.5 text-[11px] font-semibold hover:bg-muted disabled:opacity-40"
+            >
+              <Icon size={16} strokeWidth={2.25} />
+              {LAYER_LABELS[t]}
+            </button>
+          );
+        })}
+        <span className="my-0.5 border-t-2 border-border" />
         <button
           type="button"
           data-testid="layer-undo"
           disabled={history.length === 0}
           onClick={undo}
-          className={`${BTN} bg-secondary text-muted-foreground`}
+          className="flex w-14 flex-col items-center gap-0.5 rounded-md px-1 py-1.5 text-[11px] font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40"
         >
-          ↶ Lấy lại
+          <Undo2 size={16} strokeWidth={2.25} />
+          Lấy lại
         </button>
       </div>
 
@@ -140,17 +152,19 @@ export function LayerEditor({
               data-testid={`layer-frame-${f}`}
               aria-pressed={frame === f}
               onClick={() => setFrame(f)}
-              className={`${BTN} ${frame === f ? 'bg-primary text-primary-foreground' : 'bg-card'}`}
+              className={`st-chip ${frame === f ? 'st-on' : ''}`}
             >
               {FRAME_LABELS[f]}
             </button>
           ))}
         </div>
 
+        <div className="relative">
         <div
           ref={canvas}
           data-testid="layer-canvas"
-          className="pen-line-static relative aspect-[9/16] w-full max-w-[16rem] overflow-hidden rounded-[var(--radius)] bg-black"
+          className="st-stage relative aspect-[9/16]"
+          style={{ width: `${ZOOMS[zoom]}rem`, maxWidth: '100%' }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={frameSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -197,15 +211,27 @@ export function LayerEditor({
             </div>
           ))}
         </div>
+        {/* The reference's zoom cluster, beside the stage. */}
+        <div data-testid="layer-zoom" className="absolute -right-11 bottom-2 flex flex-col items-center gap-1">
+          <button type="button" aria-label="Phóng to" disabled={zoom === ZOOMS.length - 1} onClick={() => setZoom((z) => Math.min(ZOOMS.length - 1, z + 1))} className="st-btn st-sm st-icon w-9">
+            <Plus strokeWidth={2.5} />
+          </button>
+          <span className="st-num text-[11px]">{Math.round((ZOOMS[zoom] / 16) * 100)}%</span>
+          <button type="button" aria-label="Thu nhỏ" disabled={zoom === 0} onClick={() => setZoom((z) => Math.max(0, z - 1))} className="st-btn st-sm st-icon w-9">
+            <Minus strokeWidth={2.5} />
+          </button>
+        </div>
+        </div>
       </div>
 
       <aside className="w-full shrink-0 lg:w-64">
-        <div className="pen-line-static flex flex-col gap-2 rounded-[var(--radius)] bg-card p-3">
+        <div className="st-card flex flex-col gap-2 p-3">
           <div className="flex items-baseline gap-2">
-            <h3 className="text-sm font-semibold">Lớp</h3>
-            <span data-testid="layer-count" className={CAPS}>
+            <h3 className="text-sm font-bold">Lớp</h3>
+            <span data-testid="layer-count" className="st-num text-[11px] text-muted-foreground">
               {layers.length}/{MAX_LAYERS}
             </span>
+            <span className="ml-auto text-[10px] text-muted-foreground">kéo để sắp xếp</span>
           </div>
 
           <ol data-testid="layer-list" className="flex flex-col gap-1">
@@ -213,8 +239,8 @@ export function LayerEditor({
               <li
                 key={l.id}
                 data-testid={`layer-row-${l.id}`}
-                className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-xs ${
-                  picked === l.id ? 'bg-sidebar-accent' : ''
+                className={`flex items-center gap-1 rounded-md border-l-[3px] px-1.5 py-1 text-xs ${
+                  picked === l.id ? 'border-primary bg-sidebar-accent' : 'border-transparent hover:bg-muted'
                 }`}
               >
                 <button type="button" onClick={() => setPicked(l.id)} className="min-w-0 flex-1 truncate text-left">
@@ -226,27 +252,27 @@ export function LayerEditor({
                   title="Lên một lớp"
                   data-testid={`layer-up-${l.id}`}
                   onClick={() => put(reorder(layers, l.id, 1))}
-                  className={CAPS}
+                  className="text-muted-foreground hover:text-foreground"
                 >
-                  ▲
+                  <ArrowUp size={13} strokeWidth={2.25} />
                 </button>
                 <button
                   type="button"
                   title="Xuống một lớp"
                   data-testid={`layer-down-${l.id}`}
                   onClick={() => put(reorder(layers, l.id, -1))}
-                  className={CAPS}
+                  className="text-muted-foreground hover:text-foreground"
                 >
-                  ▼
+                  <ArrowDown size={13} strokeWidth={2.25} />
                 </button>
                 <button
                   type="button"
                   title="Xoá lớp"
                   data-testid={`layer-del-${l.id}`}
                   onClick={() => put(layers.filter((x) => x.id !== l.id))}
-                  className={CAPS}
+                  className="text-muted-foreground hover:text-foreground"
                 >
-                  ✕
+                  <X size={13} strokeWidth={2.25} />
                 </button>
               </li>
             ))}
@@ -259,7 +285,9 @@ export function LayerEditor({
                 className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground"
               >
                 <span className="min-w-0 flex-1 truncate">{e.label}</span>
-                <span className={CAPS}>🔒 cố định</span>
+                <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide">
+                  <Lock size={11} strokeWidth={2.5} /> cố định
+                </span>
               </li>
             ))}
           </ol>
@@ -282,8 +310,9 @@ export function LayerEditor({
                 ...copyFrom(value[other] ?? [], (i) => `c${Date.now().toString(36)}${i}`),
               ].slice(0, MAX_LAYERS))
             }
-            className={`${BTN} bg-card`}
+            className="st-btn st-sm st-ghost"
           >
+            <Copy strokeWidth={2.25} />
             Sao chép từ {FRAME_LABELS[other]}
           </button>
         </div>

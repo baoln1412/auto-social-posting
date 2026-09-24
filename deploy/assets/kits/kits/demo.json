@@ -38,8 +38,8 @@
     "case": "upper"
   },
   "frame": {
-    "preset": "continuous",
-    "layout": "continuous",
+    "preset": "multi",
+    "layout": "multi",
     "intro": false,
     "durationBand": "short"
   },
@@ -57,5 +57,5 @@
   "music": {
     "tier": "soft"
   },
-  "revision": 2
+  "revision": 3
 }

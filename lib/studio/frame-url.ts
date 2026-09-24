@@ -15,6 +15,13 @@ export interface FrameSpec {
   plate?: string | null;
   /** Absolute path of a sticker PNG to composite. */
   sticker?: string | null;
+  /**
+   * How the card sits in the frame — `card-top` / `continuous` place it as an overlay over
+   * `background`; `multi` makes it the plate. Omitted = the plate is used as given.
+   */
+  layout?: 'card-top' | 'continuous' | 'multi';
+  /** Absolute path of the kit's background image, for the overlay layouts. */
+  background?: string | null;
 }
 
 /**
@@ -26,6 +33,8 @@ export interface FrameSpec {
  */
 export function plateAllowed(plate: string, root: string): boolean {
   if (/^https?:\/\//i.test(plate)) return true;
+  // The kit editor sends the card it is drawing — a relative card URL, rendered in-process.
+  if (plate.startsWith('/api/studio/card?') || plate.startsWith('/api/image/card?')) return true;
   if (!plate.startsWith('/')) return false;
   const norm = plate.replace(/\/+/g, '/');
   if (norm.includes('/../') || norm.endsWith('/..')) return false;
@@ -39,6 +48,8 @@ export function frameQuery(spec: FrameSpec): string {
   const q = new URLSearchParams({ text: spec.text ?? '', style: JSON.stringify(spec.style ?? {}) });
   if (spec.plate) q.set('plate', spec.plate);
   if (spec.sticker) q.set('sticker', spec.sticker);
+  if (spec.layout) q.set('layout', spec.layout);
+  if (spec.background) q.set('background', spec.background);
   return q.toString();
 }
 

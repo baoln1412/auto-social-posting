@@ -17,6 +17,7 @@ import sharp from 'sharp';
 import { NextRequest } from 'next/server';
 import { POST as drawPreviewFrame } from '@/app/api/video/preview/route';
 import { STICKER_INSET } from './steps/overlay';
+import { cardPngFor, isCardUrl, scenePlate } from './plate';
 import { hashOf } from './hash';
 import type { FrameSpec } from './frame-url';
 
@@ -63,15 +64,22 @@ async function stickerOn(base: Uint8Array, sticker: string): Promise<Uint8Array>
 
 /** The composed PNG, rendered once per distinct set of inputs and kept on disk. */
 export async function renderFrame(spec: FrameSpec): Promise<Uint8Array> {
-  const key = hashOf(spec.text, spec.style, spec.plate ?? null, spec.sticker ?? null);
+  const key = hashOf(spec.text, spec.style, spec.plate ?? null, spec.sticker ?? null, spec.layout ?? null, spec.background ?? null);
   const file = path.join(CACHE_DIR, `${key}.png`);
   if (fs.existsSync(file)) return fs.readFileSync(file);
+
+  // The plate the engine gets is the scene as the reel will show it: a card URL is drawn
+  // first (in-process), and for the overlay layouts the card is placed over the background
+  // where the S12 pass puts it — so the engine's cover-scale of a 1080×1920 plate is identity.
+  let plate: string | null = spec.plate ?? null;
+  if (plate && isCardUrl(plate)) plate = await cardPngFor(plate);
+  if (spec.layout) plate = await scenePlate({ card: plate, background: spec.background ?? null, layout: spec.layout });
 
   const res = await drawPreviewFrame(
     new NextRequest('http://127.0.0.1/api/video/preview', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text: spec.text ?? '', style: spec.style ?? {}, plate: spec.plate ?? null }),
+      body: JSON.stringify({ text: spec.text ?? '', style: spec.style ?? {}, plate }),
     }),
   );
   if (!res.ok) {

@@ -31,6 +31,7 @@ import { pickSticker, stickerChoices } from './pick';
 import { mediaById } from '../assets';
 import type { OverlayPlan } from './overlay';
 import { frameUrl } from '../frame';
+import { scenePlate } from '../plate';
 import { budgetFindings, probeDuration, type BudgetKit, type DurationBand } from '../gates/budget';
 import type { Draft } from '../gold';
 import type { CardAsset } from './image';
@@ -56,12 +57,17 @@ function narrationFor(draft: Draft, ctx: RunCtx): string {
 }
 
 /** What this scene shows behind the caption: the card if it exists, else the background. */
-function plateFor(ctx: RunCtx): string | null {
+/**
+ * The scene as the reel will show it: for the overlay layouts the card placed over the
+ * background where the S12 pass puts it; for `multi` the card itself. Composed by
+ * lib/studio/plate.ts, the same numbers ffmpeg gets — the fidelity gate measures that.
+ */
+function plateFor(ctx: RunCtx): Promise<string | null> {
   const card = ctx.outputs.image as CardAsset | undefined;
-  if (card?.path) return card.path;
   const bg = backgroundMedia(ctx.kit);
   // A video background has no still to show; the neutral plate is the honest answer.
-  return bg && bg.kind === 'image' ? bg.url.replace(/^file:\/\//, '') : null;
+  const background = bg && bg.kind === 'image' ? bg.url.replace(/^file:\/\//, '') : null;
+  return scenePlate({ card: card?.path ?? null, background, layout: layoutOf(ctx.kit, ctx.overrides) });
 }
 
 function budgetKit(ctx: RunCtx): BudgetKit {
@@ -147,7 +153,7 @@ export const reelStep: Step<Draft, ReelAsset> = {
         firstFrameUrl: frameUrl({
           text: scenes[i]?.text ?? draft.title,
           style: captionStyle(ctx.kit),
-          plate: plateFor(ctx),
+          plate: await plateFor(ctx),
           sticker: stickerPath(ctx.kit),
         }),
         steps: STEP_ORDER,

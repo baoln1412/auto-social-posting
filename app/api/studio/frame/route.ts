@@ -39,6 +39,8 @@ export async function GET(req: NextRequest) {
       // with the neutral plate, and the caption is what the owner was looking at anyway.
       plate: keep(q.get('plate')),
       sticker: keep(q.get('sticker')),
+      layout: (['card-top', 'continuous', 'multi'] as const).find((l) => l === q.get('layout')),
+      background: keep(q.get('background')),
     });
     return new NextResponse(new Uint8Array(png), {
       headers: {

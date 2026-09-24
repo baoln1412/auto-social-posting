@@ -101,7 +101,12 @@ describe('the kit reaches the engines', () => {
 
   it('maps the frame tab onto the two flags startRenderJob takes', () => {
     expect(effectiveFrame(vi, {})).toMatchObject({ includeLayout: true, includeIntro: true });
-    expect(effectiveFrame(demo, {})).toMatchObject({ includeLayout: false, includeIntro: false });
+    expect(effectiveFrame(demo, {})).toMatchObject({ includeLayout: true, includeIntro: false });
+    // `continuous` is the one layout the overlay pass places itself, so make-reel must not
+    // also lay the card out. Built here rather than borrowed from whichever shipped kit
+    // happens to use it — that coupling broke when the demo kit moved to `multi`.
+    const slides = { ...demo, frame: { ...(demo.frame as object), layout: 'continuous' } } as typeof demo;
+    expect(effectiveFrame(slides, {})).toMatchObject({ includeLayout: false, includeIntro: false });
   });
 
   it('lets the per-run drawer win over the kit without changing the kit', () => {

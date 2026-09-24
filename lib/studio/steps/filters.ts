@@ -70,10 +70,30 @@ export function stickerAt(where: Where[], fly: FlyStyle | undefined, sw: number,
  */
 export function layoutAt(layout: Layout, cw: number, ch: number): string | null {
   if (layout === 'multi') return null;
-  const x = Math.round((W - cw) / 2);
-  if (layout === 'card-top') return `overlay=${x}:${Math.round(H * 0.06)}`;
-  const rest = Math.round(H * 0.18);
-  return `overlay=${x}:'if(lt(t,${FLY_SEC}),${H}-(${H}-${rest})*(t/${FLY_SEC}),${rest})'`;
+  const { x, y } = cardBox(layout, cw, ch);
+  if (layout === 'card-top') return `overlay=${x}:${y}`;
+  return `overlay=${x}:'if(lt(t,${FLY_SEC}),${H}-(${H}-${y})*(t/${FLY_SEC}),${y})'`;
+}
+
+/**
+ * Where the card ends up in the frame, in pixels — the one set of numbers layoutAt (ffmpeg),
+ * the composed preview (sharp) and the fidelity gate all read. For `multi` the card is the
+ * scene plate and make-reel cover-scales it: the box is that scale, so a card that is not
+ * 9:16 comes back with a negative x — the crop, in numbers, before anyone renders it.
+ */
+export function cardBox(layout: Layout, cw: number, ch: number): { x: number; y: number; w: number; h: number } {
+  if (layout === 'multi') {
+    const s = Math.max(W / cw, H / ch);
+    const w = Math.round(cw * s);
+    const h = Math.round(ch * s);
+    return { x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w, h };
+  }
+  return {
+    x: Math.round((W - cw) / 2),
+    y: Math.round(H * (layout === 'card-top' ? 0.06 : 0.18)),
+    w: cw,
+    h: ch,
+  };
 }
 
 /** Margins the drifting handle keeps: clear of the caption band at the bottom. */
