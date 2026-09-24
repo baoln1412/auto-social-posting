@@ -52,9 +52,9 @@ export interface KitOpt {
 const STEPS = ['Nguồn', 'Lọc & xếp', 'Đầu ra', 'Ảnh & video', 'Lịch'];
 
 const CAPS = 'st-label text-muted-foreground';
-const CARD = 'pen-line-static rounded-[var(--radius)] bg-card p-3';
-const BTN = 'pen-line-sm rounded-md px-2.5 py-1 text-xs font-semibold disabled:opacity-50';
-const FIELD = 'pen-line-sm w-full rounded-md bg-background px-2 py-1 text-sm outline-none';
+const CARD = 'st-quiet p-3.5';
+const BTN = 'st-btn st-sm';
+const FIELD = 'st-field';
 
 /** A pasted box → what to store in rss_feeds, or why it cannot be. */
 function asFeed(raw: string): { kind: SourceKind; url: string; note?: string } | null {
@@ -171,8 +171,8 @@ export function PipelineSetup({
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span data-testid="pipeline-gate" className={CAPS}>
+      <footer className="st-card sticky bottom-3 flex flex-wrap items-center gap-2 px-3.5 py-2.5">
+        <span data-testid="pipeline-gate" className={`st-chip ${gate.checked === 0 ? 'st-soft' : gate.findings.length ? 'st-soft' : 'st-on'}`}>
           {gate.checked === 0
             ? 'chưa kiểm tra'
             : gate.findings.length
@@ -189,7 +189,7 @@ export function PipelineSetup({
           data-testid="pipeline-save"
           disabled={saving}
           onClick={save}
-          className={`ml-auto ${BTN} bg-card`}
+          className={`ml-auto ${BTN}`}
         >
           {saving ? 'Đang lưu…' : 'Lưu thiết lập'}
         </button>
@@ -202,12 +202,12 @@ export function PipelineSetup({
               await save();
               setStep((s) => s + 1);
             }}
-            className={`${BTN} bg-primary text-primary-foreground`}
+            className={`${BTN} st-primary`}
           >
             Tiếp
           </button>
         )}
-      </div>
+      </footer>
     </div>
   );
 }
@@ -356,7 +356,7 @@ function SourcesStep({
                         sourceWeights: { ...cfg.order.sourceWeights, [f.name]: Number(e.target.value) },
                       })
                     }
-                    className="pen-line-sm ml-1 w-14 rounded-md bg-background px-1 py-0.5 font-sans text-xs text-foreground"
+                    className="st-field ml-1 w-14 px-1 py-0.5 text-xs"
                   />
                 </label>
               </li>
@@ -382,7 +382,7 @@ function SourcesStep({
           {target ? `sẽ lưu như: ${SOURCE_LABELS[target.kind]}` : 'chưa nhận ra nguồn'}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button type="button" data-testid="src-test" disabled={!target} onClick={runTest} className={`${BTN} bg-card`}>
+          <button type="button" data-testid="src-test" disabled={!target} onClick={runTest} className={`${BTN}`}>
             Thử lấy bài
           </button>
           <button
@@ -390,7 +390,7 @@ function SourcesStep({
             data-testid="src-save"
             disabled={!ready}
             onClick={saveFeed}
-            className={`${BTN} bg-primary text-primary-foreground`}
+            className={`${BTN} st-primary`}
           >
             Lưu nguồn
           </button>
@@ -500,7 +500,7 @@ function OrderStep({
                     topics: on ? cfg.order.topics.filter((x) => x !== t.id) : [...cfg.order.topics, t.id],
                   })
                 }
-                className={`${BTN} ${on ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}
+                className={`${BTN} ${on ? 'st-primary' : 'st-ghost'}`}
               >
                 {t.vi}
               </button>
@@ -606,7 +606,7 @@ function OutputStep({
                 patch('output', { format: f.id });
                 setDrafts(null);
               }}
-              className={`${BTN} ${cfg.output.format === f.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}
+              className={`${BTN} ${cfg.output.format === f.id ? 'st-primary' : 'st-ghost'}`}
             >
               {f.label}
             </button>
@@ -623,7 +623,7 @@ function OutputStep({
                 patch('output', { length: e.target.value as never });
                 setDrafts(null);
               }}
-              className="pen-line-sm ml-1 rounded-md bg-background px-1 py-0.5 font-sans text-xs font-semibold text-foreground"
+              className="st-field ml-1 w-auto px-1 py-0.5 text-xs font-semibold"
             >
               {Object.entries(LENGTH_BANDS).map(([k, v]) => (
                 <option key={k} value={k}>
@@ -641,7 +641,7 @@ function OutputStep({
                 patch('output', { titleStyle: e.target.value as never });
                 setDrafts(null);
               }}
-              className="pen-line-sm ml-1 rounded-md bg-background px-1 py-0.5 font-sans text-xs font-semibold text-foreground"
+              className="st-field ml-1 w-auto px-1 py-0.5 text-xs font-semibold"
             >
               {Object.entries(TITLE_STYLES).map(([k, v]) => (
                 <option key={k} value={k}>
@@ -695,7 +695,7 @@ function OutputStep({
       <div className={CARD}>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-sm font-semibold">Xem thử ba bài</h2>
-          <button type="button" data-testid="out-preview" disabled={busy} onClick={preview} className={`ml-auto ${BTN} bg-card`}>
+          <button type="button" data-testid="out-preview" disabled={busy} onClick={preview} className={`ml-auto ${BTN}`}>
             {busy ? 'Đang viết…' : 'Viết thử 3 bài'}
           </button>
         </div>
@@ -707,7 +707,7 @@ function OutputStep({
         {drafts && (
           <ul data-testid="out-drafts" className="mt-2 grid gap-2 md:grid-cols-3">
             {drafts.map((d) => (
-              <li key={d.id} data-testid="out-draft" className="pen-line-sm rounded-md bg-background p-2">
+              <li key={d.id} data-testid="out-draft" className="st-quiet p-2">
                 <p className="text-xs font-semibold">{d.title}</p>
                 <p className="mt-1 line-clamp-6 text-[11px] leading-snug text-muted-foreground">{d.text || d.error}</p>
                 <p
@@ -759,7 +759,7 @@ function MediaStep({
             data-testid="media-kit"
             value={cfg.media.kitId ?? ''}
             onChange={(e) => patch('media', { kitId: e.target.value || null })}
-            className="pen-line-sm ml-1 rounded-md bg-background px-1 py-0.5 font-sans text-xs font-semibold text-foreground"
+            className="st-field ml-1 w-auto px-1 py-0.5 text-xs font-semibold"
           >
             <option value="">— chưa chọn —</option>
             {kits.map((k) => (
@@ -879,7 +879,7 @@ function ScheduleStep({
             data-testid="pipeline-run-now"
             disabled={busy || !shapeChecked || Boolean(state?.running)}
             onClick={runNow}
-            className={`ml-auto ${BTN} bg-primary text-primary-foreground`}
+            className={`ml-auto ${BTN} st-primary`}
           >
             {busy ? 'Đang gọi…' : 'Chạy ngay'}
           </button>

@@ -45,20 +45,14 @@ export function TelegramSettings({
   }
 
   return (
-    <section
-      data-testid="telegram-settings"
-      className="pen-line-static flex flex-col gap-3 rounded-[var(--radius)] bg-card p-4"
-    >
+    <section data-testid="telegram-settings" className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold">Thông báo Telegram</h2>
-        <span
-          data-testid="tg-state"
-          className="pen-line-sm rounded-md bg-secondary px-2 py-0.5 st-label"
-        >
+        <span className="text-[13.5px] font-bold">Kết nối</span>
+        <span data-testid="tg-state" className="st-badge st-grey">
           {blocked ? 'chưa có token' : chatId ? (enabled ? 'đang bật' : 'đã nối, đang tắt') : 'chưa nối'}
         </span>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="-mt-2 text-xs text-muted-foreground">
         Video dựng xong và bước nào lỗi sẽ gửi vào chat bạn chọn. Mặc định tắt.
       </p>
 
@@ -69,7 +63,7 @@ export function TelegramSettings({
       ) : chatId ? (
         <>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[11px] text-muted-foreground">chat {chatId}</span>
+            <span className="st-num text-[11px] text-muted-foreground">chat {chatId}</span>
             <label className="ml-auto flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
@@ -93,7 +87,7 @@ export function TelegramSettings({
               onClick={async () => {
                 if (await call('test')) setNote('Đã gửi thử.');
               }}
-              className="pen-line-sm rounded-md bg-card px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+              className="st-btn st-sm"
             >
               Gửi thử
             </button>
@@ -105,7 +99,7 @@ export function TelegramSettings({
                 await call('forget');
                 router.refresh();
               }}
-              className="pen-line-sm rounded-md bg-card px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+              className="st-btn st-sm"
             >
               Ngắt kết nối
             </button>
@@ -124,7 +118,7 @@ export function TelegramSettings({
                 setBot(b.bot);
               }
             }}
-            className="pen-line-sm self-start rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            className="st-btn st-sm st-primary self-start"
           >
             Kết nối
           </button>
@@ -140,7 +134,7 @@ export function TelegramSettings({
               </p>
               <code
                 data-testid="tg-code"
-                className="pen-line-static self-start rounded-md bg-background px-3 py-1.5 font-mono text-lg tracking-widest"
+                className="st-num st-quiet self-start rounded-md bg-background px-3 py-1.5 text-lg tracking-widest"
               >
                 {code}
               </code>
@@ -151,7 +145,7 @@ export function TelegramSettings({
                 onClick={async () => {
                   if (await call('link')) router.refresh();
                 }}
-                className="pen-line-sm self-start rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                className="st-btn st-sm st-primary self-start"
               >
                 Tôi đã gửi
               </button>

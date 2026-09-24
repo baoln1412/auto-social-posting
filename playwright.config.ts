@@ -8,6 +8,8 @@ export default defineConfig({
   //@ts-expect-error - resolve is accepted at runtime
   resolve: { alias: { '@': path.resolve(__dirname, '.') } },
   testDir: 'tests/e2e',
+  // Removes the channels and runs previous suite runs left behind — see the file.
+  globalSetup: './tests/e2e/global-setup.ts',
   outputDir: 'tests/.playwright',
   timeout: 90_000,
   reporter: [['list']],

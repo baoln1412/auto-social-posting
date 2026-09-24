@@ -103,3 +103,17 @@
 .st-tile svg { width: 17px; height: 17px; }
 .st-stepn { width: 22px; height: 22px; border: 2px solid var(--st-pen2); border-radius: 6px; display: grid; place-items: center; font-size: 11px; color: hsl(var(--muted-foreground)); flex: none; }
 .st-guide { border-top: 2px solid hsl(var(--border)); padding-top: 16px; }
+
+/* ── S21: fields, a settings sub-nav, meters, empty states ── */
+.st-field { width: 100%; border: 2px solid var(--st-pen2); border-radius: 8px; background: hsl(var(--background)); padding: 6px 9px; font-size: 13px; outline: none; }
+.st-field:focus { border-color: hsl(var(--primary)); }
+.st-subnav { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 14px; }
+.st-subnav a { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground)); border-left: 3px solid transparent; }
+.st-subnav a svg { width: 15px; height: 15px; }
+.st-subnav a:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+.st-meter { height: 8px; border-radius: 99px; border: 2px solid hsl(var(--foreground)); background: hsl(var(--muted)); overflow: hidden; }
+.st-meter > i { display: block; height: 100%; background: hsl(var(--primary)); }
+.st-meter.st-full > i { background: hsl(var(--destructive)); }
+.st-blank { border: 2px dashed var(--st-pen2); border-radius: var(--radius); background: hsl(var(--muted)); padding: 26px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: hsl(var(--muted-foreground)); font-size: 13px; }
+.st-blank > svg { width: 26px; height: 26px; color: hsl(var(--primary)); }
+.st-blank b { font-size: 14px; color: hsl(var(--foreground)); }

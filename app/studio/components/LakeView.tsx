@@ -95,17 +95,20 @@ export function LakeView({
       if (keyword.trim()) params.set('keyword', keyword.trim());
       const res = await fetch(`/api/posts?${params}`);
       const data = (await res.json()) as { posts: PostDraft[]; totalCount: number; filters?: { sources?: string[] } };
+
+      // Both fetches land before anything is shown. Setting the posts first renders the list
+      // with an empty run map for a tick, and `Video: chưa có` then shows every post in the
+      // market before quietly dropping most of them — the wrong set, visibly.
+      const refs = (data.posts ?? []).filter((p) => p.id).map((p) => `gold:${p.id}`);
+      let found: Record<string, RunSummary> = {};
+      if (refs.length) {
+        const r = await fetch(`/api/studio/runs?items=${encodeURIComponent(refs.join(','))}`);
+        found = ((await r.json()) as { runs: Record<string, RunSummary> }).runs ?? {};
+      }
       setPosts(data.posts ?? []);
       setTotal(data.totalCount ?? 0);
       setSources(data.filters?.sources ?? []);
-      const refs = (data.posts ?? []).filter((p) => p.id).map((p) => `gold:${p.id}`);
-      if (refs.length) {
-        const r = await fetch(`/api/studio/runs?items=${encodeURIComponent(refs.join(','))}`);
-        const body = (await r.json()) as { runs: Record<string, RunSummary> };
-        setRuns(body.runs ?? {});
-      } else {
-        setRuns({});
-      }
+      setRuns(found);
     } finally {
       setLoading(false);
     }
