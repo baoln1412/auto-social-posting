@@ -60,7 +60,13 @@ function sweepPreviews(ctx: RunCtx, keep: string): void {
 async function renderTo(file: string, draft: Draft, ctx: RunCtx): Promise<string> {
   const render = cardEngine(ctx.kit) === 'studio' ? renderStudio : renderClassic;
   const res = await render(new NextRequest(cardUrl(draft, ctx)));
-  if (!res.ok) throw new Error(`Trình dựng ảnh trả về ${res.status}.`);
+  if (!res.ok) {
+    throw new Error(
+      res.status === 404
+        ? `Trình dựng ảnh trả về 404 — ${cardPath(ctx.kit)} chỉ bật khi STUDIO_ENABLED được đặt.`
+        : `Trình dựng ảnh trả về ${res.status}.`,
+    );
+  }
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const abs = path.join(OUT_DIR, file);
   fs.writeFileSync(abs, Buffer.from(await res.arrayBuffer()));

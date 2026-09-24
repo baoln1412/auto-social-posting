@@ -29,7 +29,10 @@ const REAL: Partial<Record<StepName, Step>> = {
 };
 
 export function resolveStep(name: StepName, channel: Channel): Step {
-  const step = (isDemoChannel(channel) ? DEMO_STEPS : REAL)[name];
+  // The demo pack REPLACES the steps that would spend or reach the network; anything it
+  // does not name falls through to the real one. `image` is the case that matters: Satori
+  // is local and free, so a demo run draws a real card and the Ảnh controls actually work.
+  const step = (isDemoChannel(channel) ? (DEMO_STEPS[name] ?? REAL[name]) : REAL[name]);
   if (!step) throw new Error(`Bước "${name}" chưa có engine cho kênh này.`);
   return step;
 }

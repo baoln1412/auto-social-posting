@@ -94,12 +94,13 @@ describe('listLibrary()', () => {
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     await walk(id);
 
-    const rows = listLibrary();
-    expect(rows).toHaveLength(1);
-    expect(rows[0].runId).toBe(id);
-    expect(rows[0].status).toBe('done');
-    expect(rows[0].assets.map((a) => a.kind).sort()).toEqual(['mp4', 'png']);
-    expect(rows[0].sourceUrl).toContain('example.com');
+    // The seed ships one finished example run, so the claim is about THIS run, not about
+    // how many rows the library happens to hold.
+    const row = listLibrary().find((r) => r.runId === id)!;
+    expect(row).toBeDefined();
+    expect(row.status).toBe('done');
+    expect(row.assets.map((a) => a.kind).sort()).toEqual(['mp4', 'png']);
+    expect(row.sourceUrl).toContain('example.com');
   });
 
   it('re-running a step replaces its asset instead of stacking a second one', async () => {
@@ -116,7 +117,7 @@ describe('listLibrary() channel filtering', () => {
   it('keeps the runs whose channel is in the allowed set', async () => {
     const id = createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
     await walk(id);
-    expect(listLibrary({ channelIds: new Set([DEMO_CHANNEL_ID]) })).toHaveLength(1);
+    expect(listLibrary({ channelIds: new Set([DEMO_CHANNEL_ID]) }).map((r) => r.runId)).toContain(id);
   });
 
   it('drops the runs whose channel is not', async () => {
@@ -126,8 +127,9 @@ describe('listLibrary() channel filtering', () => {
   });
 
   it('shows everything when no set is given', async () => {
+    const before = listLibrary().length;
     createRun({ channelId: DEMO_CHANNEL_ID, itemRef: 'demo:1' });
-    expect(listLibrary()).toHaveLength(1);
+    expect(listLibrary()).toHaveLength(before + 1);
   });
 });
 

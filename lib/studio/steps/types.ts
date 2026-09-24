@@ -126,6 +126,8 @@ export interface SourceItem {
   text: string;
   url?: string;
   source?: string;
+  /** The article's own pictures, newest source first. The Ảnh step picks among them. */
+  images?: string[];
   comments: Comment[];
 }
 

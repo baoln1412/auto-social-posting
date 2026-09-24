@@ -101,18 +101,6 @@ export interface CardAsset {
   kind: 'png';
 }
 
-const imageStep: Step<Draft, CardAsset> = {
-  name: 'image',
-  from: 'draft',
-  async preview(_draft, _ctx) {
-    return { kind: 'png', data: { url: DEMO_CARD_URL }, cost: FREE };
-  },
-  async run(_draft, ctx) {
-    boomIfAsked('image', ctx);
-    return { url: DEMO_CARD_URL, kind: 'png' as const };
-  },
-};
-
 export interface ReelAsset {
   url: string;
   path: string;
@@ -180,10 +168,16 @@ const publishStep: Step<Draft, { library: boolean; telegram: string; at: string 
   },
 };
 
+/**
+ * The demo channel's engines — every one a fixture, except `image`.
+ *
+ * The real image step is already free (Satori, local, `dựng tại chỗ`, $0), and a stub that
+ * returned one fixed PNG made every control on the Ảnh screen decorative: the ratio moved
+ * and the picture did not. A demo that cannot show what a control does is not a demo of it.
+ */
 export const DEMO_STEPS: Partial<Record<StepName, Step>> = {
   fetch: fetchStep,
   draft: draftStep,
-  image: imageStep,
   reel: reelStep,
   publish: publishStep,
 };

@@ -61,6 +61,10 @@ export interface RunViewProps {
   initialView?: StepName;
   item: SourceItem | null;
   itemRef: string | null;
+  /** Which card renderer the kit uses — the classic one is the only one with an inset. */
+  cardEngine: 'classic' | 'studio';
+  /** The kit's own card ratio, so an untouched control shows what is actually drawn. */
+  cardRatio: string;
   channelName: string;
   kitName: string;
   kitId: string;
@@ -105,6 +109,7 @@ export function RunView(p: RunViewProps) {
   const [selection, setSelection] = useState<Selection>(p.selection);
   const [overrides, setOverrides] = useState<Overrides>(p.overrides);
   const [draftEdit, setDraftEdit] = useState<string | null>(null);
+  const [imgSaved, setImgSaved] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [editing, setEditing] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -228,7 +233,7 @@ export function RunView(p: RunViewProps) {
         data-state={s?.status === 'error' ? 'error' : s ? 'done' : onCurrent ? 'current' : 'future'}
         className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem]"
       >
-        <main className="pen-line-static min-w-0 rounded-[var(--radius)] bg-card p-3">
+        <main className="st-card min-w-0 p-3.5">
           <div className="mb-2 flex flex-wrap items-baseline gap-2">
             <h2 className="text-sm font-semibold">{STEP_LABELS[view]}</h2>
             {s?.stale && (
@@ -268,6 +273,12 @@ export function RunView(p: RunViewProps) {
 
           {view === 'draft' && (
             <>
+              <DraftHelp
+                draft={draft}
+                title={p.item?.title ?? ''}
+                channelName={p.channelName}
+                onApply={(text) => setDraftEdit(text)}
+              />
               {s ? (
                 <textarea
                   id="draft-editor"
@@ -284,14 +295,34 @@ export function RunView(p: RunViewProps) {
           )}
 
           {view === 'image' && (
-            <>
-              {card ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={card} alt="" data-testid="card-preview" className="pen-line-static w-full max-w-xs rounded-md" />
-              ) : (
-                live.preview && <Preview preview={live.preview} stale={live.stale} />
-              )}
-            </>
+            <ImageScreen
+              card={card ?? ((live.preview?.data as { url?: string } | undefined)?.url ?? null)}
+              images={p.item?.images ?? []}
+              engine={p.cardEngine}
+              kitRatio={p.cardRatio}
+              opts={opts}
+              onChange={setOpts}
+              saved={imgSaved}
+              checks={imageChecks(p, opts, card ?? null)}
+              onSave={async () => {
+                // The old app's own write: PATCH /api/posts { id, imageUrl, insetUrl }, the
+                // same call PostCard's saveCardImages makes. One write path, not two.
+                const id = p.itemRef?.startsWith('gold:') ? p.itemRef.slice(5) : null;
+                if (!id) return;
+                setImgSaved('saving');
+                const co = (opts.card ?? {}) as Record<string, unknown>;
+                const res = await fetch('/api/posts', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    id,
+                    imageUrl: String(co.bgUrl ?? p.item?.images?.[0] ?? ''),
+                    insetUrl: String(co.insetUrl ?? p.item?.images?.[1] ?? ''),
+                  }),
+                }).catch(() => null);
+                setImgSaved(res?.ok ? 'saved' : 'error');
+              }}
+            />
           )}
 
           {view === 'reel' && (
@@ -351,7 +382,7 @@ export function RunView(p: RunViewProps) {
             // eslint-disable-next-line @next/next/no-img-element
             <>
               {video ? (
-                <video data-testid="run-player" src={video} controls className="pen-line-static w-full rounded-[var(--radius)] bg-black" />
+                <video data-testid="run-player" src={video} controls className="st-stage w-full" />
               ) : (
                 live.preview?.kind === 'scenes' && <Preview preview={live.preview} stale={live.stale} />
               )}
@@ -359,13 +390,15 @@ export function RunView(p: RunViewProps) {
           )}
           {view !== 'reel' &&
             (video ? (
-              <video data-testid="run-player" src={video} controls className="pen-line-static w-full rounded-[var(--radius)] bg-black" />
+              <video data-testid="run-player" src={video} controls className="st-stage w-full" />
             ) : card ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={card} alt="" data-testid="rail-card" className="pen-line-static w-full rounded-[var(--radius)]" />
+              <img src={card} alt="" data-testid="rail-card" className="st-card w-full rounded-[var(--radius)]" />
             ) : (
-              <div className="pen-line-static grid aspect-[9/16] place-items-center rounded-[var(--radius)] bg-card text-xs text-muted-foreground">
-                Chưa có kết quả
+              // Not "Chưa có kết quả": on Đọc bài and Viết bài the result is in the main
+              // column, and a box saying there is none was contradicting the screen beside it.
+              <div className="st-quiet grid aspect-[9/16] place-items-center px-3 text-center text-xs text-muted-foreground">
+                Ảnh và video hiện ở đây sau bước <b>Ảnh</b>.
               </div>
             ))}
 
@@ -397,8 +430,8 @@ export function RunView(p: RunViewProps) {
             </p>
           )}
 
-          <div className="pen-line-static rounded-[var(--radius)] bg-card p-2.5">
-            <div className={`mb-1 ${CAPS}`}>Tuỳ chỉnh video này</div>
+          <div className="st-quiet p-2.5">
+            <div className="mb-1 text-[12px] font-bold">Tuỳ chỉnh video này</div>
             <ul data-testid="ov-summary" className={`mb-2 flex flex-col gap-0.5 ${CAPS}`}>
               {ovSummary.map((l) => (
                 <li key={l}>· {l}</li>
@@ -408,7 +441,7 @@ export function RunView(p: RunViewProps) {
               type="button"
               data-testid="ov-edit"
               onClick={() => setDrawerOpen((v) => !v)}
-              className="pen-line-sm rounded-md bg-card px-2.5 py-1 text-xs font-semibold"
+              className="st-btn st-sm"
             >
               Sửa
             </button>
@@ -435,7 +468,7 @@ export function RunView(p: RunViewProps) {
         </aside>
       </div>
 
-      <footer className="pen-line-static flex flex-wrap items-center gap-2 rounded-[var(--radius)] bg-card px-3 py-2">
+      <footer className="st-card sticky bottom-3 flex flex-wrap items-center gap-2 px-3.5 py-2.5">
         <span data-testid={`cost-${view}`} className={CAPS}>
           {/* note() already ends with the price; printing money() first said it twice. */}
           {note(view, s, onCurrent ? live.preview : null, scenes)}
@@ -448,7 +481,7 @@ export function RunView(p: RunViewProps) {
             data-testid={`rerun-${view}`}
             disabled={busy !== null}
             onClick={() => post({ step: view }, `re-${view}`)}
-            className="ml-auto pen-line-sm rounded-md bg-card px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
+            className="ml-auto st-btn st-sm"
           >
             {view === 'reel' ? 'Chỉnh tiếp & render lại' : 'Chạy lại bước này'}
           </button>
@@ -460,7 +493,7 @@ export function RunView(p: RunViewProps) {
             data-testid={`continue-${view}`}
             disabled={busy !== null || (Boolean(s) && !gateOk && s?.status !== 'error')}
             onClick={() => post({}, view)}
-            className={`${s ? '' : 'ml-auto'} pen-line-sm rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50`}
+            className={`${s ? '' : 'ml-auto'} st-btn st-sm st-primary`}
           >
             {busy === view ? 'Đang chạy…' : s ? 'Thử lại' : 'Tiếp tục'}
           </button>
@@ -742,7 +775,7 @@ function Veil({ stale, children }: { stale?: boolean; children: React.ReactNode 
   );
 }
 
-const ACT = 'st-label text-muted-foreground hover:text-primary';
+const ACT = 'st-btn st-sm st-ghost';
 
 function SceneBoard({
   scenes,
@@ -781,14 +814,19 @@ function SceneBoard({
           <li
             key={s.commentId ?? `post-${s.n}`}
             data-testid="scene"
-            className={`rounded-md px-2 py-1 text-[13px] leading-snug ${
-              s.kind === 'post' ? 'bg-secondary' : 'bg-sidebar-accent'
-            }`}
-            style={{ marginLeft: s.kind === 'comment' ? 14 : 0 }}
+            className={`${s.kind === 'post' ? 'st-card' : 'st-quiet'} px-3 py-2 text-[14px] leading-snug`}
+            style={{ marginLeft: s.kind === 'comment' ? 26 : 0 }}
           >
-            <span className="mr-1.5 st-label text-muted-foreground">
-              {s.kind === 'comment' ? '↳ ' : ''}Cảnh #{s.n} ·{' '}
-              {s.kind === 'post' ? 'bài gốc' : `${s.score ?? '—'} likes`}
+            <span className="mb-1 flex flex-wrap items-center gap-2 text-[11.5px] text-muted-foreground">
+              <span className="st-badge st-green">CẢNH #{s.n}</span>
+              {s.kind === 'post' ? (
+                'bài gốc'
+              ) : (
+                <>
+                  <span className="st-num">{s.score ?? '—'}</span> likes
+                </>
+              )}
+              <span>· Text TTS</span>
             </span>
             {editing === s.commentId && s.commentId ? (
               <textarea
@@ -805,7 +843,7 @@ function SceneBoard({
             ) : (
               <span>{showOriginal === s.commentId ? (s.original ?? s.text) : s.text}</span>
             )}
-            <span className="ml-1.5 inline-flex gap-2">
+            <span className="mt-1.5 flex flex-wrap gap-1.5">
               {s.kind === 'comment' && s.commentId && (
                 <>
                   <button
@@ -880,6 +918,325 @@ function SceneBoard({
                 </label>
               ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What the Ảnh step checked. Three things that can be known here, each true or false, so the
+ * screen can say "3/3" and mean it — a gate that says how many things it checked, the same
+ * rule the steps follow.
+ */
+function imageChecks(p: RunViewProps, opts: StepOptions, card: string | null): { label: string; ok: boolean }[] {
+  const co = (opts.card ?? {}) as Record<string, unknown>;
+  const picture = String(co.bgUrl ?? p.item?.images?.[0] ?? '');
+  return [
+    { label: 'Đã dựng được ảnh', ok: Boolean(card) },
+    { label: 'Bài có link nguồn', ok: Boolean(p.item?.url) },
+    { label: 'Có ảnh nền (không phải nền trống)', ok: Boolean(picture) },
+  ];
+}
+
+/**
+ * Ảnh — the old app's News Card section, as a step.
+ *
+ * Every control PostCard has (tests/unit/postcard-parity.test.ts holds the list) and three
+ * things it does not: what this one picture is used for, a check that says how many things
+ * it checked, and the sentence that says where the STYLE lives. Ratio, picture and highlight
+ * are this post's; theme, font and radius belong to the kit, because they are the channel's.
+ */
+function ImageScreen({
+  card,
+  images,
+  engine,
+  kitRatio,
+  opts,
+  onChange,
+  onSave,
+  saved,
+  checks,
+}: {
+  card: string | null;
+  images: string[];
+  engine: 'classic' | 'studio';
+  kitRatio: string;
+  opts: StepOptions;
+  onChange: (o: StepOptions) => void;
+  onSave: () => void;
+  saved: 'idle' | 'saving' | 'saved' | 'error';
+  checks: { label: string; ok: boolean }[];
+}) {
+  const cardOpts = (opts.card ?? {}) as Record<string, unknown>;
+  const set = (next: Record<string, unknown>) => onChange({ ...opts, card: { ...cardOpts, ...next } });
+  // Unset means the kit's, not 4:5 — a chip that claimed 4:5 while the kit drew 9:16 was
+  // the control lying about what is on screen beside it.
+  const ratio = String(cardOpts.ratio ?? kitRatio);
+  const chosen = cardOpts.bgUrl as string | undefined;
+  const passed = checks.filter((c) => c.ok).length;
+
+  return (
+    <div className="flex flex-col gap-3 lg:flex-row">
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        {card ? (
+          <a href={card} target="_blank" rel="noopener noreferrer" data-testid="img-open" title="Mở ảnh gốc" className="self-start">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={card} alt="" data-testid="card-preview" className="st-card w-full max-w-[22rem] rounded-[var(--radius)]" />
+          </a>
+        ) : (
+          <div className="st-quiet grid aspect-[4/5] w-full max-w-[22rem] place-items-center text-xs text-muted-foreground">
+            Chưa dựng ảnh
+          </div>
+        )}
+        <div className="st-quiet px-3.5 py-2.5 text-[13px]">
+          <b>Ảnh này dùng ở đâu</b>
+          <div className="st-help mt-1">
+            Đăng Facebook (<span className="st-num">1200×630</span>) · ảnh bìa video · thẻ trong video. Sửa ở
+            đây một lần, cả ba chỗ cùng đổi.
+          </div>
+        </div>
+        <div data-testid="img-checks" className="st-quiet px-3.5 py-2.5 text-[13px]">
+          <b>
+            Kiểm tra <span className="st-num">{passed}/{checks.length}</span>
+          </b>
+          <ul className="st-help mt-1 flex flex-col gap-0.5">
+            {checks.map((c) => (
+              <li key={c.label}>
+                {c.ok ? '✓' : '✗'} {c.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <aside className="st-card flex w-full shrink-0 flex-col gap-3 px-4 py-3.5 lg:w-80">
+        <h3 className="text-[17px] font-bold" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
+          Sửa ảnh
+        </h3>
+
+        <div className="st-group">
+          <div className="st-gt">Tỉ lệ</div>
+          {/* Literal testids, not a template: tests/unit/postcard-parity.test.ts greps this
+              file for the control the old card has, and a template hides it from that grep. */}
+          <div className="flex gap-1.5">
+            <button type="button" data-testid="img-ratio-4:5" aria-pressed={ratio === '4:5'} onClick={() => set({ ratio: '4:5' })} className={`st-chip flex-1 justify-center ${ratio === '4:5' ? 'st-on' : ''}`}>
+              4:5 dọc
+            </button>
+            <button type="button" data-testid="img-ratio-1:1" aria-pressed={ratio === '1:1'} onClick={() => set({ ratio: '1:1' })} className={`st-chip flex-1 justify-center ${ratio === '1:1' ? 'st-on' : ''}`}>
+              1:1 vuông
+            </button>
+            <button type="button" data-testid="img-ratio-9:16" aria-pressed={ratio === '9:16'} onClick={() => set({ ratio: '9:16' })} className={`st-chip flex-1 justify-center ${ratio === '9:16' ? 'st-on' : ''}`}>
+              9:16 video
+            </button>
+          </div>
+          {ratio === '9:16' && engine === 'classic' && (
+            <div className="st-help">Thẻ cổ điển chỉ dựng 4:5 và 1:1 — 9:16 cần kiểu thẻ Studio.</div>
+          )}
+        </div>
+
+        <div data-testid="img-main" className="st-group">
+          <div className="st-gt">Ảnh chính</div>
+          {images.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {images.map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  data-testid="img-pick"
+                  aria-pressed={chosen === u}
+                  onClick={() => set({ bgUrl: u })}
+                  className={`h-11 w-16 overflow-hidden rounded-md border-2 ${chosen === u ? 'border-primary shadow-[2px_2px_0_hsl(var(--foreground))]' : 'border-[var(--st-pen2)]'}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={u} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="st-help">Bài này không có ảnh nào — tải lên một tấm.</div>
+          )}
+          <Upload label="Tải ảnh chính lên" testId="img-upload" onDone={(url) => set({ bgUrl: url })} />
+        </div>
+
+        <div data-testid="img-inset" className="st-group">
+          <div className="st-gt">Ảnh tròn</div>
+          {engine === 'studio' ? (
+            <div className="st-help">Kiểu thẻ Studio không có ảnh tròn — đổi sang thẻ cổ điển ở Bộ nhận diện.</div>
+          ) : (
+            <>
+              <Upload label="Tải ảnh tròn lên" testId="img-upload-inset" onDone={(url) => set({ insetUrl: url })} />
+              {cardOpts.insetUrl ? <div className="st-help">Đã chọn.</div> : <div className="st-help">Dùng khi bài không có ảnh nền riêng.</div>}
+            </>
+          )}
+        </div>
+
+        <label className="st-group">
+          <div className="st-gt">Chữ nhấn</div>
+          <select
+            data-testid="img-highlight"
+            value={String(cardOpts.highlight ?? '')}
+            onChange={(e) => set({ highlight: e.target.value || undefined })}
+            className="rounded-lg border-2 border-foreground bg-background px-2.5 py-1.5 text-[13px] font-semibold"
+          >
+            <option value="">(theo bộ nhận diện)</option>
+            <option value="after-colon">Sau dấu hai chấm</option>
+            <option value="first-clause">Mệnh đề đầu</option>
+            <option value="none">Không nhấn</option>
+          </select>
+        </label>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            data-testid="img-reset"
+            onClick={() => onChange({ ...opts, card: {} })}
+            className="st-btn st-sm st-ghost"
+          >
+            Dùng lại ảnh của bài
+          </button>
+          {card && (
+            <a
+              href={`/api/image/resize?url=${encodeURIComponent(card)}`}
+              download="fb-post-image.jpg"
+              data-testid="img-download"
+              className="st-btn st-sm"
+            >
+              Tải <span className="st-num">1200×630</span>
+            </a>
+          )}
+        </div>
+
+        <button type="button" data-testid="img-save" disabled={saved === 'saving' || !card} onClick={onSave} className="st-btn st-primary">
+          {saved === 'saving' ? 'Đang lưu…' : saved === 'saved' ? 'Đã lưu vào bài' : 'Lưu vào bài'}
+        </button>
+        {saved === 'error' && <p className="text-xs text-[hsl(var(--destructive))]">Không lưu được vào bài.</p>}
+        <p className="st-help">
+          Đổi kiểu thẻ, font, bo góc… ở <b>Bộ nhận diện → Ảnh chụp bài viết</b>. Ở đây chỉ sửa cho bài này.
+        </p>
+      </aside>
+    </div>
+  );
+}
+
+/** One file to Kho tài nguyên, through the old app's own upload route. */
+function Upload({ label, testId, onDone }: { label: string; testId: string; onDone: (url: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <label className={`st-btn st-sm st-ghost cursor-pointer ${busy ? 'opacity-50' : ''}`}>
+      {busy ? 'Đang tải…' : label}
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        data-testid={testId}
+        className="hidden"
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = '';
+          if (!f) return;
+          setBusy(true);
+          try {
+            const fd = new FormData();
+            fd.append('file', f);
+            const res = await fetch('/api/image/upload', { method: 'POST', body: fd });
+            const b = (await res.json().catch(() => ({}))) as { url?: string };
+            if (b.url) onDone(b.url);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+    </label>
+  );
+}
+
+/**
+ * Sửa bằng AI and Tạo script — the old app's two writing helps, on the step that writes.
+ *
+ * Both call the routes the old app calls (`/api/ai/refine`, `/api/ai/video-script`) with the
+ * bodies it sends; a second AI path would drift from the first the day either prompt changed.
+ */
+function DraftHelp({ draft, title, channelName, onApply }: { draft: string; title: string; channelName: string; onApply: (text: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState('');
+  const [out, setOut] = useState('');
+  const [busy, setBusy] = useState<'refine' | 'script' | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function call(what: 'refine' | 'script') {
+    setBusy(what);
+    setErr(null);
+    try {
+      const res =
+        what === 'refine'
+          ? await fetch('/api/ai/refine', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ draft, instruction: prompt }),
+            })
+          : await fetch('/api/ai/video-script', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, draft, channelName }),
+            });
+      const b = (await res.json().catch(() => ({}))) as { refined?: string; script?: string; text?: string; error?: string };
+      if (!res.ok) {
+        setErr(b.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      setOut(b.refined ?? b.script ?? b.text ?? '');
+      setOpen(true);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" data-testid="draft-ai" onClick={() => setOpen((v) => !v)} className="st-btn st-sm">
+          Sửa bằng AI
+        </button>
+        <button type="button" data-testid="draft-script" disabled={busy !== null} onClick={() => call('script')} className="st-btn st-sm">
+          {busy === 'script' ? 'Đang viết…' : 'Tạo script'}
+        </button>
+      </div>
+      {open && (
+        <div className="st-quiet flex flex-col gap-2 px-3 py-2.5">
+          <input
+            type="text"
+            data-testid="draft-ai-prompt"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Viết lại mở bài, thêm số liệu…"
+            className="rounded-lg border-2 border-foreground bg-background px-2.5 py-1.5 text-[13px]"
+          />
+          <button type="button" data-testid="draft-ai-run" disabled={busy !== null || !prompt.trim()} onClick={() => call('refine')} className="st-btn st-sm st-primary self-start">
+            {busy === 'refine' ? 'Đang sửa…' : 'Nhờ AI sửa'}
+          </button>
+          {err && <p className="text-xs text-[hsl(var(--destructive))]">{err}</p>}
+          {out && (
+            <>
+              <textarea data-testid="draft-ai-out" value={out} readOnly rows={6} className="w-full resize-y rounded-lg border-2 border-foreground bg-background p-2 text-[13px]" />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  data-testid="draft-ai-apply"
+                  onClick={() => {
+                    onApply(out);
+                    setOut('');
+                    setOpen(false);
+                  }}
+                  className="st-btn st-sm st-primary"
+                >
+                  Áp dụng
+                </button>
+                <button type="button" data-testid="draft-ai-discard" onClick={() => setOut('')} className="st-btn st-sm st-ghost">
+                  Bỏ
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

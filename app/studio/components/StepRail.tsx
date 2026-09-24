@@ -17,11 +17,16 @@ export interface RailItem {
   note?: string;
 }
 
+/**
+ * One accent, not four fills: the current step is the accent card, a finished one keeps the
+ * pen line and marks its number, a future one is quiet. Only an error gets a second colour,
+ * because an error is the one thing that must not read as "fine".
+ */
 const STATE_CLASS: Record<RailItem['state'], string> = {
-  done: 'bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]',
-  current: 'bg-primary text-primary-foreground',
-  error: 'bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]',
-  future: 'bg-secondary text-muted-foreground',
+  done: 'border-foreground bg-card shadow-[3px_3px_0_hsl(var(--foreground))]',
+  current: 'border-primary bg-sidebar-accent text-sidebar-accent-foreground shadow-[3px_3px_0_hsl(var(--foreground))]',
+  error: 'border-[hsl(var(--destructive))] bg-card text-[hsl(var(--destructive))]',
+  future: 'border-[var(--st-pen2)] bg-card text-muted-foreground',
 };
 
 export function StepRail({
@@ -44,18 +49,22 @@ export function StepRail({
             data-state={s.state}
             disabled={!onGo}
             onClick={() => onGo?.(s.id, i)}
-            className={`pen-line-sm flex flex-col items-start rounded-md px-2.5 py-1 text-left ${STATE_CLASS[s.state]} ${
+            className={`flex items-center gap-2 rounded-lg border-2 px-3 py-1.5 text-left ${STATE_CLASS[s.state]} ${
               onGo ? '' : 'cursor-default'
             }`}
           >
-            <span className="text-xs font-semibold">
-              {i + 1}. {s.label}
+            <span
+              className={`grid h-[22px] w-[22px] flex-none place-items-center rounded-full border-2 border-foreground text-[11px] ${
+                s.state === 'done' || s.state === 'current' ? 'bg-primary text-white' : 'bg-card'
+              }`}
+              style={{ fontFamily: "'Source Code Pro', monospace" }}
+            >
+              {s.state === 'done' ? '✓' : i + 1}
             </span>
-            {s.note && (
-              <span className="st-label opacity-80">
-                {s.note}
-              </span>
-            )}
+            <span className="min-w-0">
+              <b className="block text-[13px] leading-tight">{s.label}</b>
+              {s.note && <small className="block text-[10.5px] opacity-80">{s.note}</small>}
+            </span>
           </button>
           {i < items.length - 1 && (
             <span aria-hidden className="text-xs text-muted-foreground">

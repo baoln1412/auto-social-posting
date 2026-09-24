@@ -10,5 +10,9 @@ export default defineConfig({
   test: {
     include: ['tests/unit/**/*.test.ts'],
     environment: 'node',
+    // The unit suite exercises Studio's own code, so Studio is on: /api/studio/card is
+    // gated on this and answers 404 without it — which reached a test as "the run made no
+    // assets" rather than as "the card route refused".
+    env: { STUDIO_ENABLED: '1' },
   },
 });

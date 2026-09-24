@@ -17,6 +17,10 @@ export interface CardTab {
   width?: number;
   y?: number;
   comments?: 'none' | 'group';
+  /** An explicit main picture, chosen on the Ảnh step. Beats the article's own. */
+  bgUrl?: string;
+  /** An explicit circle inset. Classic engine only — the studio card has no inset. */
+  insetUrl?: string;
 }
 
 /** The clause the SOP paints in the highlight colour. */
@@ -78,9 +82,16 @@ export function cardParams(
         if (c.trim()) q.append('c', c.trim());
       }
     }
-    if (articleUrl && (card.background ?? 'none') === 'article') q.set('bg', articleUrl);
+    if (card.bgUrl) q.set('bg', card.bgUrl);
+    else if (articleUrl && (card.background ?? 'none') === 'article') q.set('bg', articleUrl);
+  } else if (card.bgUrl) {
+    // An explicit picture beats the article's own: the Ảnh step is where the owner says
+    // which of the article's images — or an upload — this post's card should show.
+    q.set('bg', card.bgUrl);
+    if (card.insetUrl) q.set('inset', card.insetUrl);
   } else if (articleUrl && (card.background ?? 'article') === 'article') {
     q.set('article', articleUrl);
+    if (card.insetUrl) q.set('inset', card.insetUrl);
   }
   return q;
 }

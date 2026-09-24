@@ -20,6 +20,21 @@ export function goldRowToItem(row: Record<string, any>): SourceItem {
     url: row.article_url ?? undefined,
     source: row.source_name ?? undefined,
     comments,
+    // The article's own pictures, for the Ảnh step to choose between. A JSON array in the
+    // lake, a bare column, or nothing — all three shapes exist in rows already written.
+    images: (() => {
+      const many = (() => {
+        try {
+          const v = JSON.parse(String(row.image_urls ?? '[]'));
+          return Array.isArray(v) ? v.map(String) : [];
+        } catch {
+          return String(row.image_urls ?? '')
+            .split(/[\n,]/)
+            .map((x) => x.trim());
+        }
+      })();
+      return [...new Set([row.image_url, ...many].filter((u): u is string => typeof u === 'string' && /^https?:/.test(u)))];
+    })(),
   };
 }
 
