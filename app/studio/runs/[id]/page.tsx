@@ -5,9 +5,10 @@ import { can, tier } from '@/lib/studio/tier';
 import { sourceFor } from '@/lib/studio/steps/fetch';
 import { captionStyle, voiceId } from '@/lib/studio/kits/load';
 import { listMedia } from '@/lib/studio/assets';
-import { effectiveKit } from '@/lib/studio/steps/types';
+import { effectiveKit, RUN_STATUS_LABELS } from '@/lib/studio/steps/types';
 import type { SourceItem, StepName } from '@/lib/studio/steps/types';
 import { RunView, type StepView } from '../../components/RunView';
+import { PageHeader } from '../../components/PageHeader';
 import runTour from '@/lib/studio/tours/run.json';
 import { Tour } from '../../components/Tour';
 
@@ -45,6 +46,16 @@ export default async function RunPage({ params }: { params: { id: string } }) {
 
   return (
     <>
+      <PageHeader
+        title={rec.channel.name}
+        sub={
+          <>
+            {sourceFor(rec.channel.sources_json, rec.run.item_ref).def.label} · kit {rec.kit.name} ·{' '}
+            {RUN_STATUS_LABELS[rec.run.status] ?? rec.run.status} · <span className="st-num">#{rec.run.id.slice(0, 8)}</span>
+          </>
+        }
+      />
+      <div className="st-content">
       <Tour id="run" steps={runTour} />
       <RunView
       runId={rec.run.id}
@@ -69,6 +80,7 @@ export default async function RunPage({ params }: { params: { id: string } }) {
       selection={rec.run.selection}
         canSpend={can(t, 'spend')}
       />
+      </div>
     </>
   );
 }

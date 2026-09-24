@@ -30,6 +30,7 @@ import {
   type StepName,
   type StepOptions,
   type StepPreview,
+  RUN_STATUS_LABELS,
 } from '@/lib/studio/steps/types';
 import { OverrideDrawer, type KitOption } from './OverrideDrawer';
 import { StepRail, type RailItem } from './StepRail';
@@ -73,13 +74,7 @@ export interface RunViewProps {
   canSpend: boolean;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  new: 'mới',
-  running: 'đang chạy',
-  blocked: 'bị chặn',
-  done: 'xong',
-  error: 'lỗi',
-};
+const STATUS_LABEL = RUN_STATUS_LABELS;
 
 const money = (m?: Money) => `$${(m?.usd ?? 0).toFixed(2)}`;
 
@@ -218,13 +213,6 @@ export function RunView(p: RunViewProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h1 className="text-xl font-bold">{p.channelName}</h1>
-        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-          {p.sourceLabel} · {p.kitName} · {STATUS_LABEL[p.status] ?? p.status} · {p.runId.slice(0, 8)}
-        </span>
-      </header>
-
       <StepRail items={rail} onGo={(id) => setView(id as StepName)} />
 
       {err && (
@@ -247,7 +235,7 @@ export function RunView(p: RunViewProps) {
               </span>
             )}
             {s?.error && (
-              <span className="font-mono text-[11px] text-[hsl(var(--destructive))]">{s.error}</span>
+              <span className="text-[12px] font-semibold text-[hsl(var(--destructive))]">{s.error}</span>
             )}
           </div>
 
@@ -329,7 +317,7 @@ export function RunView(p: RunViewProps) {
                       data-testid={`render-${r}`}
                       data-done={render.done.includes(r) ? 'true' : 'false'}
                       data-current={render.step === r ? 'true' : 'false'}
-                      className={`rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
+                      className={`rounded-md px-2 py-0.5 st-label ${
                         render.done.includes(r)
                           ? 'bg-[hsl(var(--success))] text-[hsl(var(--success-foreground))]'
                           : render.step === r
@@ -480,7 +468,7 @@ export function RunView(p: RunViewProps) {
   );
 }
 
-const CAPS = 'font-mono text-[10px] uppercase tracking-wider text-muted-foreground';
+const CAPS = 'st-label text-muted-foreground';
 
 /**
  * Đăng — where the finished run goes.
@@ -690,7 +678,7 @@ function Listen({
   );
 }
 
-const CTRL = 'flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground';
+const CTRL = 'flex items-center gap-1 st-label text-muted-foreground';
 const SEL = 'pen-line-sm rounded-md bg-card px-1.5 py-0.5 font-sans text-xs font-semibold text-foreground';
 
 function Preview({ preview, stale }: { preview: StepPreview; stale?: boolean }) {
@@ -752,7 +740,7 @@ function Veil({ stale, children }: { stale?: boolean; children: React.ReactNode 
   );
 }
 
-const ACT = 'font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary';
+const ACT = 'st-label text-muted-foreground hover:text-primary';
 
 function SceneBoard({
   scenes,
@@ -796,7 +784,7 @@ function SceneBoard({
             }`}
             style={{ marginLeft: s.kind === 'comment' ? 14 : 0 }}
           >
-            <span className="mr-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="mr-1.5 st-label text-muted-foreground">
               {s.kind === 'comment' ? '↳ ' : ''}Cảnh #{s.n} ·{' '}
               {s.kind === 'post' ? 'bài gốc' : `${s.score ?? '—'} likes`}
             </span>
@@ -853,7 +841,7 @@ function SceneBoard({
 
       {pool.length > 0 && (
         <div data-testid="comment-pool">
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center gap-2 st-label text-muted-foreground">
             <span>Comment khác · {unpicked}</span>
             <label className="flex cursor-pointer items-center gap-1">
               <input

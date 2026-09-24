@@ -8,6 +8,8 @@ import { NewRunBox, type ChannelRow } from './components/NewRunBox';
 import newTour from '@/lib/studio/tours/new.json';
 import { Tour } from './components/Tour';
 
+import { PageHeader } from '@/app/studio/components/PageHeader';
+
 export const dynamic = 'force-dynamic';
 
 /** Gold posts of the first gold channel that have no Studio reel yet. Best-effort: a source
@@ -45,17 +47,18 @@ export default async function StudioNewPage() {
   ]);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-      {/* Small, but present: the drawing has no title here, and every screen still needs one
-          heading for structure and for a screen reader. */}
-      <h1 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-        /studio · tạo mới
-      </h1>
+    <>
+      <PageHeader title="Tạo video" />
+      <div className="st-content">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+      <h2 className="text-center text-[40px] font-extrabold leading-none" style={{ fontFamily: "'Baloo 2', system-ui, sans-serif" }}>
+        Dựng <em className="text-primary" style={{ fontStyle: 'italic', fontWeight: 700 }}>video mới</em>
+      </h2>
 
       <NewRunBox channels={channels} kits={kits} canSpend={can(t, 'spend')} />
 
       <section>
-        <h2 className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <h2 className="mb-1.5 st-label text-muted-foreground">
           Gợi ý từ kho nguồn · bài gold chưa có video
         </h2>
         {gợi.length === 0 ? (
@@ -72,7 +75,7 @@ export default async function StudioNewPage() {
                   className="pen-line-static block rounded-md bg-card px-2.5 py-2 hover:bg-secondary"
                 >
                   <span className="line-clamp-2 text-[13px] leading-snug">{s.title}</span>
-                  <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span className="mt-0.5 block st-label text-muted-foreground">
                     gold {s.source ? `· ${s.source}` : ''} · chưa có reel
                   </span>
                 </Link>
@@ -83,7 +86,7 @@ export default async function StudioNewPage() {
       </section>
 
       <section>
-        <h2 className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <h2 className="mb-1.5 st-label text-muted-foreground">
           Kết quả gần đây
         </h2>
         {recent.length === 0 ? (
@@ -118,5 +121,7 @@ export default async function StudioNewPage() {
 
       <Tour id="new" steps={newTour} />
     </div>
+      </div>
+    </>
   );
 }

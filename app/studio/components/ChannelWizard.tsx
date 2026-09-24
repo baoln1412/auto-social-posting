@@ -126,7 +126,7 @@ export function ChannelWizard({
             key={s}
             data-testid={`rail-${i}`}
             data-active={i === step}
-            className={`pen-line-sm rounded-md px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider ${
+            className={`pen-line-sm rounded-md px-2.5 py-1 st-label ${
               i === step
                 ? 'bg-primary text-primary-foreground'
                 : i < step
@@ -165,7 +165,7 @@ export function ChannelWizard({
                   {s.blocked && (
                     <span
                       data-testid={`blocked-${s.kind}`}
-                      className="mt-1 block font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--warning))]"
+                      className="mt-1 block st-label text-[hsl(var(--warning))]"
                     >
                       {s.blocked}
                     </span>
@@ -233,7 +233,7 @@ export function ChannelWizard({
                 {items.map((i) => (
                   <li key={i.id} data-testid="test-item" className="rounded-md bg-secondary px-2 py-1.5 text-sm">
                     <span className="font-medium">{i.title}</span>
-                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <span className="ml-2 st-label text-muted-foreground">
                       {i.source ?? '—'} · {i.comments} bình luận
                     </span>
                   </li>

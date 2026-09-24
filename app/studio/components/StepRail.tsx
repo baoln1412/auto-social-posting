@@ -52,7 +52,7 @@ export function StepRail({
               {i + 1}. {s.label}
             </span>
             {s.note && (
-              <span className="font-mono text-[10px] uppercase tracking-wider opacity-80">
+              <span className="st-label opacity-80">
                 {s.note}
               </span>
             )}

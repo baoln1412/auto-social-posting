@@ -51,7 +51,7 @@ export interface KitOpt {
 
 const STEPS = ['Nguồn', 'Lọc & xếp', 'Đầu ra', 'Ảnh & video', 'Lịch'];
 
-const CAPS = 'font-mono text-[10px] uppercase tracking-wider text-muted-foreground';
+const CAPS = 'st-label text-muted-foreground';
 const CARD = 'pen-line-static rounded-[var(--radius)] bg-card p-3';
 const BTN = 'pen-line-sm rounded-md px-2.5 py-1 text-xs font-semibold disabled:opacity-50';
 const FIELD = 'pen-line-sm w-full rounded-md bg-background px-2 py-1 text-sm outline-none';
@@ -526,7 +526,7 @@ function OrderStep({
               <span className={`${CAPS} w-5`}>{i + 1}</span>
               <span className="min-w-0 flex-1 truncate">{r.title}</span>
               <span className={CAPS}>{r.source}</span>
-              <span className="font-mono text-[11px] font-semibold">{r.score}</span>
+              <span className="st-num text-[12px]">{r.score}</span>
               <span data-testid="queue-parts" className={CAPS}>
                 {r.parts.map((p: any) => `${p.label} ${p.value}`).join(' · ')}
               </span>

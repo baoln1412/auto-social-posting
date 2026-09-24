@@ -231,3 +231,12 @@ export function effectiveKit(kit: Kit, overrides: Overrides): Kit {
   }
   return out;
 }
+
+/** A run's status, as the header and the run page say it. Pure: a server page imports it. */
+export const RUN_STATUS_LABELS: Record<string, string> = {
+  new: 'mới',
+  running: 'đang chạy',
+  blocked: 'bị chặn',
+  done: 'xong',
+  error: 'lỗi',
+};

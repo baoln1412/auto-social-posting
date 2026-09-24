@@ -53,7 +53,7 @@ export function TelegramSettings({
         <h2 className="text-sm font-semibold">Thông báo Telegram</h2>
         <span
           data-testid="tg-state"
-          className="pen-line-sm rounded-md bg-secondary px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+          className="pen-line-sm rounded-md bg-secondary px-2 py-0.5 st-label"
         >
           {blocked ? 'chưa có token' : chatId ? (enabled ? 'đang bật' : 'đã nối, đang tắt') : 'chưa nối'}
         </span>
@@ -63,7 +63,7 @@ export function TelegramSettings({
       </p>
 
       {blocked ? (
-        <p data-testid="tg-blocked" className="font-mono text-[11px] text-[hsl(var(--warning))]">
+        <p data-testid="tg-blocked" className="text-[12px] font-semibold text-[hsl(var(--warning))]">
           {blocked}
         </p>
       ) : chatId ? (
@@ -133,7 +133,7 @@ export function TelegramSettings({
             <div className="flex flex-col gap-2">
               <p className="text-xs">
                 Mở{' '}
-                <span className="font-mono">
+                <span className={bot ? 'st-num' : ''}>
                   {bot ? `@${bot}` : 'bot của bạn'}
                 </span>{' '}
                 trên Telegram và gửi mã này:

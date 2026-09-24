@@ -47,7 +47,7 @@ export function OverrideDrawer({
     <details open={open} data-testid="override-drawer" className="pen-line-static rounded-md bg-card">
       <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold">
         ⚙ Tuỳ chỉnh riêng lượt này
-        {count > 0 && <span className="ml-2 font-mono text-[10px] text-primary">{count} thay đổi</span>}
+        {count > 0 && <span className="ml-2 text-[11px] font-semibold text-primary"><span className="st-num">{count}</span> thay đổi</span>}
       </summary>
 
       <div className="border-t border-border px-3 py-2">
@@ -198,7 +198,7 @@ export function OverrideDrawer({
           <a
             href={`/studio/kits/${kitId}?run=${runId}`}
             data-testid="ov-full-config"
-            className="mt-1 block py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary"
+            className="mt-1 block py-1.5 st-label text-muted-foreground hover:text-primary"
           >
             ⚙ Mở cấu hình đầy đủ →
           </a>

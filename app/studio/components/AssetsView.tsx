@@ -53,7 +53,7 @@ export function AssetsView({
   return (
     <div className="flex flex-col gap-6">
       <div className="pen-line-static rounded-[var(--radius)] bg-card p-4">
-        <div className="mb-2 flex items-center justify-between font-mono text-[11px] uppercase tracking-wider">
+        <div className="mb-2 flex items-center justify-between st-label">
           <span>Dung lượng</span>
           <span data-testid="quota-label">
             {mb(quota.bytes)} / 50 MB · {quota.files} / 30 tệp
@@ -102,7 +102,7 @@ export function AssetsView({
         const rows = media.filter((m) => m.kind === k.id);
         return (
           <section key={k.id}>
-            <h2 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+            <h2 className="mb-2 st-label text-muted-foreground">
               {k.label} · {rows.length}
             </h2>
             {rows.length === 0 ? (

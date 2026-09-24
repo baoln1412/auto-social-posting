@@ -3,6 +3,8 @@ import { studioDb } from '@/lib/studio/db';
 import { cardParams, cardPath } from '@/lib/studio/kits/load';
 import type { Kit } from '@/lib/studio/steps/types';
 
+import { PageHeader } from '@/app/studio/components/PageHeader';
+
 export const dynamic = 'force-dynamic';
 
 /** One headline, every kit — the only way to see what a kit actually changes. */
@@ -18,13 +20,10 @@ export default function KitsPage() {
   }[];
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Bộ nhận diện</h1>
-        <p className="text-sm text-muted-foreground">
-          Cùng một tiêu đề, mỗi bộ một kiểu. Đây là cách duy nhất thấy được bộ nào đổi cái gì.
-        </p>
-      </header>
+    <>
+      <PageHeader title="Bộ nhận diện" sub="Cùng một tiêu đề, mỗi bộ một kiểu. Đây là cách duy nhất thấy được bộ nào đổi cái gì." />
+      <div className="st-content">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
 
       <ul data-testid="kit-grid" className="grid gap-6 sm:grid-cols-2">
         {rows.map((r) => {
@@ -48,7 +47,7 @@ export default function KitsPage() {
               </Link>
               <div className="flex items-center gap-2">
                 <span className="font-medium">{r.name}</span>
-                <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <span className="ml-auto st-label text-muted-foreground">
                   {card.ratio} · {card.highlight}
                 </span>
               </div>
@@ -56,6 +55,8 @@ export default function KitsPage() {
           );
         })}
       </ul>
-    </div>
+      </div>
+      </div>
+    </>
   );
 }

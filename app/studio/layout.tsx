@@ -1,73 +1,60 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { Plus, Send } from 'lucide-react';
 import { tier } from '@/lib/studio/tier';
 import { seedDemo } from '@/lib/studio/demo/seed';
+import { studioDb } from '@/lib/studio/db';
+import { StudioNav } from './components/StudioNav';
+import './studio.css';
 
 // Studio is off unless the server says otherwise, so :3000's production build never
 // exposes a half-built route tree. `npm run dev:studio` sets it.
 export const dynamic = 'force-dynamic';
 
-// `soon` items are drawn but not linked — the shell shows its whole shape from slice 0,
-// and each slice flips one flag as it lands.
-const NAV: { href: string; label: string; soon?: boolean }[] = [
-  { href: '/studio', label: 'Tạo mới' },
-  { href: '/studio/pipeline', label: 'Nguồn tự động' },
-  { href: '/studio/channels', label: 'Kênh' },
-  { href: '/studio/kits', label: 'Bộ nhận diện' },
-  { href: '/studio/library', label: 'Thư viện' },
-  { href: '/studio/assets', label: 'Kho tài nguyên' },
-  { href: '/studio/guide', label: 'Hướng dẫn' },
-  { href: '/studio/settings', label: 'Cài đặt' },
-];
+/** Runs started in the last seven days — the small count beside Thư viện. */
+function weekRuns(): number {
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  return (studioDb().prepare('SELECT COUNT(*) AS n FROM studio_runs WHERE created_at >= ?').get(since) as { n: number }).n;
+}
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {
   if (!process.env.STUDIO_ENABLED) notFound();
-  const t = tier();
+  tier();
   seedDemo();
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="flex w-56 shrink-0 flex-col gap-6 border-r-2 border-foreground/15 p-5">
-        <Link href="/studio" className="block">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Desoul
-          </div>
-          <div className="text-xl font-bold leading-tight">Studio</div>
+    <div className="st-app bg-background">
+      <aside data-testid="studio-side" className="st-side">
+        <Link href="/studio" className="st-lockup">
+          {/* The head is INSIDE the word — DESOUL is an image, never typed (brand rule 3).
+              The sub-word is set in type at the size AppSidebar measured for a 140px wordmark. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/wordmark.png" alt="DESOUL" className="w-full max-w-[140px] h-auto" />
+          <span className="desoul-subword uppercase" style={{ fontSize: '29.2px', marginTop: '-6px' }}>
+            Studio
+          </span>
         </Link>
 
-        <nav className="flex flex-col gap-1">
-          {NAV.map((n) =>
-            n.soon ? (
-              <span
-                key={n.href}
-                className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-muted-foreground/60"
-              >
-                {n.label}
-                <span className="font-mono text-[10px] uppercase tracking-wider">sắp có</span>
-              </span>
-            ) : (
-              <Link
-                key={n.href}
-                href={n.href}
-                className="rounded-md px-3 py-2 text-sm font-medium hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              >
-                {n.label}
-              </Link>
-            ),
-          )}
-        </nav>
+        <Link href="/studio" data-testid="studio-cta" className="st-cta pen-line">
+          <Plus strokeWidth={2.5} />
+          Tạo video mới
+        </Link>
 
-        <div className="mt-auto">
-          <span
-            data-testid="tier-badge"
-            className="pen-line-sm inline-block rounded-md bg-card px-2 py-1 font-mono text-[11px] uppercase tracking-wider"
-          >
-            {t}
-          </span>
+        <StudioNav counts={{ '/studio/library': weekRuns() }} />
+
+        <div className="st-tip pen-line-static">
+          <b>
+            <Send strokeWidth={2.25} />
+            Nhận video qua Telegram
+          </b>
+          <p>Video render xong tự về chat của bạn, kèm cảnh báo khi lỗi.</p>
+          <Link href="/studio/settings" className="st-btn st-primary st-sm w-full">
+            Kết nối ngay
+          </Link>
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 p-8">{children}</main>
+      <div className="st-main">{children}</div>
     </div>
   );
 }

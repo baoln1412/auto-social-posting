@@ -8,6 +8,8 @@ import { loadPipeline } from '@/lib/studio/pipeline/config';
 import { can, tier } from '@/lib/studio/tier';
 import { PipelineSetup, type MarketRow } from '../../components/PipelineSetup';
 
+import { PageHeader } from '@/app/studio/components/PageHeader';
+
 export const dynamic = 'force-dynamic';
 
 /**
@@ -56,19 +58,18 @@ export default async function PipelinePage({ params }: { params: { market: strin
   }[];
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-      <header className="flex flex-wrap items-baseline gap-2">
-        <h1 className="text-xl font-bold">{market.name}</h1>
-        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-          nguồn tự động · rev {loadPipeline(market.id).revision}
-        </span>
-        <Link
-          href="/studio/pipeline"
-          className="ml-auto font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary"
-        >
-          ← tất cả thị trường
-        </Link>
-      </header>
+    <>
+      <PageHeader
+        title={market.name}
+        sub={<>Nguồn tự động · bản <span className="st-num">{loadPipeline(market.id).revision}</span></>}
+        right={
+          <Link href="/studio/pipeline" className="st-btn st-ghost st-sm">
+            ← Tất cả thị trường
+          </Link>
+        }
+      />
+      <div className="st-content">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
 
       <PipelineSetup
         market={market}
@@ -77,5 +78,7 @@ export default async function PipelinePage({ params }: { params: { market: strin
         schedule={scheduleText()}
       />
     </div>
+      </div>
+    </>
   );
 }

@@ -2,6 +2,10 @@
 """Put our screen beside the reference screen it answers.
 
     pair-shot.py <slice>-<screen> <ours.png> <ref.jpg> ["left label" "right label"]
+    pair-shot.py <slice>-<screen> <ours.png> <mock.png> <ref.jpg> --triple ["ours" "mock" "ref"]
+
+v3 (2026-09-24) added the triple: the approved mock sits between ours and the reference, so
+the pair answers "did we build the drawing" and "does the drawing answer the reference" at once.
 
 Writes tests/shots/pairs/<slice>-<screen>.png. The pair IS the acceptance test for UX
 parity — "looks fine to me" does not close a slice — so it is committed with the code.
@@ -49,18 +53,23 @@ def main() -> int:
     if len(sys.argv) < 4:
         print(__doc__)
         return 2
-    name, ours_p, ref_p = sys.argv[1:4]
-    left = sys.argv[4] if len(sys.argv) > 4 else "OURS"
-    right = sys.argv[5] if len(sys.argv) > 5 else "REFERENCE"
+    args = [x for x in sys.argv[1:] if x != "--triple"]
+    triple = "--triple" in sys.argv
+    name = args[0]
+    paths = args[1:4] if triple else args[1:3]
+    labels = args[4:] if triple else args[3:]
+    defaults = ["OURS", "MOCK", "REFERENCE"] if triple else ["OURS", "REFERENCE"]
+    labels = labels + defaults[len(labels):]
 
-    a, b = panel(ours_p), panel(ref_p)
-    out = Image.new("RGB", (a.width + GAP + b.width, H + BAR), BG)
+    panels = [panel(p) for p in paths]
+    out = Image.new("RGB", (sum(p.width for p in panels) + GAP * (len(panels) - 1), H + BAR), BG)
     d = ImageDraw.Draw(out)
     f = font(15)
-    d.text((8, 6), f"{left}  ·  {name}", INK, font=f)
-    d.text((a.width + GAP + 8, 6), right, INK, font=f)
-    out.paste(a, (0, BAR))
-    out.paste(b, (a.width + GAP, BAR))
+    x = 0
+    for i, (im, label) in enumerate(zip(panels, labels)):
+        d.text((x + 8, 6), f"{label}  ·  {name}" if i == 0 else label, INK, font=f)
+        out.paste(im, (x, BAR))
+        x += im.width + GAP
 
     dest = Path("tests/shots/pairs") / f"{name}.png"
     dest.parent.mkdir(parents=True, exist_ok=True)

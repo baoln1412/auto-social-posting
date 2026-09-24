@@ -4,6 +4,8 @@ import { query } from '@/app/lib/db';
 import { loadPipeline } from '@/lib/studio/pipeline/config';
 import { can, tier } from '@/lib/studio/tier';
 
+import { PageHeader } from '@/app/studio/components/PageHeader';
+
 export const dynamic = 'force-dynamic';
 
 /** Which markets exist, and which of them have been set up here. */
@@ -13,13 +15,10 @@ export default async function PipelineIndex() {
   const markets = (data ?? []) as { id: string; name: string; country_code: string }[];
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-      <header>
-        <h1 className="text-xl font-bold">Nguồn tự động</h1>
-        <p className="text-sm text-muted-foreground">
-          Một thiết lập cho mỗi thị trường: nguồn → lọc &amp; xếp → dạng bài → ảnh → lịch.
-        </p>
-      </header>
+    <>
+      <PageHeader title="Nguồn tự động" sub="Một thiết lập cho mỗi thị trường: nguồn → lọc &amp; xếp → dạng bài → ảnh → lịch." />
+      <div className="st-content">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
 
       <ul data-testid="market-list" className="flex flex-col gap-2">
         {markets.map((m) => {
@@ -32,7 +31,7 @@ export default async function PipelineIndex() {
                 className="pen-line-static flex flex-wrap items-baseline gap-2 rounded-[var(--radius)] bg-card px-3 py-2 hover:bg-secondary"
               >
                 <span className="text-sm font-semibold">{m.name}</span>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <span className="st-label text-muted-foreground">
                   {p.revision === 0
                     ? 'chưa thiết lập'
                     : `${p.config.output.format} · rev ${p.revision}`}
@@ -42,6 +41,8 @@ export default async function PipelineIndex() {
           );
         })}
       </ul>
-    </div>
+      </div>
+      </div>
+    </>
   );
 }

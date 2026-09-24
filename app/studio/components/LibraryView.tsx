@@ -87,7 +87,7 @@ export function LibraryView({ items }: { items: LibraryItem[] }) {
 
       {days.map((d) => (
         <section key={d.day} data-testid="lib-day">
-          <h2 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+          <h2 className="mb-2 st-label text-muted-foreground">
             {d.day} · {d.items.length}
           </h2>
 
@@ -135,7 +135,7 @@ export function LibraryView({ items }: { items: LibraryItem[] }) {
                   </Link>
 
                   <div className={`flex items-center gap-2 ${grid ? 'mt-auto' : 'ml-auto'}`}>
-                    <span className="truncate font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <span className="truncate st-label text-muted-foreground">
                       {i.channelName} · {STATUS[i.status] ?? i.status}
                     </span>
                     {mp4?.url && (

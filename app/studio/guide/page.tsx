@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { PageHeader } from '@/app/studio/components/PageHeader';
+
 export const dynamic = 'force-dynamic';
 
 /** Task cards, each opening the screen that does it. */
@@ -33,11 +35,10 @@ const CARDS = [
 
 export default function GuidePage() {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Hướng dẫn</h1>
-        <p className="text-sm text-muted-foreground">Mỗi thẻ mở thẳng màn hình làm việc đó.</p>
-      </header>
+    <>
+      <PageHeader title="Hướng dẫn" sub="Mỗi thẻ mở thẳng màn hình làm việc đó." />
+      <div className="st-content">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <ul className="grid gap-3 sm:grid-cols-2">
         {CARDS.map((c) => (
           <li key={c.href}>
@@ -48,6 +49,8 @@ export default function GuidePage() {
           </li>
         ))}
       </ul>
-    </div>
+      </div>
+      </div>
+    </>
   );
 }

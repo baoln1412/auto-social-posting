@@ -75,7 +75,7 @@ function VoiceTry({ voiceId }: { voiceId: string }) {
   if (voiceId) q.set('voice', voiceId);
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <span className="st-label text-muted-foreground">
         Đọc thử
       </span>
       <textarea
@@ -280,7 +280,7 @@ export function KitEditor({
             </button>
           )}
           {saved && (
-            <span data-testid="kit-saved" className="font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--success))]">
+            <span data-testid="kit-saved" className="st-label text-[hsl(var(--success))]">
               đã lưu
             </span>
           )}
@@ -368,7 +368,7 @@ export function KitEditor({
 
             {tab.media && tab.media.length > 0 && (
               <div data-testid="kit-media" className="flex flex-col gap-1.5">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <span className="st-label text-muted-foreground">
                   Tệp của bạn
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -430,7 +430,7 @@ export function KitEditor({
                       onChange={(e) => patch({ [f.key]: e.target.value.toUpperCase() })}
                       className="h-6 w-10 cursor-pointer rounded-md border-0 bg-transparent p-0"
                     />
-                    <span className="font-mono text-[10px] text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground">
                       {values[f.key] === undefined ? 'theo giao diện' : String(values[f.key])}
                     </span>
                     {values[f.key] !== undefined && (
@@ -514,7 +514,7 @@ export function KitEditor({
                 </button>
               )}
               {saved && (
-                <span data-testid="kit-saved" className="font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--success))]">
+                <span data-testid="kit-saved" className="st-label text-[hsl(var(--success))]">
                   đã lưu
                 </span>
               )}
@@ -544,7 +544,7 @@ export function KitEditor({
               }`}
             >
               <span className="text-xs font-semibold">{t.label}</span>
-              <span className="font-mono text-[10px] text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {summarise(t, (kit[t.key] ?? {}) as Record<string, unknown>)}
               </span>
             </button>

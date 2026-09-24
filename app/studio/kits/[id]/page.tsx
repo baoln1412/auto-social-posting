@@ -9,6 +9,8 @@ import { KitEditor, type FieldSpec, type TabSpec } from '../../components/KitEdi
 import { TAB_LABELS, TAB_ORDER, labelFor } from '@/lib/studio/kits/labels';
 import captionPresets from '@/deploy/assets/caption-presets.json';
 
+import { PageHeader } from '@/app/studio/components/PageHeader';
+
 export const dynamic = 'force-dynamic';
 
 /**
@@ -95,13 +97,10 @@ export default function KitEditorPage({
     }));
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">{row.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          Mỗi thẻ dưới đây là một tab của bộ nhận diện, kèm trạng thái hiện tại.
-        </p>
-      </header>
+    <>
+      <PageHeader title="Cấu hình video" sub={row.name} />
+      <div className="st-content">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <KitEditor
         kit={kit}
         tabs={tabs}
@@ -109,5 +108,7 @@ export default function KitEditorPage({
         samplePlate={path.join(process.cwd(), 'public', 'studio-demo', 'card.png')}
       />
     </div>
+      </div>
+    </>
   );
 }

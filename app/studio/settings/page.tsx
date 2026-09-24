@@ -3,18 +3,17 @@ import { getSetting } from '@/lib/studio/settings';
 import { can, tier } from '@/lib/studio/tier';
 import { TelegramSettings } from '../components/TelegramSettings';
 
+import { PageHeader } from '@/app/studio/components/PageHeader';
+
 export const dynamic = 'force-dynamic';
 
 export default function SettingsPage() {
   const t = tier();
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold">Cài đặt</h1>
-        <p className="text-sm text-muted-foreground">
-          Quyền hiện tại: <span className="font-mono text-xs uppercase">{t}</span>
-        </p>
-      </header>
+    <>
+      <PageHeader title="Cài đặt" sub={<>Quyền hiện tại: <b>{t}</b></>} />
+      <div className="st-content">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
 
       {can(t, 'deliver') ? (
         <TelegramSettings
@@ -29,8 +28,10 @@ export default function SettingsPage() {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Trạng thái gửi: <span className="font-mono">{deliveryOn() ? 'bật' : 'tắt'}</span>
+        Trạng thái gửi: <b>{deliveryOn() ? 'bật' : 'tắt'}</b>
       </p>
-    </div>
+      </div>
+      </div>
+    </>
   );
 }

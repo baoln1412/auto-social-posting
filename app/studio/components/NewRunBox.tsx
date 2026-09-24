@@ -25,7 +25,7 @@ export interface ChannelRow {
 }
 
 const CARD = 'pen-line-static flex flex-col gap-2 rounded-[var(--radius)] bg-card p-3';
-const CAPS = 'font-mono text-[10px] uppercase tracking-wider text-muted-foreground';
+const CAPS = 'st-label text-muted-foreground';
 const BTN = 'pen-line-sm rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50';
 
 export function NewRunBox({

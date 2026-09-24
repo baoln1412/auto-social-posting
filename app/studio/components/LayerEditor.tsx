@@ -30,7 +30,7 @@ import {
   type LayerType,
 } from '@/lib/studio/layers';
 
-const CAPS = 'font-mono text-[10px] uppercase tracking-wider text-muted-foreground';
+const CAPS = 'st-label text-muted-foreground';
 const BTN = 'pen-line-sm rounded-md px-2 py-1 text-xs font-semibold disabled:opacity-40';
 
 export type LayerMap = Partial<Record<FrameKey, Layer[]>>;

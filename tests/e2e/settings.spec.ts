@@ -25,11 +25,12 @@ test('every nav item now leads to a screen that renders', async ({ page }) => {
   await page.goto('/studio');
   await page.getByTestId('tour-skip').click();
   // "Nothing is still marked sắp có" is the claim — not a number, which breaks the day the
-  // nav grows for an unrelated reason. `soon` items render as a <span>, links as <a>.
+  // nav grows for an unrelated reason. (v3's nav rows carry a count <span>, so the claim is
+  // made on the text itself, not on the tag.)
   const links = page.locator('aside nav a');
   const n = await links.count();
   expect(n).toBeGreaterThan(0);
-  await expect(page.locator('aside nav span')).toHaveCount(0);
+  await expect(page.locator('aside nav').getByText('sắp có')).toHaveCount(0);
   for (let i = 0; i < n; i++) {
     await page.goto('/studio');
     const href = await links.nth(i).getAttribute('href');

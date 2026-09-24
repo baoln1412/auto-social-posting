@@ -44,7 +44,7 @@ export function Tour({ id, steps }: { id: string; steps: TourStep[] }) {
       aria-label={step.title}
       className="pen-line-static fixed right-6 top-20 z-50 w-80 rounded-[var(--radius)] bg-card p-4"
     >
-      <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="st-eyebrow mb-1">
         Tổng quan {i + 1}/{steps.length}
       </div>
       <h3 className="mb-1 text-sm font-semibold">{step.title}</h3>
