@@ -15,7 +15,8 @@ test('the library groups by day, finds a run by its source link, and downloads i
     await request.post(`/api/studio/runs/${id}/advance`, { data: {} });
   }
 
-  await page.goto('/studio/library');
+  // v3: the library is the post lake; runs with no post (demo:, url:, text:) live under Khác.
+  await page.goto('/studio/library?market=other');
   await page.getByTestId('tour-skip').click();
 
   await expect(page.getByTestId('lib-day').first()).toBeVisible();

@@ -5,7 +5,7 @@ import { can, tier } from '@/lib/studio/tier';
 import { sourceFor } from '@/lib/studio/steps/fetch';
 import { captionStyle, voiceId } from '@/lib/studio/kits/load';
 import { listMedia } from '@/lib/studio/assets';
-import { effectiveKit, RUN_STATUS_LABELS } from '@/lib/studio/steps/types';
+import { ALL_STEPS, effectiveKit, RUN_STATUS_LABELS } from '@/lib/studio/steps/types';
 import type { SourceItem, StepName } from '@/lib/studio/steps/types';
 import { RunView, type StepView } from '../../components/RunView';
 import { PageHeader } from '../../components/PageHeader';
@@ -14,9 +14,19 @@ import { Tour } from '../../components/Tour';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RunPage({ params }: { params: { id: string } }) {
+export default async function RunPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { step?: string };
+}) {
   const rec = getRun(params.id);
   if (!rec) notFound();
+  // ?step=image opens that screen first — the library's Sửa ảnh / Đăng land here.
+  const initialView = (ALL_STEPS as readonly string[]).includes(searchParams.step ?? '')
+    ? (searchParams.step as StepName)
+    : undefined;
 
   const t = tier();
   const done = rec.run.status === 'done';
@@ -59,6 +69,7 @@ export default async function RunPage({ params }: { params: { id: string } }) {
       <Tour id="run" steps={runTour} />
       <RunView
       runId={rec.run.id}
+      initialView={initialView}
       sourceLabel={sourceFor(rec.channel.sources_json, rec.run.item_ref).def.label}
       status={rec.run.status}
       currentStep={rec.run.current_step}

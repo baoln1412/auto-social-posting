@@ -57,6 +57,8 @@ export interface RunViewProps {
   preview: LivePreview | null;
   /** Per-step controls as last previewed, so the screen returns with its knobs in place. */
   options: Partial<Record<StepName, StepOptions>>;
+  /** Which step screen to open first; the library's Sửa ảnh / Đăng land here. */
+  initialView?: StepName;
   item: SourceItem | null;
   itemRef: string | null;
   channelName: string;
@@ -107,10 +109,10 @@ export function RunView(p: RunViewProps) {
   const [showOriginal, setShowOriginal] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [render, setRender] = useState<{ step?: string; pct?: number; done: string[] } | null>(null);
-  const [opts, setOpts] = useState<StepOptions>(p.options[p.currentStep] ?? {});
+  const [opts, setOpts] = useState<StepOptions>(p.options[p.initialView ?? p.currentStep] ?? {});
 
   /** Which screen is open. Follows the run, until the owner walks back along the rail. */
-  const [view, setView] = useState<StepName>(p.currentStep);
+  const [view, setView] = useState<StepName>(p.initialView ?? p.currentStep);
   useEffect(() => {
     setView(p.currentStep);
     setOpts(p.options[p.currentStep] ?? {});

@@ -1,5 +1,6 @@
 /**
  * POST /api/studio/runs — start a run. New route tree; nothing under app/api/* is touched.
+ * GET  /api/studio/runs?items=gold:a,gold:b — the latest run per item, for the library.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { studioDb } from '@/lib/studio/db';
@@ -7,8 +8,14 @@ import { createRun } from '@/lib/studio/runs';
 import { can, mayUseChannel, tier } from '@/lib/studio/tier';
 import { detectSource } from '@/lib/studio/sources/detect';
 import { saveRunText, textToItem } from '@/lib/studio/sources/text';
+import { runsForItems } from '@/lib/studio/lake';
 
 export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  const items = (req.nextUrl.searchParams.get('items') ?? '').split(',').filter(Boolean).slice(0, 200);
+  return NextResponse.json({ runs: await runsForItems(items, tier()) });
+}
 
 export async function POST(req: NextRequest) {
   if (!process.env.STUDIO_ENABLED) return new NextResponse('Not found', { status: 404 });
