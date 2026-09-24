@@ -124,6 +124,7 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
   };
 
   const statusLabel = vg.jobStatus === 'running' ? 'Đang render' : vg.approved ? 'Đã approve' : 'Script';
+  const renderReady = vg.approved && !!vg.script.trim();
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -401,91 +402,107 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
             )}
           </div>
 
-          {/* ─── Section 3 — Checklist + Render (only after Approve) ─── */}
+          {/* ─── Section 3 — Render controls, plus the CapCut checklist once approved ───
+              The intro/layout checkboxes and the render button used to sit inside the
+              approve gate and unmount completely until a script existed. Reported as
+              "the buttons are gone" three separate times — a control that explains why it
+              is unavailable teaches the flow; one that disappears reads as a bug. They
+              are always mounted now; only the CapCut checklist still waits for approve,
+              because it is advice about a script you have not written yet. ─── */}
+          <Separator />
+
           {vg.approved && vg.script && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-foreground">Checklist CapCut</h3>
-                <ul className="text-sm space-y-1.5 text-foreground/90">
-                  {CHECKLIST_LINES.map((line, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Checklist CapCut</h3>
+              <ul className="text-sm space-y-1.5 text-foreground/90">
+                {CHECKLIST_LINES.map((line, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
 
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={exportTxt}>📄 Xuất script .txt</Button>
-                  <Button variant="ghost" size="sm" onClick={() => onShowChecklistInChat(FULL_CHECKLIST)}>
-                    💬 Xem checklist đầy đủ
-                  </Button>
-                </div>
-
-                <label className="flex items-center gap-2 text-sm text-foreground/90 cursor-pointer w-fit">
-                  <input
-                    type="checkbox"
-                    checked={vg.includeIntro}
-                    onChange={(e) => vg.setIncludeIntro(e.target.checked)}
-                    className="w-4 h-4 accent-primary"
-                  />
-                  Chèn video intro &quot;101 Chuyện Úc chút chút&quot; sau hook
-                </label>
-
-                <label className="flex items-center gap-2 text-sm text-foreground/90 cursor-pointer w-fit">
-                  <input
-                    type="checkbox"
-                    checked={vg.includeLayout}
-                    onChange={(e) => vg.setIncludeLayout(e.target.checked)}
-                    className="w-4 h-4 accent-primary"
-                  />
-                  Layout 9:16 (khung viền + tiêu đề) — bỏ chọn để chỉ có ảnh/video + caption
-                </label>
-
-                <Button
-                  onClick={vg.render}
-                  disabled={vg.jobStatus === 'running'}
-                  className="w-full bg-primary hover:bg-primary/90 text-white"
-                >
-                  {vg.jobStatus === 'running' ? 'Đang render…' : vg.jobStatus === 'error' ? '🔁 Thử lại render' : '🎥 Bắt đầu render'}
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={exportTxt}>📄 Xuất script .txt</Button>
+                <Button variant="ghost" size="sm" onClick={() => onShowChecklistInChat(FULL_CHECKLIST)}>
+                  💬 Xem checklist đầy đủ
                 </Button>
-
-                {vg.jobStatus === 'running' && (
-                  <div className="rounded-md bg-warning/10 border border-warning/25 px-3 py-2.5 space-y-1.5">
-                    {STEP_ORDER.map((s) => {
-                      const done = vg.jobDone.includes(s);
-                      const active = vg.jobStep === s && !done;
-                      return (
-                        <div key={s} className={`flex items-center gap-2 text-xs ${
-                          done ? 'text-success' : active ? 'text-foreground font-semibold' : 'text-muted-foreground/60'
-                        }`}>
-                          <span className="w-4 shrink-0">{done ? '✓' : active ? '●' : '○'}</span>
-                          <span>{STEP_LABELS[s]}</span>
-                          {active && vg.jobPct !== null && (
-                            <span className="font-mono ml-auto">{vg.jobPct}%</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                    <p className="text-[11px] text-muted-foreground pt-1">
-                      Render đang chạy ngầm — bạn có thể đóng khung này.
-                    </p>
-                  </div>
-                )}
-                {vg.jobStatus === 'error' && vg.jobError && (
-                  <div className="text-xs text-destructive space-y-1">
-                    {vg.jobStep && (
-                      <p className="font-semibold">
-                        Lỗi ở bước: {STEP_LABELS[vg.jobStep] ?? vg.jobStep}
-                      </p>
-                    )}
-                    <p className="whitespace-pre-wrap">{vg.jobError}</p>
-                  </div>
-                )}
               </div>
-            </>
+            </div>
           )}
+
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm text-foreground/90 cursor-pointer w-fit">
+              <input
+                type="checkbox"
+                checked={vg.includeIntro}
+                onChange={(e) => vg.setIncludeIntro(e.target.checked)}
+                className="w-4 h-4 accent-primary"
+              />
+              Chèn video intro &quot;101 Chuyện Úc chút chút&quot; sau hook
+            </label>
+
+            <label className="flex items-center gap-2 text-sm text-foreground/90 cursor-pointer w-fit">
+              <input
+                type="checkbox"
+                checked={vg.includeLayout}
+                onChange={(e) => vg.setIncludeLayout(e.target.checked)}
+                className="w-4 h-4 accent-primary"
+              />
+              Layout 9:16 (khung viền + tiêu đề) — bỏ chọn để chỉ có ảnh/video + caption
+            </label>
+
+            <Button
+              onClick={vg.render}
+              disabled={!renderReady || vg.jobStatus === 'running'}
+              className="w-full bg-primary hover:bg-primary/90 text-white"
+            >
+              {vg.jobStatus === 'running'
+                ? 'Đang render…'
+                : !vg.script.trim()
+                  ? '🎥 Tạo script trước đã'
+                  : !vg.approved
+                    ? '🎥 Duyệt script trước đã'
+                    : vg.jobStatus === 'error'
+                      ? '🔁 Thử lại render'
+                      : '🎥 Bắt đầu render'}
+            </Button>
+
+            {vg.jobStatus === 'running' && (
+              <div className="rounded-md bg-warning/10 border border-warning/25 px-3 py-2.5 space-y-1.5">
+                {STEP_ORDER.map((s) => {
+                  const done = vg.jobDone.includes(s);
+                  const active = vg.jobStep === s && !done;
+                  return (
+                    <div key={s} className={`flex items-center gap-2 text-xs ${
+                      done ? 'text-success' : active ? 'text-foreground font-semibold' : 'text-muted-foreground/60'
+                    }`}>
+                      <span className="w-4 shrink-0">{done ? '✓' : active ? '●' : '○'}</span>
+                      <span>{STEP_LABELS[s]}</span>
+                      {active && vg.jobPct !== null && (
+                        <span className="font-mono ml-auto">{vg.jobPct}%</span>
+                      )}
+                    </div>
+                  );
+                })}
+                <p className="text-[11px] text-muted-foreground pt-1">
+                  Render đang chạy ngầm — bạn có thể đóng khung này.
+                </p>
+              </div>
+            )}
+
+            {vg.jobStatus === 'error' && vg.jobError && (
+              <div className="text-xs text-destructive space-y-1">
+                {vg.jobStep && (
+                  <p className="font-semibold">
+                    Lỗi ở bước: {STEP_LABELS[vg.jobStep] ?? vg.jobStep}
+                  </p>
+                )}
+                <p className="whitespace-pre-wrap">{vg.jobError}</p>
+              </div>
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
