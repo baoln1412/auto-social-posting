@@ -8,7 +8,17 @@ cd /Users/nguyenbaole/auto-social-posting || exit 1
 
 # Single-run lock so a manual trigger (Settings button → /api/pipeline/run) and
 # the 4h schedule never overlap. The "Run Full Pipeline" button polls this file.
-LOCK="/Users/nguyenbaole/auto-social-posting/data/pipeline.lock"
+# TWO lock files, deliberately. This wrapper guards itself with its own, under a name
+# the skill never looks at; the agent takes data/pipeline.lock for itself in Step 0.
+#
+# They used to share one file, with IMM_PIPELINE_LOCK_HELD telling the agent "that fresh
+# lock is your own parent, ignore it". The agent looked anyway and self-aborted the whole
+# cycle - 2026-09-04 twice, 2026-09-24 06:00 again (nothing was stuck; the abort WAS the
+# failure, and it cost a full cycle each time). An instruction to disbelieve a file you
+# just showed someone is not a lock. So the agent no longer sees this one at all, and
+# needs no instruction about it.
+LOCK="/Users/nguyenbaole/auto-social-posting/data/pipeline.wrapper.lock"
+AGENT_LOCK="/Users/nguyenbaole/auto-social-posting/data/pipeline.lock"
 if [ -f "$LOCK" ]; then
   AGE=$(( $(date +%s) - $(stat -f %m "$LOCK") ))
   if [ "$AGE" -lt 1800 ]; then
@@ -17,12 +27,9 @@ if [ -f "$LOCK" ]; then
   fi
 fi
 echo $$ > "$LOCK"
-trap 'rm -f "$LOCK"' EXIT INT TERM
-
-# Tells the skill the lock is already held on its behalf. Without this the skill's
-# own lock check (Step 0) would see this wrapper's fresh lock and abort every
-# scheduled run as if it were a collision.
-export IMM_PIPELINE_LOCK_HELD=1
+# Sweep the agent's lock too: this wrapper outlives it, so a crashed cycle gets cleaned
+# up here instead of blocking the next scheduled run until it ages out at 30 min.
+trap 'rm -f "$LOCK" "$AGENT_LOCK"' EXIT INT TERM
 
 # Headless run of the project skill. `--permission-mode bypassPermissions` lets it
 # run curl/bash unattended; remove it if you prefer to pre-approve a tool allowlist.

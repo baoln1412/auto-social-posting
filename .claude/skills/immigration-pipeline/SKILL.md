@@ -38,23 +38,18 @@ and Settings-button runs against each other, but a cycle started by hand in a se
 bypasses that wrapper and is invisible to it — that collision has happened.
 
 ```bash
-if [ -n "$IMM_PIPELINE_LOCK_HELD" ]; then
-  echo "lock held by run-pipeline.sh — proceed"        # scheduled run: already locked
-elif [ -f data/pipeline.lock ] && [ $(( $(date +%s) - $(stat -f %m data/pipeline.lock) )) -lt 1800 ]; then
+if [ -f data/pipeline.lock ] && [ $(( $(date +%s) - $(stat -f %m data/pipeline.lock) )) -lt 1800 ]; then
   echo "ABORT: another pipeline cycle is in progress"; exit 1
 else
   echo $$ > data/pipeline.lock                          # took it; release in Step 5
 fi
 ```
-**If `IMM_PIPELINE_LOCK_HELD` is set, do not read `data/pipeline.lock` at all — not its
-PID, not its age, nothing.** That file legitimately belongs to `run-pipeline.sh`, your
-own parent process, and inspecting it "just to double check" is exactly the failure
-mode that has already happened twice: the wrapper's own PID in that file gets mistaken
-for a hostile concurrent run and the whole cycle self-aborts for no reason (missed the
-2026-09-04 06:00 scheduled run this way — nothing was actually stuck, the abort was the
-bug), or a sub-agent mid-run raises a false collision alarm over the same misreading
-(also 2026-09-04, caught and self-corrected that time). The env var alone is the
-complete, sufficient answer; checking further can only produce a wrong one.
+`data/pipeline.lock` is **yours**, in every run — scheduled or hand-started. If it is
+there and fresh, another *cycle* is genuinely live and you must abort. `run-pipeline.sh`
+guards itself with a separate file and never writes this one, so a lock here is never
+your own parent. (It used to be, with an env var telling you to ignore what you saw;
+that misfired three times and cost a full cycle each time. Hence one lock, one owner,
+no exceptions to reason about.)
 
 **Sub-agents spawned later (Step 3/4 market fanout) never touch `data/pipeline.lock`
 themselves** — the lock is a whole-cycle concern the top-level session already resolved
@@ -298,10 +293,9 @@ For each market id:
 ## Step 5 — Report and release the lock
 Summarize per market: bronze crawled, silver kept (with a topic breakdown), gold generated.
 
-Then release the lock **only if Step 0 is the one that took it** — if
-`IMM_PIPELINE_LOCK_HELD` was set, the wrapper owns it and removes it itself:
+Then release the lock — Step 0 took it, so it is always yours to drop:
 ```bash
-[ -n "$IMM_PIPELINE_LOCK_HELD" ] || rm -f data/pipeline.lock
+rm -f data/pipeline.lock
 ```
 Release it even when the cycle ends early or errors; otherwise the next scheduled run
 skips itself for 30 minutes until the lock goes stale.
