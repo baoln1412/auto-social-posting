@@ -1,0 +1,55 @@
+<!doctype html><meta charset="utf-8"><title>mock · Bước Ảnh</title><link rel="stylesheet" href="mock.css"><link rel="stylesheet" href="run.css">
+<style>
+.two{grid-template-columns:1fr 340px}
+.cardwrap{display:flex;gap:16px;align-items:flex-start}
+.preview{flex:none;width:380px;aspect-ratio:4/5;background:var(--stage);border:2.5px solid var(--pen);border-radius:12px;box-shadow:4px 4px 0 var(--pen);overflow:hidden;position:relative}
+.preview img{width:100%;height:100%;object-fit:cover}
+.preview .txt{position:absolute;left:0;right:0;bottom:0;padding:18px 20px 22px;background:linear-gradient(transparent,rgba(0,32,96,.92) 40%);color:#fff;font:800 22px/1.2 'Source Sans 3';text-transform:uppercase}
+.preview .txt em{font-style:normal;color:#F8EF63}
+.preview .inset{position:absolute;top:14px;right:14px;width:64px;height:64px;border-radius:99px;border:3px solid #fff;overflow:hidden;background:#fff}
+.preview .inset img{object-fit:cover}
+.ctrl{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.ctrl h2{font-size:18px;display:flex;align-items:center;gap:8px}.ctrl h2 svg{width:18px;height:18px;stroke:var(--accent)}
+.g{display:flex;flex-direction:column;gap:6px}.g .t{font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px}.g .t svg{width:14px;height:14px;stroke:var(--accent)}
+.ratio{display:flex;gap:6px}.ratio .chip{flex:1;justify-content:center}
+.drop{border:2px dashed var(--pen2);border-radius:10px;padding:10px;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted)}
+.drop svg{width:18px;height:18px;stroke:var(--accent)}
+.pick{display:flex;gap:6px}.pick .p{width:52px;height:40px;border-radius:6px;border:2px solid var(--pen2);overflow:hidden}.pick .p.on{border-color:var(--accent);box-shadow:2px 2px 0 var(--pen)}.pick .p img{width:100%;height:100%;object-fit:cover}
+.rowbtn{display:flex;gap:8px}
+</style>
+<body><script src="icons.js"></script><script src="shell.js"></script>
+<script>
+const st=(k,l,s,cls)=>`<div class="st ${cls}"><span class="k">${cls==='done'?'✓':k}</span><div><b>${l}</b><small>${s}</small></div></div>`;
+shell({page:'library',title:'Tin định cư Mỹ · <span style="font-weight:400;color:var(--muted)">Cụ bà 82 tuổi ở Pomona…</span>',sub:'Lượt chạy <span class="num">#75281757</span> · kit Tin định cư Mỹ',body:`
+<div class="rail">
+ ${st(1,'Đọc bài','<span class="num">$0.00</span>','done')}<span class="arrow">→</span>
+ ${st(2,'Viết bài','3 quy tắc · đạt','done')}<span class="arrow">→</span>
+ ${st(3,'Ảnh','4:5 · thẻ sáng','on')}<span class="arrow">→</span>
+ ${st(4,'Video','chưa chạy','')}<span class="arrow">→</span>
+ ${st(5,'Đăng','2 nơi','')}
+</div>
+<div class="two">
+ <div class="cardwrap">
+  <div class="preview"><img src="img/post-0.jpg"><span class="inset"><img src="img/post-2.jpg"></span>
+    <div class="txt">Mỹ: Cụ bà 82 tuổi ở Pomona <em>bị lừa mất 2.500 đô</em> vì chiêu vé số trúng thưởng</div></div>
+  <div class="grow" style="display:flex;flex-direction:column;gap:10px">
+    <div class="card quiet" style="padding:12px 14px;font-size:13px"><b>Ảnh này dùng ở đâu</b><div class="help" style="margin-top:4px">Đăng Facebook (<span class="num">1200×630</span>) · ảnh bìa video · card trong reel. Sửa ở đây một lần, ba chỗ cùng đổi.</div></div>
+    <div class="card quiet" style="padding:12px 14px;font-size:13px"><b>Kiểm tra</b><div class="help" style="margin-top:4px">✓ Chữ không tràn · ✓ Có nguồn · ✓ Không mặt người nhận diện được · <span class="num">3/3</span></div></div>
+  </div>
+ </div>
+ <div class="card ctrl">
+  <h2><svg><use href="#image"/></svg>Sửa ảnh</h2>
+  <div class="g"><div class="t"><svg><use href="#frame"/></svg>Tỉ lệ</div><div class="ratio"><span class="chip on">4:5 dọc</span><span class="chip">1:1 vuông</span><span class="chip">9:16 reel</span></div></div>
+  <div class="g"><div class="t"><svg><use href="#image"/></svg>Ảnh chính</div>
+    <div class="pick"><span class="p on"><img src="img/post-0.jpg"></span><span class="p"><img src="img/post-1.jpg"></span><span class="p"><img src="img/post-2.jpg"></span></div>
+    <div class="help">3 ảnh từ bài báo. Hoặc:</div>
+    <div class="drop"><svg><use href="#upload"/></svg>Kéo ảnh vào đây / chọn từ Kho tài nguyên</div></div>
+  <div class="g"><div class="t"><svg><use href="#image"/></svg>Ảnh tròn (khi bài không có ảnh)</div><div class="drop"><svg><use href="#upload"/></svg>Chọn ảnh tròn</div></div>
+  <div class="g"><div class="t"><svg><use href="#type"/></svg>Chữ nhấn</div><select><option>Sau dấu hai chấm</option></select></div>
+  <div class="rowbtn"><a class="btn sm grow"><svg><use href="#refresh"/></svg>Tạo lại</a><a class="btn sm grow"><svg><use href="#download"/></svg>Tải 1200×630</a></div>
+  <a class="btn primary">Lưu vào bài</a>
+  <div class="help">Đổi kiểu thẻ, font, bo góc… ở <b>Bộ nhận diện → Ảnh chụp bài viết</b>. Ở đây chỉ sửa cho bài này.</div>
+ </div>
+</div>
+<div class="card foot"><span class="sum">Ảnh <span class="num">4:5</span> · <span class="num">$0.00</span> · đã đổi ảnh chính</span><span class="sp"></span><a class="btn">Chạy lại bước này</a><a class="btn primary">Tiếp tục → Video</a></div>`});
+</script></body>

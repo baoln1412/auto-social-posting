@@ -1,0 +1,80 @@
+/* Studio v3 mockups — the Desoul brand, applied the way the brand file says (SKILL.md steps 1–4).
+   These are design drawings, not app code. Tokens are copied from brand.json `core`. */
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@500;600&family=Fredoka:wght@700&display=swap');
+:root{
+  --paper:#F7F5F0;--card:#FFFEFB;--faint:#F2EFE6;--ink:#1F1D18;--muted:#5C584C;--soft:#8A8578;
+  --line:#E6E1D5;--accent:#2F6B4F;--accent-soft:#E7F0E9;--accent-tint:#F2F7F3;--warn:#B0700F;--bad:#B3402F;
+  --neutral:#A39D8D;--track:#EDE6D2;--pen:#211F19;--pen2:#6B6455;--r:10px;
+  --stage:#141414; /* the video canvas: the one dark surface, because video is dark */
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 'Source Sans 3',system-ui,sans-serif}
+h1,h2,h3,.display{font-family:'Baloo 2',system-ui,sans-serif;margin:0;line-height:1.1}
+.num,.mono{font-family:'Source Code Pro',monospace;font-weight:600}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+/* ── sidebar ── */
+.side{background:var(--card);border-right:2.5px solid var(--pen);display:flex;flex-direction:column;padding:18px 16px;gap:18px}
+.lockup{display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 6px 0}
+.lockup img{width:150px}
+.lockup .sub{font-family:Fredoka,'Baloo 2';font-weight:700;letter-spacing:-.035em;font-size:26px;color:#FFFEFB;-webkit-text-stroke:2px var(--pen);paint-order:stroke fill;text-shadow:2.5px 2.5px 0 var(--pen);line-height:1;margin-top:-6px}
+.cta svg{width:18px;height:18px;flex:none}
+.cta{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:#fff;font:700 15px 'Source Sans 3';padding:11px 14px;border:2.5px solid var(--pen);border-radius:var(--r);box-shadow:4px 4px 0 var(--pen)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:600;font-size:15px}
+.nav a svg{width:18px;height:18px;stroke:var(--muted)}
+.nav a.on{background:var(--accent-soft);color:var(--accent);border:2px solid var(--accent)}
+.nav a.on svg{stroke:var(--accent)}
+.nav a .count{margin-left:auto;font-size:12px;color:var(--soft)}
+.tip{margin-top:auto;background:var(--accent-tint);border:2.5px solid var(--pen);border-radius:var(--r);box-shadow:4px 4px 0 var(--pen);padding:12px}
+.tip b{display:flex;align-items:center;gap:6px;font-size:13px}
+.tip p{margin:4px 0 10px;font-size:12px;color:var(--muted)}
+.tip .btn{width:100%}
+/* ── header ── */
+.main{display:flex;flex-direction:column;min-width:0}
+.top{display:flex;align-items:center;gap:14px;padding:10px 22px;border-bottom:2px solid var(--line);background:var(--paper);position:sticky;top:0}
+.top .title{font-family:'Baloo 2';font-weight:700;font-size:20px}
+.top .subtitle{font-size:12px;color:var(--soft);margin-top:-2px}
+.top .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--pen);background:var(--card);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;box-shadow:2px 2px 0 var(--pen)}
+.pill .num{font-size:13px}
+.bell{position:relative;width:34px;height:34px;display:grid;place-items:center;border:2px solid var(--pen);border-radius:999px;background:var(--card)}
+.bell i{position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:99px;background:var(--bad);color:#fff;font:700 9px/14px 'Source Code Pro';text-align:center;border:2px solid var(--card)}
+.user{display:flex;align-items:center;gap:8px}
+.avatar{width:32px;height:32px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font:800 15px 'Baloo 2';border:2px solid var(--pen);box-shadow:2px 2px 0 var(--pen)}
+.user .n{font-weight:700;font-size:13px;line-height:1.1}.user .e{font-size:11px;color:var(--soft)}
+.content{padding:22px 26px;flex:1}
+/* ── primitives ── */
+.card{background:var(--card);border:2.5px solid var(--pen);border-radius:var(--r);box-shadow:4px 4px 0 var(--pen)}
+.card.quiet{box-shadow:none;border-color:var(--pen2);border-width:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border:2.5px solid var(--pen);border-radius:var(--r);background:var(--card);font:700 14px 'Source Sans 3';color:var(--ink);box-shadow:3px 3px 0 var(--pen);white-space:nowrap}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.sm{padding:5px 10px;font-size:12px;box-shadow:2px 2px 0 var(--pen);border-width:2px}
+.btn.ghost{box-shadow:none;border-color:var(--line);background:transparent}
+.btn.icon{padding:8px;width:38px}
+.btn svg,.chip svg{width:15px;height:15px}
+svg{stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:2px solid var(--pen);background:var(--card);font-size:12px;font-weight:600}
+.chip.on{background:var(--accent);color:#fff}
+.chip.soft{border-color:var(--line);background:var(--faint);color:var(--muted)}
+.label{font-size:12px;font-weight:700;color:var(--muted);text-transform:none}
+.eyebrow{font:600 11px 'Source Code Pro';letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+.help{font-size:12px;color:var(--soft)}
+.sec{display:flex;align-items:center;gap:8px;margin:18px 0 10px}
+.sec h3{font-size:17px;display:flex;align-items:center;gap:8px}.sec h3 svg{width:18px;height:18px;stroke:var(--accent)}
+.sec .more{margin-left:auto;font-size:13px;font-weight:600;color:var(--accent)}
+.toggle{width:38px;height:22px;border-radius:99px;border:2px solid var(--pen);background:var(--card);position:relative;flex:none}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:99px;background:var(--pen)}
+.toggle.on{background:var(--accent)}.toggle.on::after{left:auto;right:2px;background:#fff}
+select,input[type=text],textarea{font:inherit;color:var(--ink);background:var(--card);border:2px solid var(--pen);border-radius:8px;padding:7px 10px}
+.phone{background:var(--stage);border:2.5px solid var(--pen);border-radius:18px;box-shadow:4px 4px 0 var(--pen);aspect-ratio:9/16;overflow:hidden;position:relative}
+.phone img{width:100%;height:100%;object-fit:cover;display:block}
+.phone .tag{position:absolute;top:10px;left:10px;font:600 10px 'Source Code Pro';letter-spacing:.08em;background:rgba(255,255,255,.92);color:var(--ink);padding:3px 7px;border-radius:6px}
+.thumb{width:132px;aspect-ratio:9/16;border-radius:var(--r);border:2.5px solid var(--pen);box-shadow:3px 3px 0 var(--pen);overflow:hidden;position:relative;background:var(--stage);flex:none}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .t{position:absolute;top:6px;right:6px;font:600 10px 'Source Code Pro';background:rgba(255,255,255,.92);padding:2px 5px;border-radius:5px}
+.thumb .play{position:absolute;inset:0;display:grid;place-items:center}
+.thumb .play b{width:34px;height:34px;border-radius:99px;background:rgba(255,255,255,.92);display:grid;place-items:center;border:2px solid var(--pen)}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;border:2px solid var(--pen)}
+.badge.green{background:var(--accent-soft);color:var(--accent)}.badge.amber{background:#FBF1DC;color:var(--warn)}.badge.grey{background:var(--faint);color:var(--muted)}

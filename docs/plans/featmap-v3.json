@@ -1,0 +1,477 @@
+{
+ "status": {
+  "now": [
+   "#2f6b4f",
+   "",
+   "now · a v3 slice builds it"
+  ],
+  "keep": [
+   "#0f8fa3",
+   "",
+   "keep · built in v1/v2, v3 re-draws it"
+  ],
+  "later": [
+   "#b45309",
+   "",
+   "later · after Facebook is measured"
+  ],
+  "engine": [
+   "#6b7280",
+   "6 4",
+   "engine · needs make-reel.py changed (second plan)"
+  ],
+  "never": [
+   "#b91c1c",
+   "2 4",
+   "never · not for this owner"
+  ]
+ },
+ "left": [
+  {
+   "id": "A",
+   "title": "Tạo video",
+   "mock": "create",
+   "features": [
+    {
+     "feature": "Dán link · nguồn · kit",
+     "target": "create",
+     "status": "now",
+     "ours": "The paste box with the reference's bottom bar; Door 1 becomes a status strip under it.",
+     "reason": "Same logic as v2 S8; re-drawn."
+    },
+    {
+     "feature": "4 chế độ: Đọc bài · Viết lời · Lồng tiếng · Video dọc",
+     "target": "run",
+     "status": "keep",
+     "ours": "The five-step rail on the run page; five chips on the create page (S16).",
+     "reason": "v2 removed the modes; v3 draws the rail as the reference's chips."
+    },
+    {
+     "feature": "Gợi ý từ kho nguồn · Kết quả gần đây",
+     "target": "create",
+     "status": "now",
+     "ours": "Two-column suggestion cards with source, counts and a video button; real frames in Kết quả gần đây.",
+     "reason": "v2 had text rows and six dashes."
+    }
+   ]
+  },
+  {
+   "id": "B",
+   "title": "Tuỳ chỉnh video (drawer)",
+   "mock": "drawer",
+   "features": [
+    {
+     "feature": "kit · thời lượng · bình luận · duyệt trước",
+     "target": "run",
+     "status": "keep",
+     "ours": "v2 drawer, unchanged; opened from Tuỳ chỉnh on the create page and Sửa on the run page.",
+     "reason": "Slice 1. Duyệt trước = auto_continue off; duration = the budget gate's band; comment mode auto/manual = the pool."
+    },
+    {
+     "feature": "intro · layout · nhạc · style",
+     "target": "run",
+     "status": "keep",
+     "ours": "v2 drawer.",
+     "reason": "Slice 1/3. Each maps to a flag the render job already accepts (--no-intro, includeLayout, style, music tier)."
+    },
+    {
+     "feature": "che mặt · SFX · GIF phản ứng · outro CTA",
+     "target": "engine",
+     "status": "engine",
+     "ours": "Not in make-reel.py.",
+     "reason": "A renderer feature, not a surface one. Belongs to a second plan after the surface exists and has been used."
+    },
+    {
+     "feature": "chất lượng HD/30fps",
+     "target": "never",
+     "status": "never",
+     "ours": "One output quality.",
+     "reason": "Nothing to choose; the renderer has one profile."
+    }
+   ]
+  },
+  {
+   "id": "C",
+   "title": "Cấu hình video (Brand Kit, 8 tab)",
+   "mock": "kit",
+   "features": [
+    {
+     "feature": "Thương hiệu: tên · logo · hashtag",
+     "target": "kit",
+     "status": "keep",
+     "ours": "v2 S11; re-drawn with icon+title+helper rows.",
+     "reason": "Slice 4."
+    },
+    {
+     "feature": "Nội dung: cách kể · chọn bình luận · độ dài",
+     "target": "kit",
+     "status": "now",
+     "ours": "Radio cards with descriptions and an illustration, as tv-25.",
+     "reason": "v2 used selects."
+    },
+    {
+     "feature": "Giọng đọc: giọng · tốc độ · ngắt · đọc thử",
+     "target": "kit",
+     "status": "keep",
+     "ours": "v2 S11 VoiceTry.",
+     "reason": "Slice 4. The owner's cloned voice (bao) is a later provider."
+    },
+    {
+     "feature": "nhiều giọng theo câu",
+     "target": "engine",
+     "status": "engine",
+     "ours": "make-reel calls TTS once for the whole narration, by design (one network call).",
+     "reason": "Changing that is engine work; measured $0 path stays."
+    },
+    {
+     "feature": "Ảnh chụp bài viết: chữ · rộng · vị trí · theme",
+     "target": "kit",
+     "status": "keep",
+     "ours": "v2 S11; sliders get mono values; preview fidelity gate.",
+     "reason": "Slice 4. Changing a value means the card re-renders next run, same as theirs."
+    },
+    {
+     "feature": "Phụ đề: mẫu karaoke",
+     "target": "kit",
+     "status": "keep",
+     "ours": "v2 S11 preset wall.",
+     "reason": "Exists today; the tab adds the wall of samples."
+    },
+    {
+     "feature": "Khung hình: 3 bố cục · 531 ảnh nền",
+     "target": "kit",
+     "status": "keep",
+     "ours": "v2 S11/S12; radio cards for Bố cục.",
+     "reason": "Presets are content: ≥ 6 per tab or the tab is not done. Own uploads come from Assets."
+    },
+    {
+     "feature": "Nhãn dán: bộ sticker · bìa · mở đầu",
+     "target": "kit",
+     "status": "keep",
+     "ours": "v2 S11/S12 built it; the tab gets the config anatomy.",
+     "reason": "Slice 5. ffmpeg overlay beside make-reel.py, never inside it."
+    },
+    {
+     "feature": "Chữ ký trôi (DVD)",
+     "target": "engine",
+     "status": "engine",
+     "ours": "A moving overlay across the whole clip.",
+     "reason": "Renderer work; second plan."
+    },
+    {
+     "feature": "Watermark chìm",
+     "target": "kit",
+     "status": "keep",
+     "ours": "v2 S12 overlay; the Chữ ký kênh tab.",
+     "reason": "Slice 5."
+    },
+    {
+     "feature": "Ngôn ngữ + dịch",
+     "target": "kit",
+     "status": "keep",
+     "ours": "v2 S11 Nội dung tab.",
+     "reason": "AILP already renders EN + VI; comes when the two apps share the kit."
+    },
+    {
+     "feature": "Lấy profile TikTok · kênh đăng tự động",
+     "target": "never",
+     "status": "never",
+     "ours": "— · the publish step later, sanctioned APIs only.",
+     "reason": "No TikTok tool here; auto-post is the publish step of a later slice."
+    }
+   ]
+  },
+  {
+   "id": "D",
+   "title": "Chỉnh lớp (layer editor)",
+   "mock": "layers",
+   "features": [
+    {
+     "feature": "canvas Hook / Thân / Mở đầu · lớp · khoá · undo",
+     "target": "kit",
+     "status": "keep",
+     "ours": "v2 S14 editor; v3 reskins the chrome (toolbar strip, stage bezel, zoom pills).",
+     "reason": "Slice 7, conditional: after two weeks of use, the owner names a layout presets cannot express. Layers would live in the kit and render through the overlay step."
+    }
+   ]
+  },
+  {
+   "id": "E",
+   "title": "Chỉnh & Render lại",
+   "mock": "review",
+   "features": [
+    {
+     "feature": "CẢNH #n · likes · Text TTS · Text gốc · Nghe thoại",
+     "target": "run",
+     "status": "now",
+     "ours": "Scene cards as tv-12: chip, mono likes, ghost/filled actions, inline textarea edit.",
+     "reason": "v2 had one mono line per scene."
+    },
+    {
+     "feature": "COMMENT KHÁC · n · Ẩn không chọn",
+     "target": "run",
+     "status": "now",
+     "ours": "Checkbox rows with likes, Ẩn không chọn.",
+     "reason": "Sources with comments: Reddit (score), own Threads (likes), gold rows (comment_1..3)."
+    },
+    {
+     "feature": "Chỉnh tiếp & render lại",
+     "target": "run",
+     "status": "keep",
+     "ours": "v2 S13; a real player in the bezel.",
+     "reason": "Slice 1. A step writes its record on success and on failure."
+    }
+   ]
+  },
+  {
+   "id": "F",
+   "title": "Thư viện video",
+   "mock": "library",
+   "features": [
+    {
+     "feature": "tìm · sắp xếp · lưới/danh sách · hôm nay",
+     "target": "library",
+     "status": "now",
+     "ours": "The reference's toolbar over the lake, day groups, plus a Video: filter.",
+     "reason": "Slice 5."
+    },
+    {
+     "feature": "Có thể bạn cũng thích",
+     "target": "library",
+     "status": "now",
+     "ours": "Posts with no run yet, under the same filter.",
+     "reason": "Slice 0."
+    },
+    {
+     "feature": "giữ 24 giờ",
+     "target": "never",
+     "status": "never",
+     "ours": "We keep everything.",
+     "reason": "It is our disk."
+    }
+   ]
+  },
+  {
+   "id": "G",
+   "title": "Kho tài nguyên",
+   "mock": "assets",
+   "features": [
+    {
+     "feature": "ảnh nền · video nền · sticker · nhạc · 50 MB",
+     "target": "pages",
+     "status": "now",
+     "ours": "Tabs as tv-21, Hiệu ứng locked with a reason, empty states with an action.",
+     "reason": "v2 had three headed lists."
+    }
+   ]
+  },
+  {
+   "id": "H",
+   "title": "Tiện ích · Cài đặt · Hướng dẫn",
+   "mock": "settings",
+   "features": [
+    {
+     "feature": "Chrome extension · phiên TikTok/FB · Pinterest",
+     "target": "never",
+     "status": "never",
+     "ours": "—",
+     "reason": "Our sources are crawled, not captured from a logged-in tab; session capture and third-party asset grabbing have no route we would run."
+    },
+    {
+     "feature": "Credit · nạp credit",
+     "target": "shell",
+     "status": "now",
+     "ours": "Tháng này $ in the header — cost, not credits.",
+     "reason": "Slice 1. The tier seam is where billing would attach if this ever serves others."
+    },
+    {
+     "feature": "Telegram",
+     "target": "publish",
+     "status": "now",
+     "ours": "A destination on Đăng and the alert channel (S22/S23).",
+     "reason": "v2 S13 parked it."
+    },
+    {
+     "feature": "email · giới thiệu · mật khẩu · xoá tài khoản",
+     "target": "never",
+     "status": "never",
+     "ours": "—",
+     "reason": "Owner behind Cloudflare Access; SaaS account furniture."
+    },
+    {
+     "feature": "Hướng dẫn · tour 8 bước",
+     "target": "guide",
+     "status": "now",
+     "ours": "SVG-cutout spotlight tour; tv-17 hub with five cards.",
+     "reason": "v2's tour was a corner card."
+    }
+   ]
+  },
+  {
+   "id": "I",
+   "title": "Desoul Posting · PostCard (ours today)",
+   "mock": "library",
+   "features": [
+    {
+     "feature": "Thẻ bài: ảnh · nguồn · chủ đề · trạng thái · Original",
+     "target": "library",
+     "status": "now",
+     "ours": "PostCard imported unmodified; Studio wraps it with progress dots, the reel thumb and Tạo video · Sửa ảnh · Đăng.",
+     "reason": "Owner: 'I like the way we show posts on Desoul Posting more — use it as our library.'"
+    },
+    {
+     "feature": "Thị trường · bộ lọc nguồn/chủ đề/ngày/trạng thái",
+     "target": "library",
+     "status": "now",
+     "ours": "/api/pages tabs and /api/posts filters, reused; plus Video: tất cả / chưa có / đang render / xong / đã đăng.",
+     "reason": "The lake is the library; runs hang off posts."
+    },
+    {
+     "feature": "News Card: 4:5 / 1:1 · ảnh chính · ảnh tròn · lưu vào bài · tải 1200×630",
+     "target": "run",
+     "status": "now",
+     "ours": "The Ảnh step: ratio chips (+9:16), article images as picks, drop zones, PATCH /api/posts as PostCard does.",
+     "reason": "Owner: 'the steps to fix the post images and video seem missing compared to our ASP.'"
+    },
+    {
+     "feature": "AI refine (prompt → gợi ý → áp dụng) · Tạo script",
+     "target": "run",
+     "status": "now",
+     "ours": "Viết bài step: POST /api/ai/refine and /api/ai/video-script, PostCard's and VideoGenModal's calls.",
+     "reason": "Same routes, no second AI path."
+    },
+    {
+     "feature": "Kênh Facebook · lịch · Post to FB",
+     "target": "publish",
+     "status": "now",
+     "ours": "Destinations on Đăng from the SPA's connected pages; the SPA's photo/feed route called, Reels added beside it.",
+     "reason": "Two implementations of 'post a photo' drift by the first bug fix."
+    }
+   ]
+  },
+  {
+   "id": "J",
+   "title": "Publisher tools (Buffer · Later · Metricool · Publer)",
+   "mock": "settings",
+   "features": [
+    {
+     "feature": "Lịch · giờ đăng · khe trống kế tiếp",
+     "target": "publish",
+     "status": "now",
+     "ours": "studio_publish rows; Facebook via scheduled_publish_time, the rest by a publisher loop; ContentCalendar imported.",
+     "reason": "Research: absent from the reference because ThreadViral renders, it does not publish. Owner runs six pages."
+    },
+    {
+     "feature": "Bình luận đầu tiên (nguồn)",
+     "target": "publish",
+     "status": "now",
+     "ours": "A field on Đăng, default Nguồn: <url>, posted after publish.",
+     "reason": "The project's compliance rule (cite the source) made cheap."
+    },
+    {
+     "feature": "Kiểm tra giới hạn caption / hashtag",
+     "target": "publish",
+     "status": "now",
+     "ours": "lib/studio/publish/limits.ts; reports n/n checks, blocks over-limit.",
+     "reason": "IG/TikTok 2 200 chars, ~125 before the fold; nothing stops an overrun today."
+    },
+    {
+     "feature": "Số liệu sau đăng (views · reach · reactions)",
+     "target": "analytics",
+     "status": "now",
+     "ours": "AnalyticsDashboard imported; studio_metrics per run, fetched daily.",
+     "reason": "No feedback loop into topic or market choice exists."
+    },
+    {
+     "feature": "Cảnh báo lỗi render / đăng",
+     "target": "analytics",
+     "status": "now",
+     "ours": "studio_alerts → the bell; Telegram when connected.",
+     "reason": "A 4-hourly unattended pipeline with no failure signal."
+    },
+    {
+     "feature": "Đăng chéo IG · TikTok · YouTube Shorts",
+     "target": "publish",
+     "status": "later",
+     "ours": "After Facebook is measured; TikTok unaudited = SELF_ONLY.",
+     "reason": "Owner named them as next targets."
+    },
+    {
+     "feature": "Điểm viral · auto-reframe · B-roll · duyệt nhiều người",
+     "target": "never",
+     "status": "never",
+     "ours": "—",
+     "reason": "No camera subject in our format; no team."
+    }
+   ]
+  }
+ ],
+ "right": [
+  {
+   "id": "shell",
+   "title": "Shell + skin  app/studio/layout.tsx",
+   "sub": "S15",
+   "mock": "settings"
+  },
+  {
+   "id": "create",
+   "title": "Tạo video  /studio",
+   "sub": "S16",
+   "mock": "new"
+  },
+  {
+   "id": "library",
+   "title": "Thư viện = the lake  /studio/library",
+   "sub": "S17",
+   "mock": "library"
+  },
+  {
+   "id": "kit",
+   "title": "Cấu hình video + Chỉnh lớp  /studio/kits/[id]",
+   "sub": "S18",
+   "mock": "kit"
+  },
+  {
+   "id": "run",
+   "title": "Run page: Đọc bài · Viết bài · Ảnh · Video  /studio/runs/[id]",
+   "sub": "S19",
+   "mock": "run"
+  },
+  {
+   "id": "guide",
+   "title": "Tour + Hướng dẫn",
+   "sub": "S20",
+   "mock": "guide"
+  },
+  {
+   "id": "pages",
+   "title": "Kênh · Kho · Cài đặt · Nguồn tự động",
+   "sub": "S21 · reskin",
+   "mock": "assets"
+  },
+  {
+   "id": "publish",
+   "title": "Đăng + Lịch  /studio/calendar",
+   "sub": "S22",
+   "mock": "telegram"
+  },
+  {
+   "id": "analytics",
+   "title": "Số liệu + Cảnh báo  /studio/analytics",
+   "sub": "S23",
+   "mock": "guide"
+  },
+  {
+   "id": "engine",
+   "title": "Engine — a second plan",
+   "sub": "make-reel.py unchanged here",
+   "mock": "engine"
+  },
+  {
+   "id": "never",
+   "title": "Never",
+   "sub": "no credits · no extension · no team",
+   "mock": "never"
+  }
+ ]
+}

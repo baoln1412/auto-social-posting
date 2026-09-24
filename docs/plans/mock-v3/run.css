@@ -1,0 +1,15 @@
+.rail{display:flex;align-items:center;gap:6px;margin:0 0 14px}
+.rail .st{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border:2px solid var(--pen2);border-radius:10px;background:var(--card);color:var(--muted)}
+.rail .st .k{width:22px;height:22px;border-radius:99px;border:2px solid var(--pen);display:grid;place-items:center;font:600 11px 'Source Code Pro';background:var(--card)}
+.rail .st.done{border-color:var(--pen)}.rail .st.done .k{background:var(--accent);color:#fff;border-color:var(--accent)}
+.rail .st.on{border-color:var(--accent);background:var(--accent-soft);color:var(--ink);box-shadow:3px 3px 0 var(--pen)}
+.rail .st.on .k{background:var(--accent);color:#fff;border-color:var(--pen)}
+.rail .st b{font-size:13px;display:block;line-height:1.1}.rail .st small{font-size:10.5px;display:block}
+.rail .arrow{color:var(--soft)}
+.two{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+.foot{position:sticky;bottom:0;margin-top:16px;display:flex;align-items:center;gap:10px;padding:10px 14px}
+.foot .sum{font-size:13px;color:var(--muted)}
+.foot .sp{flex:1}
+.ovr{padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.ovr .t{font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px}.ovr .t svg{width:14px;height:14px;stroke:var(--accent)}
+.ovr .kv{display:flex;justify-content:space-between;color:var(--muted)}.ovr .kv b{color:var(--ink);font-weight:600}
