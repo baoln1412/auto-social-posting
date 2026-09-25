@@ -165,6 +165,7 @@ export function PipelineSetup({
         <ScheduleStep
           market={market}
           cfg={cfg}
+          patch={patch}
           schedule={schedule}
           outputGate={gates[2] ?? { checked: 0, findings: [] }}
           report={(g) => report(4, g)}
@@ -802,12 +803,14 @@ function MediaStep({
 function ScheduleStep({
   market,
   cfg,
+  patch,
   schedule,
   outputGate,
   report,
 }: {
   market: MarketRow;
   cfg: PipelineConfig;
+  patch: Patch;
   schedule: string;
   /** Step 3's gate. A shape nobody has previewed is a shape nobody has checked. */
   outputGate: { checked: number; findings: string[] };
@@ -895,6 +898,29 @@ function ScheduleStep({
         <p className={`mt-2 ${CAPS}`}>
           một lượt chạy quét mọi thị trường và ghi vào kho bài; kết quả hiện ở trang Tạo mới
         </p>
+      </div>
+
+      <div className={CARD}>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <b className="text-sm">Tự đăng khi render xong</b>
+            <p className={CAPS}>
+              video dựng xong là vào hàng đợi đăng ngay, không qua màn hình Đăng
+            </p>
+          </div>
+          <button
+            type="button"
+            data-testid="auto-publish"
+            aria-pressed={cfg.publish.auto}
+            onClick={() => patch('publish', { auto: !cfg.publish.auto })}
+            className={`st-toggle ${cfg.publish.auto ? 'st-on' : ''}`}
+          />
+        </div>
+        {cfg.publish.auto && (
+          <p data-testid="auto-publish-where" className={`mt-2 ${CAPS}`}>
+            gửi tới: {cfg.publish.to.join(' · ')} — sửa nơi đăng ở màn hình Đăng của một lượt chạy
+          </p>
+        )}
       </div>
 
       <div className={CARD}>

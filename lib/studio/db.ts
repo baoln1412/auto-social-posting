@@ -121,6 +121,19 @@ export function ensureStudioTables(d: Database.Database): void {
       created_at TEXT DEFAULT ${NOW}
     );
 
+    -- What was asked to go out, and what happened. WHERE is a SQL keyword, hence where_to.
+    CREATE TABLE IF NOT EXISTS studio_publish (
+      id            TEXT PRIMARY KEY,
+      run_id        TEXT,
+      where_to      TEXT,
+      at            TEXT,
+      status        TEXT,
+      remote_id     TEXT,
+      first_comment TEXT,
+      error         TEXT,
+      created_at    TEXT DEFAULT ${NOW}
+    );
+
     -- Installation-level settings: a Telegram chat id belongs to the install, not a channel.
     CREATE TABLE IF NOT EXISTS studio_settings (
       key        TEXT PRIMARY KEY,
@@ -128,6 +141,8 @@ export function ensureStudioTables(d: Database.Database): void {
       updated_at TEXT DEFAULT ${NOW}
     );
 
+    CREATE INDEX IF NOT EXISTS studio_publish_run ON studio_publish (run_id);
+    CREATE INDEX IF NOT EXISTS studio_publish_due ON studio_publish (status, at);
     CREATE INDEX IF NOT EXISTS studio_steps_run ON studio_steps (run_id);
     CREATE INDEX IF NOT EXISTS studio_assets_run ON studio_assets (run_id);
     CREATE INDEX IF NOT EXISTS studio_runs_channel ON studio_runs (channel_id);

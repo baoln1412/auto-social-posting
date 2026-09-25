@@ -85,10 +85,15 @@ export interface Overrides {
   outro?: string;
   /** A media id from Kho tài nguyên, played at each scene change. */
   sfx?: string;
-  /** Where the finished run goes. The library is always one of them. */
-  publishTo?: ('library' | 'telegram')[];
-  /** Recorded only — this repo has no scheduler, and the screen says so. */
+  /** Where the finished run goes. The library is always one of them. A `facebook:<channelId>`
+   *  names a row in page_channels — the table FacebookConnect writes, not a page id. */
+  publishTo?: ('library' | 'telegram' | `facebook:${string}`)[];
+  /** ISO, local-input shape. A row in studio_publish; the server's loop acts on it. */
   publishAt?: string;
+  /** Which control set publishAt — 'slot' means it came from the cadence, 'at' from the field. */
+  publishWhen?: 'at' | 'slot';
+  /** Posted under the post once it is up. Defaults to `Nguồn: <link>`. */
+  firstComment?: string;
   style?: string;
   /** Demo channels only: force a step to fail, or a gate to find something. Nothing else reads it. */
   demo?: { boom?: StepName; gateFail?: boolean; cost?: number };

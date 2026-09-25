@@ -12,8 +12,13 @@
  * The scene list is computed with the same scenesFor() the reel engine calls, so ticking a
  * comment changes the list the renderer receives rather than a picture of it.
  */
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { CalendarDays, Clock, MessageSquare, Send } from 'lucide-react';
+import { lintCaption } from '@/lib/studio/publish/limits';
+import type { PublishRow } from '@/lib/studio/publish/queue';
+import type { Where } from '@/lib/studio/steps/publish';
 import { PRESETS } from '@/app/lib/captionPresets';
 import { poolFor, scenesFor, type Scene } from '@/lib/studio/scenes';
 import { useStepPreview, type LivePreview } from './useStepPreview';
@@ -373,6 +378,7 @@ export function RunView(p: RunViewProps) {
               preview={onCurrent && !s ? live.preview : null}
               overrides={overrides}
               onChange={setOverrides}
+              runId={p.runId}
             />
           )}
         </main>
@@ -506,95 +512,217 @@ export function RunView(p: RunViewProps) {
 const CAPS = 'st-label text-muted-foreground';
 
 /**
- * Đăng — where the finished run goes.
+ * Đăng — where the finished run goes, and when.
  *
- * The library is stated, not offered: every run is already in it. "Đăng sau" records a time
- * and says plainly that nothing will act on it, because nothing will — a scheduler this repo
- * does not have is not something a button should imply.
+ * Every destination becomes a row in `studio_publish`, so "Vào lúc 18:00" is a fact on disk
+ * that the server's own loop acts on. v2's version recorded the time and said, correctly at
+ * the time, that nothing would run it.
+ *
+ * The linter runs here rather than only on the server: being told the caption is too long
+ * while you can still edit it is the whole value, and the route checks again anyway.
  */
 function PublishScreen({
   record,
   preview,
   overrides,
   onChange,
+  runId,
 }: {
   record: any;
   preview: LivePreview | null;
   overrides: Overrides;
   onChange: (o: Overrides) => void;
+  runId: string;
 }) {
   const d = (preview?.data ?? {}) as {
     title?: string;
+    text?: string;
+    sourceUrl?: string | null;
     assets?: { kind: string; url?: string }[];
     destinations?: { id: string; label: string; blocked: string | null }[];
+    rows?: PublishRow[];
   };
-  const to = overrides.publishTo ?? ['library'];
-  const set = (id: 'library' | 'telegram', on: boolean) =>
+  const to = (overrides.publishTo ?? ['library']) as Where[];
+  const when: 'now' | 'at' | 'slot' = overrides.publishAt ? (overrides.publishWhen === 'slot' ? 'slot' : 'at') : 'now';
+  const [slotBusy, setSlotBusy] = useState(false);
+
+  const set = (id: Where, on: boolean) =>
     onChange({
       ...overrides,
       publishTo: on ? Array.from(new Set([...to, id])) : to.filter((x) => x !== id),
     });
 
+  // `Nguồn: <link>` is this project's own compliance rule made cheap — a source in the first
+  // comment instead of nowhere. Typed over freely; only the default is opinionated.
+  const firstComment =
+    typeof overrides.firstComment === 'string'
+      ? overrides.firstComment
+      : d.sourceUrl
+        ? `Nguồn: ${d.sourceUrl}`
+        : '';
+
+  const gate = lintCaption(
+    {
+      title: d.title ?? '',
+      text: d.text ?? '',
+      firstComment,
+      sourceUrl: d.sourceUrl ?? undefined,
+      hasReel: (d.assets ?? []).some((a) => a.kind === 'mp4'),
+    },
+    to,
+  );
+
+  async function askForSlot() {
+    setSlotBusy(true);
+    try {
+      const r = await fetch('/api/studio/publish', { method: 'PUT' });
+      const b = (await r.json()) as { at: string | null };
+      onChange({ ...overrides, publishAt: b.at ? toLocalInput(b.at) : undefined, publishWhen: b.at ? 'slot' : undefined });
+    } finally {
+      setSlotBusy(false);
+    }
+  }
+
   if (record) {
+    const rows: PublishRow[] = record.rows ?? [];
     return (
-      <div data-testid="publish-done" className="flex flex-col gap-1 text-sm">
-        <p>Đã lưu vào thư viện.</p>
-        <p className={CAPS}>
-          telegram: {record.telegram}
-          {record.telegramNote ? ` — ${record.telegramNote}` : ''}
-        </p>
-        {record.scheduledAt && <p className={CAPS}>hẹn giờ ghi nhận: {record.scheduledAt}</p>}
+      <div data-testid="publish-done" className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-1.5">
+          {rows.map((r) => (
+            <li key={r.id} data-testid="pub-row" className="st-quiet flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+              <b>{r.where.startsWith('facebook:') ? 'Facebook' : r.where === 'telegram' ? 'Telegram' : 'Thư viện'}</b>
+              <span className={`st-badge ${r.status === 'sent' ? 'st-green' : r.status === 'failed' ? 'st-amber' : 'st-grey'}`}>
+                {r.status === 'sent' ? 'đã gửi' : r.status === 'failed' ? 'lỗi' : 'chờ giờ'}
+              </span>
+              <span className="st-num text-xs text-muted-foreground">{new Date(r.at).toLocaleString('vi-VN')}</span>
+              {r.error && <span className="w-full text-xs text-[hsl(var(--destructive))]">{r.error}</span>}
+            </li>
+          ))}
+        </ul>
+        <Link href="/studio/calendar" className="st-btn st-sm self-start">
+          <CalendarDays strokeWidth={2.25} />
+          Xem lịch đăng
+        </Link>
       </div>
     );
   }
 
   return (
-    <div data-testid="publish-screen" className="flex flex-col gap-2">
-      {d.title && <p className="text-sm font-medium">{d.title}</p>}
-      <div className="flex flex-col gap-1">
+    <div data-testid="publish-screen" className="flex flex-col gap-3.5">
+      <div className="st-group">
+        <span className="st-gt">
+          <Send strokeWidth={2.25} />
+          Đăng đi đâu
+        </span>
         {(d.destinations ?? []).map((dest) => (
-          <label key={dest.id} className="flex items-center gap-2 text-sm">
+          <label
+            key={dest.id}
+            className={`st-radio ${to.includes(dest.id as Where) || dest.id === 'library' ? 'st-on' : ''} ${dest.blocked ? 'opacity-60' : ''}`}
+          >
             <input
               type="checkbox"
               data-testid={`pub-${dest.id}`}
               disabled={dest.id === 'library' || Boolean(dest.blocked)}
-              checked={dest.id === 'library' || to.includes(dest.id as 'telegram')}
-              onChange={(e) => set(dest.id as 'library' | 'telegram', e.target.checked)}
-              className="h-4 w-4 accent-[hsl(var(--primary))]"
+              checked={dest.id === 'library' || to.includes(dest.id as Where)}
+              onChange={(e) => set(dest.id as Where, e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]"
             />
-            {dest.label}
-            {dest.blocked && (
-              <span data-testid={`pub-blocked-${dest.id}`} className={CAPS}>
-                {dest.blocked}
-              </span>
-            )}
+            <span className="min-w-0">
+              <b>{dest.label}</b>
+              {dest.id === 'library' && <span>Mọi lượt chạy đều ở đây — không tắt được.</span>}
+              {dest.blocked && (
+                <span data-testid={`pub-blocked-${dest.id}`} className="text-[hsl(var(--destructive))]">
+                  {dest.blocked}
+                </span>
+              )}
+            </span>
           </label>
         ))}
       </div>
 
-      <label className={`flex items-center gap-2 ${CAPS}`}>
-        đăng sau
-        <input
-          type="datetime-local"
-          data-testid="pub-at"
-          value={overrides.publishAt ?? ''}
-          onChange={(e) => onChange({ ...overrides, publishAt: e.target.value || undefined })}
-          className="pen-line-sm rounded-md bg-background px-1.5 py-0.5 font-sans text-xs text-foreground"
+      <div className="st-group">
+        <span className="st-gt">
+          <Clock strokeWidth={2.25} />
+          Khi nào
+        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            data-testid="pub-now"
+            onClick={() => onChange({ ...overrides, publishAt: undefined, publishWhen: undefined })}
+            className={`st-chip ${when === 'now' ? 'st-on' : 'st-soft'}`}
+          >
+            Đăng ngay
+          </button>
+          <button
+            type="button"
+            data-testid="pub-slot"
+            disabled={slotBusy}
+            onClick={askForSlot}
+            className={`st-chip ${when === 'slot' ? 'st-on' : 'st-soft'}`}
+          >
+            {slotBusy ? 'Đang tìm…' : 'Khe trống kế tiếp'}
+          </button>
+          <input
+            type="datetime-local"
+            data-testid="pub-at"
+            value={overrides.publishAt ?? ''}
+            onChange={(e) =>
+              onChange({ ...overrides, publishAt: e.target.value || undefined, publishWhen: e.target.value ? 'at' : undefined })
+            }
+            className="st-field w-auto"
+          />
+        </div>
+      </div>
+
+      <label className="st-group">
+        <span className="st-gt">
+          <MessageSquare strokeWidth={2.25} />
+          Bình luận đầu
+        </span>
+        <textarea
+          data-testid="pub-comment"
+          rows={2}
+          value={firstComment}
+          onChange={(e) => onChange({ ...overrides, firstComment: e.target.value })}
+          className="st-field resize-none"
         />
       </label>
-      <p className={CAPS}>
-        giờ hẹn chỉ được ghi lại — chưa có bộ đặt lịch nào chạy nó
-      </p>
+
+      <div data-testid="pub-lint" className="flex flex-col gap-1">
+        <span className={`st-chip self-start ${gate.findings.length ? 'st-soft' : 'st-on'}`}>
+          <span className="st-num">{gate.checked}</span> kiểm tra
+          {gate.findings.length ? ` · ${gate.findings.length} vấn đề` : ' · đạt'}
+        </span>
+        {gate.findings.map((f) => (
+          <span key={f} data-testid="pub-finding" className="text-xs text-[hsl(var(--destructive))]">
+            {f}
+          </span>
+        ))}
+        {gate.warnings.map((w) => (
+          <span key={w} data-testid="pub-warning" className="text-xs text-muted-foreground">
+            {w}
+          </span>
+        ))}
+      </div>
 
       <ul className="flex flex-wrap gap-2">
         {(d.assets ?? []).map((a) => (
-          <li key={a.url} data-testid="publish-asset" className={CAPS}>
+          <li key={a.url} data-testid="publish-asset" className="st-chip st-soft">
             {a.kind}
           </li>
         ))}
       </ul>
+      <span hidden data-testid="pub-run">{runId}</span>
     </div>
   );
+}
+
+/** An ISO instant as the local value a `datetime-local` input wants. */
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 /**

@@ -28,6 +28,8 @@ export interface PipelineConfig {
   media: MediaConfig;
   /** Free text the owner leaves for themselves about the schedule. */
   scheduleNote: string;
+  /** Queue the finished reel the moment it renders, with no screen in between. */
+  publish: { auto: boolean; to: string[] };
 }
 
 export const DEFAULT_PIPELINE: PipelineConfig = {
@@ -35,6 +37,7 @@ export const DEFAULT_PIPELINE: PipelineConfig = {
   output: DEFAULT_OUTPUT,
   media: { kitId: null, renderCard: true, renderReel: false },
   scheduleNote: '',
+  publish: { auto: false, to: ['library'] },
 };
 
 export interface StoredPipeline {
@@ -52,6 +55,7 @@ function merge(raw: unknown): PipelineConfig {
     output: { ...DEFAULT_PIPELINE.output, ...(v.output ?? {}) },
     media: { ...DEFAULT_PIPELINE.media, ...(v.media ?? {}) },
     scheduleNote: typeof v.scheduleNote === 'string' ? v.scheduleNote : '',
+    publish: { ...DEFAULT_PIPELINE.publish, ...(v.publish ?? {}) },
   };
 }
 

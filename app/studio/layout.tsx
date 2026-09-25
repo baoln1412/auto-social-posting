@@ -4,6 +4,7 @@ import { Plus, Send } from 'lucide-react';
 import { tier } from '@/lib/studio/tier';
 import { seedDemo } from '@/lib/studio/demo/seed';
 import { studioDb } from '@/lib/studio/db';
+import { startPublishLoop } from '@/lib/studio/publish/loop';
 import { StudioNav } from './components/StudioNav';
 import './studio.css';
 
@@ -21,6 +22,8 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   if (!process.env.STUDIO_ENABLED) notFound();
   tier();
   seedDemo();
+  // Idempotent: the second call sees the timer and returns.
+  startPublishLoop();
 
   return (
     <div className="st-app bg-background">

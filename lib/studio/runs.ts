@@ -33,6 +33,10 @@ import { hashOf } from './hash';
 import { tierOf } from './tier-of';
 import { deliverFailure, deliverReel } from './deliver';
 import { getSetting, setSetting } from './settings';
+import { loadPipeline } from './pipeline/config';
+import { enqueue, rowsFor, tick } from './publish/queue';
+import { sendRow } from './publish/send';
+import type { Where } from './steps/publish';
 
 export type RunStatus = 'new' | 'running' | 'blocked' | 'done' | 'error';
 
@@ -365,6 +369,7 @@ export async function advance(
 
   const out = getRun(id)!;
   await notify(out, name, status, error);
+  if (!error && name === 'reel') await autoPublish(out);
 
   // `Duyệt trước khi dựng` off: walk the rail without asking, and stop at the first step
   // that would cost something. auto_continue has been a column since slice 0 with nothing
@@ -376,6 +381,30 @@ export async function advance(
     }
   }
   return out;
+}
+
+/**
+ * `Tự đăng khi render xong`, if the market's dây chuyền has it on.
+ *
+ * It queues; it does not send by itself. The row goes in with `at = now`, the same loop that
+ * handles a scheduled post picks it up, and a failure lands on the row rather than on the run
+ * — the video is rendered and in the library either way.
+ */
+async function autoPublish(rec: RunRecord): Promise<void> {
+  try {
+    const marketId = rec.channel.market_id;
+    if (!marketId) return;
+    const { config } = loadPipeline(marketId);
+    if (!config.publish.auto) return;
+    const already = new Set(rowsFor(rec.run.id).map((r) => r.where));
+    const now = new Date().toISOString();
+    for (const w of config.publish.to as Where[]) {
+      if (!already.has(w)) enqueue({ runId: rec.run.id, where: w, at: now });
+    }
+    await tick(sendRow);
+  } catch (e) {
+    console.error('[studio] tự đăng lỗi:', e);
+  }
 }
 
 /**

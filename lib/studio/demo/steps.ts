@@ -143,41 +143,17 @@ const reelStep: Step<Draft, ReelAsset> = {
   },
 };
 
-/** The demo tier publishes to the library and nowhere else — it is not allowed to deliver. */
-const publishStep: Step<Draft, { library: boolean; telegram: string; at: string }> = {
-  name: 'publish',
-  from: 'draft',
-  async preview(draft, _ctx) {
-    return {
-      kind: 'text',
-      data: {
-        title: draft?.title ?? '',
-        text: draft?.text ?? '',
-        assets: [{ kind: 'mp4', url: DEMO_MP4_URL }],
-        destinations: [
-          { id: 'library', label: 'Thư viện', blocked: null },
-          { id: 'telegram', label: 'Telegram', blocked: 'Chế độ xem thử không gửi đi đâu cả.' },
-        ],
-      },
-      cost: FREE,
-    };
-  },
-  async run(_draft, ctx) {
-    boomIfAsked('publish', ctx);
-    return { library: true, telegram: 'off', at: new Date().toISOString() };
-  },
-};
-
 /**
- * The demo channel's engines — every one a fixture, except `image`.
+ * The demo channel's engines — fixtures for the two that would spend or reach the network.
  *
- * The real image step is already free (Satori, local, `dựng tại chỗ`, $0), and a stub that
- * returned one fixed PNG made every control on the Ảnh screen decorative: the ratio moved
- * and the picture did not. A demo that cannot show what a control does is not a demo of it.
+ * `image` and `publish` are deliberately absent. The real image step is free (Satori, local,
+ * $0) and the real publish step only writes a row in `studio_publish` — both are local, and a
+ * stub of either made its whole screen decorative: the ratio moved and the picture did not,
+ * the destinations were a fixed pair and nothing was ever queued. What the demo must not do is
+ * SEND, and `sendRow` refuses that for a demo channel with the reason on the row.
  */
 export const DEMO_STEPS: Partial<Record<StepName, Step>> = {
   fetch: fetchStep,
   draft: draftStep,
   reel: reelStep,
-  publish: publishStep,
 };
