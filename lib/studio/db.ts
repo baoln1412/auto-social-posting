@@ -134,6 +134,28 @@ export function ensureStudioTables(d: Database.Database): void {
       created_at    TEXT DEFAULT ${NOW}
     );
 
+    -- Every failure that is worth telling the owner about, whatever raised it.
+    CREATE TABLE IF NOT EXISTS studio_alerts (
+      id         TEXT PRIMARY KEY,
+      run_id     TEXT,
+      kind       TEXT,
+      message    TEXT,
+      seen       INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT ${NOW}
+    );
+
+    -- One row per fetch, not one per post: a number that moves is only readable as a series.
+    CREATE TABLE IF NOT EXISTS studio_metrics (
+      id         TEXT PRIMARY KEY,
+      run_id     TEXT,
+      where_to   TEXT,
+      remote_id  TEXT,
+      views      INTEGER,
+      reach      INTEGER,
+      reactions  INTEGER,
+      fetched_at TEXT DEFAULT ${NOW}
+    );
+
     -- Installation-level settings: a Telegram chat id belongs to the install, not a channel.
     CREATE TABLE IF NOT EXISTS studio_settings (
       key        TEXT PRIMARY KEY,
@@ -141,6 +163,8 @@ export function ensureStudioTables(d: Database.Database): void {
       updated_at TEXT DEFAULT ${NOW}
     );
 
+    CREATE INDEX IF NOT EXISTS studio_alerts_seen ON studio_alerts (seen, created_at);
+    CREATE INDEX IF NOT EXISTS studio_metrics_run ON studio_metrics (run_id, fetched_at);
     CREATE INDEX IF NOT EXISTS studio_publish_run ON studio_publish (run_id);
     CREATE INDEX IF NOT EXISTS studio_publish_due ON studio_publish (status, at);
     CREATE INDEX IF NOT EXISTS studio_steps_run ON studio_steps (run_id);

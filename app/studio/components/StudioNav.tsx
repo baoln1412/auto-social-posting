@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, CalendarDays, Folder, Library, Palette, Plus, Rss, Settings, Tv } from 'lucide-react';
+import { BarChart3, BookOpen, CalendarDays, Folder, Library, Palette, Plus, Rss, Settings, Tv } from 'lucide-react';
 
 /**
  * The sidebar's nav — the reference's: an icon on every row, the current page filled with the
@@ -15,6 +15,7 @@ const NAV = [
   { href: '/studio/kits', label: 'Bộ nhận diện', Icon: Palette },
   { href: '/studio/library', label: 'Thư viện', Icon: Library },
   { href: '/studio/calendar', label: 'Lịch đăng', Icon: CalendarDays },
+  { href: '/studio/analytics', label: 'Số liệu', Icon: BarChart3 },
   { href: '/studio/assets', label: 'Kho tài nguyên', Icon: Folder },
   { href: '/studio/guide', label: 'Hướng dẫn', Icon: BookOpen },
   { href: '/studio/settings', label: 'Cài đặt', Icon: Settings },

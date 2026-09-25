@@ -17,6 +17,7 @@ import { tick } from './queue';
 import { sendRow } from './send';
 
 let timer: NodeJS.Timeout | null = null;
+let daily: NodeJS.Timeout | null = null;
 let running = false;
 
 export function startPublishLoop(everyMs = 60_000): void {
@@ -36,4 +37,25 @@ export function startPublishLoop(everyMs = 60_000): void {
   }, everyMs);
   // Never hold the process open on its own account.
   timer.unref?.();
+}
+
+/**
+ * The other clock: how the posts that went out are doing. Once a day is the cadence the
+ * numbers move at, and `fetchAllMetrics` skips anything read in the last twelve hours, so
+ * an extra pass after a restart costs one query and no Graph calls.
+ */
+export function startMetricsLoop(everyMs = 6 * 3_600_000): void {
+  if (daily) return;
+  const pass = async () => {
+    try {
+      const { fetchAllMetrics } = await import('../metrics');
+      const out = await fetchAllMetrics();
+      if (out.read || out.failed) console.log(`[studio] số liệu: ${out.read} đọc, ${out.failed} lỗi`);
+    } catch (e) {
+      console.error('[studio] vòng số liệu lỗi:', e);
+    }
+  };
+  daily = setInterval(pass, everyMs);
+  daily.unref?.();
+  void pass();
 }

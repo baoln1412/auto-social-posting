@@ -4,7 +4,7 @@ import { Plus, Send } from 'lucide-react';
 import { tier } from '@/lib/studio/tier';
 import { seedDemo } from '@/lib/studio/demo/seed';
 import { studioDb } from '@/lib/studio/db';
-import { startPublishLoop } from '@/lib/studio/publish/loop';
+import { startMetricsLoop, startPublishLoop } from '@/lib/studio/publish/loop';
 import { StudioNav } from './components/StudioNav';
 import './studio.css';
 
@@ -24,6 +24,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   seedDemo();
   // Idempotent: the second call sees the timer and returns.
   startPublishLoop();
+  startMetricsLoop();
 
   return (
     <div className="st-app bg-background">

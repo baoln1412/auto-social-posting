@@ -9,6 +9,7 @@
  * clock exercise exactly the same code.
  */
 import { randomUUID } from 'node:crypto';
+import { raise, telegram } from '../alerts';
 import { studioDb } from '../db';
 import { scheduleTimes } from '../pipeline/schedule';
 import type { Where } from '../steps/publish';
@@ -122,7 +123,11 @@ export async function tick(send: Sender, now = new Date()): Promise<{ sent: numb
       markSent(row.id, out.remoteId);
       sent++;
     } catch (e) {
-      markFailed(row.id, e instanceof Error ? e.message : String(e));
+      const why = e instanceof Error ? e.message : String(e);
+      markFailed(row.id, why);
+      // The publisher's own catch: a post that never went out is exactly the thing the 4am
+      // silence used to swallow.
+      await raise('publish', `Không gửi được tới ${row.where}. ${why}`, row.runId, telegram);
       failed++;
     }
   }

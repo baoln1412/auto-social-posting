@@ -1,11 +1,116 @@
 {
   "_note": "The four responses of the Reels publish flow, in order, in the shapes graph.facebook.com/v23.0 documents. Built from Meta's reference, not captured from a live call — this install has no page token yet. When a real token exists, replace each body with what the API actually returned and the test stays the test.",
-  "start": { "video_id": "1010101010", "upload_url": "https://rupload.facebook.com/video-upload/v23.0/1010101010" },
-  "upload": { "success": true },
-  "finish": { "success": true, "post_id": "555_666" },
-  "statusUploading": { "status": { "video_status": "processing", "uploading_phase": { "status": "complete" } }, "id": "1010101010" },
-  "statusReady": { "status": { "video_status": "ready", "processing_phase": { "status": "complete" } }, "id": "1010101010" },
-  "statusError": { "status": { "video_status": "error", "processing_phase": { "status": "error", "errors": [{ "message": "Video không có âm thanh." }] } }, "id": "1010101010" },
-  "comment": { "id": "555_666_777" },
-  "tokenError": { "error": { "message": "Error validating access token: Session has expired.", "type": "OAuthException", "code": 190 } }
+  "start": {
+    "video_id": "1010101010",
+    "upload_url": "https://rupload.facebook.com/video-upload/v23.0/1010101010"
+  },
+  "upload": {
+    "success": true
+  },
+  "finish": {
+    "success": true,
+    "post_id": "555_666"
+  },
+  "statusUploading": {
+    "status": {
+      "video_status": "processing",
+      "uploading_phase": {
+        "status": "complete"
+      }
+    },
+    "id": "1010101010"
+  },
+  "statusReady": {
+    "status": {
+      "video_status": "ready",
+      "processing_phase": {
+        "status": "complete"
+      }
+    },
+    "id": "1010101010"
+  },
+  "statusError": {
+    "status": {
+      "video_status": "error",
+      "processing_phase": {
+        "status": "error",
+        "errors": [
+          {
+            "message": "Video không có âm thanh."
+          }
+        ]
+      }
+    },
+    "id": "1010101010"
+  },
+  "comment": {
+    "id": "555_666_777"
+  },
+  "tokenError": {
+    "error": {
+      "message": "Error validating access token: Session has expired.",
+      "type": "OAuthException",
+      "code": 190
+    }
+  },
+  "insightsPost": {
+    "data": [
+      {
+        "name": "post_impressions",
+        "period": "lifetime",
+        "values": [
+          {
+            "value": 4820
+          }
+        ]
+      },
+      {
+        "name": "post_impressions_unique",
+        "period": "lifetime",
+        "values": [
+          {
+            "value": 3910
+          }
+        ]
+      }
+    ]
+  },
+  "insightsVideo": {
+    "data": [
+      {
+        "name": "total_video_views",
+        "period": "lifetime",
+        "values": [
+          {
+            "value": 12043
+          }
+        ]
+      },
+      {
+        "name": "total_video_impressions_unique",
+        "period": "lifetime",
+        "values": [
+          {
+            "value": 9004
+          }
+        ]
+      }
+    ]
+  },
+  "reactions": {
+    "reactions": {
+      "data": [],
+      "summary": {
+        "total_count": 187
+      }
+    },
+    "id": "555_666"
+  },
+  "insightsDenied": {
+    "error": {
+      "message": "(#200) Insights permission is required",
+      "type": "OAuthException",
+      "code": 200
+    }
+  }
 }

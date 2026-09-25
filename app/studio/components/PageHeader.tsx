@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { Bell, DollarSign } from 'lucide-react';
+import { unseenCount } from '@/lib/studio/alerts';
 import { studioDb } from '@/lib/studio/db';
 import { tier } from '@/lib/studio/tier';
 
@@ -32,6 +34,7 @@ export function PageHeader({
   right?: React.ReactNode;
 }) {
   const usd = monthCostUsd();
+  const alerts = unseenCount();
   const channels = (studioDb().prepare('SELECT COUNT(*) AS n FROM studio_channels').get() as { n: number }).n;
   const t = tier();
   return (
@@ -48,9 +51,16 @@ export function PageHeader({
           <DollarSign strokeWidth={2.25} />
           Tháng này <span className="st-num">${usd.toFixed(2)}</span>
         </span>
-        <span data-testid="bell" className="st-bell" title="Thông báo">
+        {/* Server-rendered, so a failure raised by the advance the screen just made is in the
+            bell as soon as that screen comes back — no poll, no lag. */}
+        <Link href="/studio/analytics#alerts" data-testid="bell" className="st-bell" title="Thông báo">
           <Bell strokeWidth={2.25} />
-        </span>
+          {alerts > 0 && (
+            <i data-testid="bell-count" className="st-num">
+              {alerts > 9 ? '9+' : alerts}
+            </i>
+          )}
+        </Link>
         <span className="st-user">
           <span className="st-avatar">C</span>
           <span>

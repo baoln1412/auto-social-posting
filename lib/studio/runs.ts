@@ -14,6 +14,7 @@ import { statSync } from 'node:fs';
 import { studioDb } from './db';
 import { resolveStep } from './steps/registry';
 import {
+  STEP_LABELS,
   canContinue,
   effectiveKit,
   makesOf,
@@ -31,8 +32,9 @@ import {
 } from './steps/types';
 import { hashOf } from './hash';
 import { tierOf } from './tier-of';
-import { deliverFailure, deliverReel } from './deliver';
+import { deliverReel } from './deliver';
 import { getSetting, setSetting } from './settings';
+import { raise, telegram } from './alerts';
 import { loadPipeline } from './pipeline/config';
 import { enqueue, rowsFor, tick } from './publish/queue';
 import { sendRow } from './publish/send';
@@ -423,7 +425,9 @@ async function notify(
 ): Promise<void> {
   const id = rec.run.id;
   if (error) {
-    await deliverFailure(name, error, id);
+    // The row first, the message second: a Telegram that is off must not lose the record.
+    // This replaces the bare deliverFailure call — same message, now with a bell behind it.
+    await raise('render', `Bước "${STEP_LABELS[name] ?? name}" lỗi. ${error.slice(0, 600)}`, id, telegram);
     return;
   }
   if (status !== 'done') return;
