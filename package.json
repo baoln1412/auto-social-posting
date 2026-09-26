@@ -9,7 +9,7 @@
     "lint": "next lint",
     "knip": "npx --yes knip",
     "test": "vitest run && playwright test",
-    "dev:studio": "STUDIO_ENABLED=1 NEXT_PUBLIC_STUDIO_ENABLED=1 NEXT_DIST_DIR=.next-dev DUCKDB_PATH=data/lake-dev.duckdb next dev -H 127.0.0.1 -p 3001",
+    "dev:studio": "STUDIO_ENABLED=1 NEXT_PUBLIC_STUDIO_ENABLED=1 NEXT_DIST_DIR=.next-dev DUCKDB_PATH=data/lake-dev.duckdb STUDIO_SQLITE_PATH=data/studio-test.db STUDIO_COOKIE_SECRET=playwright-tier-secret next dev -H 127.0.0.1 -p 3001",
     "dev:lake": "cp -n data/lake.duckdb data/lake-dev.duckdb"
   },
   "dependencies": {

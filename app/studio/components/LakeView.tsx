@@ -12,7 +12,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Grid2x2, Image as ImageIcon, List, RefreshCw, Search, Send, Sparkles, Video } from 'lucide-react';
+import { Grid2x2, Image as ImageIcon, List, RefreshCw, Search, Send, Sparkles, Video, Palette } from 'lucide-react';
 import PostCard from '@/app/components/PostCard';
 import type { PostDraft, PostStatus } from '@/app/types';
 import { ALL_STEPS, STEP_LABELS, type StepName } from '@/lib/studio/steps/types';
@@ -62,10 +62,15 @@ export function LakeView({
   markets,
   market,
   canRun,
+  kits,
+  defaultKitId,
 }: {
   markets: Market[];
   market: Market;
   canRun: boolean;
+  kits: { id: string; name: string }[];
+  /** The kit this market's channel wears — what a run gets when nothing is chosen. */
+  defaultKitId: string;
 }) {
   const router = useRouter();
   const [posts, setPosts] = useState<PostDraft[]>([]);
@@ -73,6 +78,17 @@ export function LakeView({
   const [sources, setSources] = useState<string[]>([]);
   const [runs, setRuns] = useState<Record<string, RunSummary>>({});
   const [loading, setLoading] = useState(true);
+  // Which look the next video gets. Per market, remembered per browser: an owner who works
+  // one market in one style should not re-pick it on every post.
+  const [kitId, setKitId] = useState(defaultKitId);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`studio.kit.${market.id}`);
+      setKitId(saved && kits.some((k) => k.id === saved) ? saved : defaultKitId);
+    } catch {
+      setKitId(defaultKitId);
+    }
+  }, [market.id, defaultKitId, kits]);
   const [keyword, setKeyword] = useState('');
   const [source, setSource] = useState('All');
   const [done, setDone] = useState('all');
@@ -154,7 +170,13 @@ export function LakeView({
       const res = await fetch('/api/studio/runs', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ channelId: market.channelId, itemRef: ref }),
+        body: JSON.stringify({
+          channelId: market.channelId,
+          itemRef: ref,
+          // Only when it differs: an override that repeats the channel's own kit would show
+          // up in the run's Tuỳ chỉnh as a change the owner never made.
+          overrides: kitId && kitId !== defaultKitId ? { kitId } : {},
+        }),
       });
       const body = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
       if (!res.ok || !body.id) {
@@ -228,6 +250,38 @@ export function LakeView({
           Khác
         </Link>
       </nav>
+
+      {/* Not a filter — what the NEXT video made from this page will look like. Sits above the
+          list because it applies to every card, and one select beats thirty. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="st-label inline-flex items-center gap-1.5">
+          <Palette size={15} strokeWidth={2.25} className="text-primary" />
+          Bộ nhận diện cho video mới
+        </span>
+        <select
+          data-testid="lake-kit"
+          value={kitId}
+          onChange={(e) => {
+            setKitId(e.target.value);
+            try {
+              localStorage.setItem(`studio.kit.${market.id}`, e.target.value);
+            } catch {
+              /* private window: the choice just does not survive the tab */
+            }
+          }}
+          className="st-btn st-sm"
+        >
+          {kits.map((k) => (
+            <option key={k.id} value={k.id}>
+              {k.name}
+              {k.id === defaultKitId ? ' (mặc định của kênh)' : ''}
+            </option>
+          ))}
+        </select>
+        <Link href="/studio/kits" className="st-btn st-sm st-ghost">
+          Sửa bộ nhận diện
+        </Link>
+      </div>
 
       <div data-testid="lake-filters" className="flex flex-wrap items-center gap-2">
         <select data-testid="lake-source" value={source} onChange={(e) => setSource(e.target.value)} className="st-btn st-sm">

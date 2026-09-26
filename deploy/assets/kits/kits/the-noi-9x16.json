@@ -1,0 +1,59 @@
+{
+  "id": "the-noi-9x16",
+  "name": "Thẻ dọc 9:16",
+  "schemaVersion": 1,
+  "identity": {
+    "channelName": "101 Australia — Chuyện Úc chút chút",
+    "handle": "@101australia"
+  },
+  "post": {
+    "preset": "hook-first",
+    "format": "hook-first",
+    "length": "long",
+    "emoji": "light",
+    "hashtags": 6
+  },
+  "card": {
+    "preset": "toi",
+    "engine": "studio",
+    "theme": "toi",
+    "ratio": "9:16",
+    "highlight": "after-colon",
+    "background": "article",
+    "font": "BeVietnamPro-Black",
+    "radius": 0,
+    "highlightColor": "#F8EF63"
+  },
+  "voice": {
+    "preset": "hoaimy",
+    "provider": "edge-tts",
+    "voiceId": "vi-VN-HoaiMyNeural"
+  },
+  "captions": {
+    "preset": "dam",
+    "size": 96,
+    "pos": 0.78,
+    "wordsPerCue": 3,
+    "maxLines": 2,
+    "case": "upper"
+  },
+  "frame": {
+    "preset": "multi",
+    "layout": "multi",
+    "intro": true,
+    "durationBand": "long"
+  },
+  "stickers": {
+    "preset": "none",
+    "set": "",
+    "where": []
+  },
+  "signature": {
+    "handle": true,
+    "watermark": false
+  },
+  "music": {
+    "tier": "soft"
+  },
+  "revision": 1
+}

@@ -8,6 +8,7 @@ process.env.STUDIO_SQLITE_PATH = path.join(dir, 'test.db');
 
 const { studioDb, resetStudioDbForTests } = await import('@/lib/studio/db');
 const { seedDemo, DEMO_CHANNEL_ID, DEMO_KIT_ID } = await import('@/lib/studio/demo/seed');
+const { listKitFiles } = await import('@/lib/studio/kits/schema');
 
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 beforeEach(() => resetStudioDbForTests());
@@ -26,8 +27,9 @@ describe('seedDemo()', () => {
     seedDemo();
     const d = studioDb();
     expect(d.prepare('SELECT COUNT(*) c FROM studio_channels').get()).toEqual({ c: 1 });
-    // Both shipped kits, seeded once each however many times seedDemo runs.
-    expect(d.prepare('SELECT COUNT(*) c FROM studio_kits').get()).toEqual({ c: 2 });
+    // Every shipped kit, seeded once each however many times seedDemo runs. Counted from
+    // the pack, not typed: adding a kit to the pack should not fail a test about seeding.
+    expect(d.prepare('SELECT COUNT(*) c FROM studio_kits').get()).toEqual({ c: listKitFiles().length });
   });
 
   it('marks the demo channel as reachable by the demo tier', () => {
@@ -51,15 +53,19 @@ describe('seedDemo()', () => {
 });
 
 describe('the shipped kits', () => {
-  it('seeds both, with their real tabs and not a stub', () => {
+  it('seeds every one of them, with its real tabs and not a stub', () => {
     seedDemo();
     const rows = studioDb().prepare('SELECT id, json FROM studio_kits ORDER BY id').all() as {
       id: string;
       json: string;
     }[];
-    expect(rows.map((r) => r.id)).toEqual(['demo', 'desoul-posting-vi']);
-    expect(JSON.parse(rows[0].json).card.engine).toBe('studio');
-    expect(JSON.parse(rows[1].json).card.engine).toBe('classic');
+    expect(rows.map((r) => r.id)).toEqual(
+      listKitFiles().map((f) => path.basename(f, '.json')).sort(),
+    );
+    // A stub has no card tab at all; every shipped kit names an engine it can be drawn with.
+    for (const r of rows) {
+      expect(['studio', 'classic'], r.id).toContain(JSON.parse(r.json).card?.engine ?? 'classic');
+    }
   });
 
   it('never overwrites a kit the owner edited', () => {

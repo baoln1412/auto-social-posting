@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+
+// Its own database: this file is otherwise pure, and the drift check below has to seed.
+const dbDir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-kits-'));
+process.env.STUDIO_SQLITE_PATH = path.join(dbDir, 'test.db');
 import {
   KITS_DIR,
   listKitFiles,
@@ -10,6 +15,8 @@ import {
   validatePreset,
 } from '@/lib/studio/kits/schema';
 import { cardParams, captionStyle, effectiveFrame } from '@/lib/studio/kits/load';
+import { studioDb } from '@/lib/studio/db';
+import { seedDemo } from '@/lib/studio/demo/seed';
 
 describe('the kit directory', () => {
   it('resolves through deploy/assets/kits — the symlink the console shares', () => {
@@ -17,11 +24,12 @@ describe('the kit directory', () => {
     expect(fs.existsSync(path.join(KITS_DIR, 'kit.schema.json'))).toBe(true);
   });
 
-  it('ships both kits', () => {
-    expect(listKitFiles().map((f) => path.basename(f, '.json')).sort()).toEqual([
-      'demo',
-      'desoul-posting-vi',
-    ]);
+  it('ships the kits the pack claims, and every one of them validates', () => {
+    const ids = listKitFiles().map((f) => path.basename(f, '.json')).sort();
+    expect(ids).toEqual(['demo', 'desoul-posting-vi', 'the-noi-9x16']);
+    // A shipped kit that does not validate is seeded and then silently skipped, so the page
+    // lists one fewer than the pack has — check the pack, not just its filenames.
+    for (const f of listKitFiles()) expect(validateKit(loadKitFile(f)), f).toBeNull();
   });
 });
 
@@ -139,7 +147,7 @@ describe('the two card engines', () => {
       card: { engine: 'studio', ratio: '9:16', theme: 'bao', font: 'BeVietnamPro-Bold',
               radius: 28, titleSize: 90, highlightColor: '#B3121D', background: 'article' },
     } as any;
-    const q = cardParams(kit, draft, 'https://ex.com/a');
+    const q = cardParams(kit, draft, 'https://ex.com/a', 'https://ex.com/pic.jpg');
     expect(cardPath(kit)).toBe('/api/studio/card');
     expect(q.get('ratio')).toBe('9:16');
     expect(q.get('theme')).toBe('bao');
@@ -147,7 +155,17 @@ describe('the two card engines', () => {
     expect(q.get('radius')).toBe('28');
     expect(q.get('titleSize')).toBe('90');
     expect(q.get('highlightColor')).toBe('#B3121D');
-    expect(q.get('bg')).toBe('https://ex.com/a');
+    // The PICTURE, not the page. This assertion used to read `bg === 'https://ex.com/a'`,
+    // which is the article's page url — it did not catch the bug, it wrote it down: the
+    // studio route has no scraper, so every studio-engine kit rendered a blank background.
+    expect(q.get('bg')).toBe('https://ex.com/pic.jpg');
+  });
+
+  it('gives the studio route no background when only the page url is known', async () => {
+    const { cardParams } = await load();
+    const kit = { id: 'k', name: 'K', card: { engine: 'studio', background: 'article' } } as any;
+    // Better nothing than an HTML page handed to an image fetcher.
+    expect(cardParams(kit, draft, 'https://ex.com/a').get('bg')).toBeNull();
   });
 
   it('never lets the classic route be asked for 9:16, which it cannot make', async () => {
@@ -166,6 +184,31 @@ describe('the two card engines', () => {
     for (const { tab, file } of listPresetFiles().filter((f) => f.tab === 'card')) {
       const preset = JSON.parse(fs.readFileSync(file, 'utf8'));
       expect(validatePreset(tab, preset), `${file}: ${validatePreset(tab, preset)}`).toBeNull();
+    }
+  });
+});
+
+describe('the shipped pack and the seeded rows', () => {
+  it('agree after a seed, so the file is what the product actually renders', () => {
+    // They drifted once and nothing caught it: the stored `demo` sat at revision 3 with
+    // `card.background: "article"` while the file at revision 3 said `"none"`, so seeding
+    // saw equal revisions and left the row alone. Every kit on the Bộ nhận diện page was
+    // then a kit nobody had shipped.
+    seedDemo();
+    for (const file of listKitFiles()) {
+      const shipped = loadKitFile(file) as { id: string; revision?: number };
+      const row = studioDb().prepare('SELECT json FROM studio_kits WHERE id=?').get(shipped.id) as
+        | { json: string }
+        | undefined;
+      expect(row, shipped.id).toBeTruthy();
+      const stored = JSON.parse(row!.json) as { revision?: number };
+      expect(stored.revision ?? 1, `${shipped.id} stored revision`).toBeGreaterThanOrEqual(
+        shipped.revision ?? 1,
+      );
+      // Equal revisions must mean equal content, or the bump rule is not doing its job.
+      if ((stored.revision ?? 1) === (shipped.revision ?? 1)) {
+        expect(stored, shipped.id).toEqual(shipped);
+      }
     }
   });
 });

@@ -32,7 +32,9 @@ export interface CardAsset {
 
 function cardUrl(draft: Draft, ctx: RunCtx): string {
   const item = ctx.outputs.fetch as SourceItem | undefined;
-  return `http://127.0.0.1${cardPath(ctx.kit)}?${cardParams(ctx.kit, draft, item?.url)}`;
+  // Two urls, two jobs: the page for the classic route to scrape, the picture for the
+  // studio route to draw. One argument doing both meant studio kits rendered no background.
+  return `http://127.0.0.1${cardPath(ctx.kit)}?${cardParams(ctx.kit, draft, item?.url, item?.images?.[0])}`;
 }
 
 /**

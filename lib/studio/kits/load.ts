@@ -48,7 +48,15 @@ export function cardPath(kit: Kit): string {
 export function cardParams(
   kit: Kit,
   draft: { title: string; comments?: string[] },
+  /** The article's own PAGE url. The classic route scrapes og:image out of it. */
   articleUrl?: string,
+  /**
+   * A picture url. The studio route has no scraper — it fetches `bg` as an image — so
+   * handing it `articleUrl` fed a renderer an HTML page and every studio-engine kit drew a
+   * blank background, in the preview and in the render. Measured on the Bộ nhận diện page:
+   * the classic kit came back (91,96,126) and both studio kits (20,19,15).
+   */
+  pictureUrl?: string,
 ): URLSearchParams {
   const card = (kit.card ?? {}) as CardTab;
   const studio = cardEngine(kit) === 'studio';
@@ -83,7 +91,7 @@ export function cardParams(
       }
     }
     if (card.bgUrl) q.set('bg', card.bgUrl);
-    else if (articleUrl && (card.background ?? 'none') === 'article') q.set('bg', articleUrl);
+    else if (pictureUrl && (card.background ?? 'none') === 'article') q.set('bg', pictureUrl);
   } else if (card.bgUrl) {
     // An explicit picture beats the article's own: the Ảnh step is where the owner says
     // which of the article's images — or an upload — this post's card should show.

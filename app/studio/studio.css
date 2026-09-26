@@ -117,3 +117,14 @@
 .st-blank { border: 2px dashed var(--st-pen2); border-radius: var(--radius); background: hsl(var(--muted)); padding: 26px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: hsl(var(--muted-foreground)); font-size: 13px; }
 .st-blank > svg { width: 26px; height: 26px; color: hsl(var(--primary)); }
 .st-blank b { font-size: 14px; color: hsl(var(--foreground)); }
+
+/* ── the lake card: one way to make a video ──
+   PostCard ships two of its own — a `Mở trong Studio` link and the gradient `Tạo Video` that
+   opens the old one-shot modal — and the cap above adds a third. Three buttons on one card,
+   two of them going somewhere different, is how a post ends up rendered with a kit nobody
+   chose. Inside Studio the cap is the single entry, and it is the one that offers a Bộ nhận
+   diện; both of PostCard's stay exactly where they were on Desoul Posting.
+   Hidden from outside, because PostCard is imported unmodified. tests/e2e/lake-actions.spec.ts
+   counts what is left, so a class change over there fails here instead of quietly showing three. */
+[data-testid='lake-card'] [data-testid='open-in-studio'],
+[data-testid='lake-card'] button.bg-gradient-to-r { display: none !important; }

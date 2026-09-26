@@ -1,6 +1,10 @@
-/** PUT /api/studio/kits/[id] — save an edited kit, but only if it still validates. */
+/**
+ * PUT    /api/studio/kits/[id] — save an edited kit, but only if it still validates.
+ * DELETE /api/studio/kits/[id] — remove one the owner made.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { studioDb } from '@/lib/studio/db';
+import { deleteKit } from '@/lib/studio/kits/create';
 import { validateKit } from '@/lib/studio/kits/schema';
 import { can, tier } from '@/lib/studio/tier';
 
@@ -28,4 +32,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     .run(String(kit.name ?? params.id), JSON.stringify({ ...kit, id: params.id }), params.id);
   if (r.changes === 0) return NextResponse.json({ error: 'Không có bộ này.' }, { status: 404 });
   return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  if (!process.env.STUDIO_ENABLED) return new NextResponse('Not found', { status: 404 });
+  if (!can(tier(), 'edit_kit')) {
+    return NextResponse.json({ error: 'Chế độ xem thử không xoá được bộ nhận diện.' }, { status: 403 });
+  }
+  try {
+    deleteKit(params.id);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    // A refusal with its reason, not a 500: "còn 2 kênh đang dùng" is the answer.
+    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 409 });
+  }
 }

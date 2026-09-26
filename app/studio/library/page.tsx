@@ -3,6 +3,7 @@ import { listLibrary } from '@/lib/studio/library';
 import { channelForMarket } from '@/lib/studio/handoff';
 import { can, tier } from '@/lib/studio/tier';
 import { visibleChannelIds } from '@/lib/studio/visible';
+import { studioDb } from '@/lib/studio/db';
 import { LakeView, type Market } from '../components/LakeView';
 import { LibraryView } from '../components/LibraryView';
 import { PageHeader } from '@/app/studio/components/PageHeader';
@@ -32,6 +33,20 @@ export default async function LibraryPage({ searchParams }: { searchParams: { ma
   const other = searchParams.market === 'other';
   const market = all.find((m) => m.id === searchParams.market) ?? all[0];
 
+  // Every kit, and the one this market's channel wears. Until now the channel's kit was the
+  // ONLY kit a Library post could be rendered with — the run was created before anyone was
+  // asked, and the answer was always Desoul Posting VI.
+  const kits = studioDb().prepare('SELECT id, name FROM studio_kits ORDER BY name').all() as {
+    id: string;
+    name: string;
+  }[];
+  const defaultKitId =
+    (
+      studioDb().prepare('SELECT kit_id FROM studio_channels WHERE id=?').get(market?.channelId ?? '') as
+        | { kit_id: string | null }
+        | undefined
+    )?.kit_id ?? kits[0]?.id ?? '';
+
   return (
     <>
       <PageHeader
@@ -60,7 +75,13 @@ export default async function LibraryPage({ searchParams }: { searchParams: { ma
               <LibraryView items={listLibrary({ channelIds: visibleChannelIds(t) }).filter((i) => !i.itemRef?.startsWith('gold:'))} />
             </>
           ) : (
-            <LakeView markets={all} market={market} canRun={can(t, 'run')} />
+            <LakeView
+              markets={all}
+              market={market}
+              canRun={can(t, 'run')}
+              kits={kits}
+              defaultKitId={defaultKitId}
+            />
           )}
           <Tour id="library" steps={libTour} />
         </div>
