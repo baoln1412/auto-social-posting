@@ -180,7 +180,8 @@
           "enum": [
             "none",
             "after-colon",
-            "first-clause"
+            "first-clause",
+            "ai"
           ]
         },
         "background": {

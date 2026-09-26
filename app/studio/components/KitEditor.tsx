@@ -537,13 +537,13 @@ function Field({
           <option value="">(mặc định)</option>
           {f.options?.map((o) => (
             <option key={o} value={o}>
-              {valueLabel(o)}
+              {valueLabel(o, `${tab}.${f.key}`)}
             </option>
           ))}
         </select>
         <div className="flex flex-col gap-2">
           {f.options?.map((o) => {
-            const label = valueLabel(o);
+            const label = valueLabel(o, `${tab}.${f.key}`);
             const [name, desc] = label.includes('(') ? [label.slice(0, label.indexOf('(')).trim(), label.slice(label.indexOf('(') + 1, -1)] : [label, ''];
               const on = effective === o;
               return (
@@ -573,7 +573,7 @@ function Field({
           <option value="">(mặc định)</option>
           {f.options?.map((o) => (
             <option key={o} value={o}>
-              {valueLabel(o)}
+              {valueLabel(o, `${tab}.${f.key}`)}
             </option>
           ))}
         </select>

@@ -7,7 +7,7 @@ import type { Kit, Overrides } from '../steps/types';
 export interface CardTab {
   engine?: 'classic' | 'studio';
   ratio?: '4:5' | '1:1' | '9:16';
-  highlight?: 'none' | 'after-colon' | 'first-clause';
+  highlight?: 'none' | 'after-colon' | 'first-clause' | 'ai';
   background?: 'article' | 'none';
   theme?: string;
   font?: string;
@@ -24,8 +24,12 @@ export interface CardTab {
 }
 
 /** The clause the SOP paints in the highlight colour. */
-function highlightOf(title: string, mode: CardTab['highlight']): string | null {
+function highlightOf(title: string, mode: CardTab['highlight'], chosen?: string | null): string | null {
   if (mode === 'none') return null;
+  // 'ai': the span the model picked while the post was being made, resolved upstream and
+  // handed in. Falls through to the colon rule when nothing was resolved, so a card is never
+  // worse than it was before the model was asked.
+  if (mode === 'ai') return chosen ?? (title.split(/[:—–]/)[1]?.trim() || null);
   if (mode === 'first-clause') return title.split(/[,—–]/)[0]?.trim() || null;
   // 'after-colon' — the SOP's own convention: "MỸ: <the headline>".
   return title.split(/[:—–]/)[1]?.trim() || null;
@@ -47,7 +51,7 @@ export function cardPath(kit: Kit): string {
  */
 export function cardParams(
   kit: Kit,
-  draft: { title: string; comments?: string[] },
+  draft: { title: string; comments?: string[]; highlight?: string | null },
   /** The article's own PAGE url. The classic route scrapes og:image out of it. */
   articleUrl?: string,
   /**
@@ -67,7 +71,7 @@ export function cardParams(
     ratio: studio ? ratio : ratio === '1:1' ? '1:1' : '4:5',
   });
 
-  const hl = highlightOf(draft.title, card.highlight ?? 'after-colon');
+  const hl = highlightOf(draft.title, card.highlight ?? 'after-colon', draft.highlight);
   if (hl) q.set('hl', hl);
 
   if (studio) {

@@ -16,6 +16,8 @@ import { cardParams, cardEngine, cardPath } from '../kits/load';
 import { paletteFor } from '../card/theme';
 import { hashOf } from '../hash';
 import type { Draft } from '../gold';
+import { chooseHighlight, ruleHighlight } from '../highlight';
+import { isDemoChannel } from './registry';
 import type { RunCtx, SourceItem, Step } from './types';
 
 const OUT_DIR = path.join(process.cwd(), 'public', 'studio-runs');
@@ -30,7 +32,21 @@ export interface CardAsset {
   kind: 'png';
 }
 
-function cardUrl(draft: Draft, ctx: RunCtx): string {
+/**
+ * The span to highlight, when the kit leaves it to the model.
+ *
+ * Asked once per headline and cached, because the Ảnh screen re-previews on every control
+ * move and a headline's emphasis does not change between two of them. A demo channel never
+ * asks: the demo pack does not reach the network, and the rule is a fine answer there.
+ */
+async function highlightFor(draft: Draft, ctx: RunCtx): Promise<string | null> {
+  const mode = ((ctx.kit.card ?? {}) as { highlight?: string }).highlight;
+  if (mode !== 'ai') return null;
+  if (isDemoChannel(ctx.channel)) return ruleHighlight(draft.title, 'after-colon');
+  return chooseHighlight(draft.title);
+}
+
+function cardUrl(draft: Draft & { highlight?: string | null }, ctx: RunCtx): string {
   const item = ctx.outputs.fetch as SourceItem | undefined;
   // Two urls, two jobs: the page for the classic route to scrape, the picture for the
   // studio route to draw. One argument doing both meant studio kits rendered no background.
@@ -42,7 +58,7 @@ function cardUrl(draft: Draft, ctx: RunCtx): string {
  * control changes the <img> src and the browser fetches a different picture. v1 reused one
  * filename per run and cached it on disk — a theme change redrew nothing at all.
  */
-function previewFile(draft: Draft, ctx: RunCtx): string {
+function previewFile(draft: Draft & { highlight?: string | null }, ctx: RunCtx): string {
   return `${ctx.runId}-card-${hashOf(cardPath(ctx.kit), cardUrl(draft, ctx))}.png`;
 }
 
@@ -59,7 +75,7 @@ function sweepPreviews(ctx: RunCtx, keep: string): void {
   }
 }
 
-async function renderTo(file: string, draft: Draft, ctx: RunCtx): Promise<string> {
+async function renderTo(file: string, draft: Draft & { highlight?: string | null }, ctx: RunCtx): Promise<string> {
   const render = cardEngine(ctx.kit) === 'studio' ? renderStudio : renderClassic;
   const res = await render(new NextRequest(cardUrl(draft, ctx)));
   if (!res.ok) {
@@ -96,9 +112,10 @@ export const imageStep: Step<Draft, CardAsset> = {
     if (!draft?.title) throw new Error('Chưa có bài để dựng ảnh.');
     // The preview IS the card. Satori composition is local, so showing the real thing costs
     // the same as describing one — and a preview of a card is a card.
-    const file = previewFile(draft, ctx);
+    const withHl = { ...draft, highlight: await highlightFor(draft, ctx) };
+    const file = previewFile(withHl, ctx);
     if (!fs.existsSync(path.join(OUT_DIR, file))) {
-      await renderTo(file, draft, ctx);
+      await renderTo(file, withHl, ctx);
       sweepPreviews(ctx, file);
     }
     return {
@@ -110,7 +127,7 @@ export const imageStep: Step<Draft, CardAsset> = {
 
   async run(draft, ctx) {
     const file = `${ctx.runId}-card.png`;
-    const abs = await renderTo(file, draft, ctx);
+    const abs = await renderTo(file, { ...draft, highlight: await highlightFor(draft, ctx) }, ctx);
     return { url: `/studio-runs/${file}`, path: abs, kind: 'png' as const };
   },
 

@@ -16,6 +16,7 @@ import { setRunJob } from '../progress';
 import { captionStyle, effectiveFrame, voiceId } from '../kits/load';
 import {
   applyOverlays,
+  articlePicture,
   backgroundMedia,
   cardIsOverlay,
   layoutOf,
@@ -64,7 +65,7 @@ function narrationFor(draft: Draft, ctx: RunCtx): string {
  */
 function plateFor(ctx: RunCtx): Promise<string | null> {
   const card = ctx.outputs.image as CardAsset | undefined;
-  const bg = backgroundMedia(ctx.kit);
+  const bg = backgroundMedia(ctx.kit, articlePicture(ctx.kit, ctx.outputs.fetch as { images?: string[] }));
   // A video background has no still to show; the neutral plate is the honest answer.
   const background = bg && bg.kind === 'image' ? bg.url.replace(/^file:\/\//, '') : null;
   return scenePlate({ card: card?.path ?? null, background, layout: layoutOf(ctx.kit, ctx.overrides) });
@@ -185,7 +186,7 @@ export const reelStep: Step<Draft, ReelAsset> = {
           // unless the layout places the card itself, in which case handing it to the
           // renderer as well would show it twice.
         media: [
-          backgroundMedia(ctx.kit),
+          backgroundMedia(ctx.kit, articlePicture(ctx.kit, ctx.outputs.fetch as { images?: string[] })),
           card && !cardIsOverlay(ctx.kit, ctx.overrides)
             ? ({ url: `file://${card.path}`, kind: 'image' } as const)
             : null,

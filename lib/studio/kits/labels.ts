@@ -77,7 +77,7 @@ export const FIELD_LABELS: Record<string, Label> = {
     hint: 'Cổ điển: ảnh bài báo phủ chữ. Studio: nền phẳng theo giao diện bên dưới.',
   },
   'card.ratio': { label: 'Tỉ lệ khung' },
-  'card.highlight': { label: 'Phần chữ tô màu', hint: 'Sau dấu hai chấm, hay mệnh đề đầu.' },
+  'card.highlight': { label: 'Phần chữ tô màu', hint: 'Để AI chọn phần đáng chú ý, hay cắt theo dấu câu.' },
   'card.background': { label: 'Ảnh nền', hint: 'Lấy ảnh của bài báo, hay để nền phẳng.' },
   'card.theme': { label: 'Giao diện thẻ' },
   'card.font': { label: 'Font chữ trong thẻ' },
@@ -190,6 +190,15 @@ export function labelFor(tab: string, field: string): Label {
   return FIELD_LABELS[`${tab}.${field}`] ?? { label: `⚠ ${field}` };
 }
 
-export function valueLabel(v: string): string {
-  return VALUE_LABELS[v] ?? v;
+/**
+ * Some values mean different things on different fields. `ai` on `post.narration` is "AI
+ * writes the script"; `ai` on `card.highlight` is "AI picks the words to colour". One flat
+ * table cannot say both, so a field may override its own values.
+ */
+const FIELD_VALUE_LABELS: Record<string, Record<string, string>> = {
+  'card.highlight': { ai: 'AI chọn' },
+};
+
+export function valueLabel(v: string, field?: string): string {
+  return (field && FIELD_VALUE_LABELS[field]?.[v]) ?? VALUE_LABELS[v] ?? v;
 }

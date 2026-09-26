@@ -16,7 +16,7 @@
   "card": {
     "preset": "news",
     "ratio": "4:5",
-    "highlight": "after-colon",
+    "highlight": "ai",
     "background": "article",
     "engine": "classic"
   },
@@ -37,7 +37,8 @@
     "preset": "card-top",
     "layout": "card-top",
     "intro": true,
-    "durationBand": "long"
+    "durationBand": "long",
+    "background": "article"
   },
   "stickers": {
     "preset": "none",
@@ -51,5 +52,5 @@
   "music": {
     "tier": "none"
   },
-  "revision": 2
+  "revision": 4
 }

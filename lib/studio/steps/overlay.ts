@@ -68,10 +68,22 @@ export function stickerPath(kit: Kit): string | null {
   return row && fs.existsSync(row.path) ? row.path : null;
 }
 
-/** The owner's uploaded background, as media make-reel.py can fetch. */
-export function backgroundMedia(kit: Kit): { url: string; kind: 'image' | 'video' } | null {
+/**
+ * What goes behind the card, as media make-reel.py can fetch.
+ *
+ * Two kinds of answer. A media id names something the owner uploaded to Kho tài nguyên. The
+ * literal `article` means this post's own picture — which is what stops an overlay layout
+ * from drawing 570 of a reel's 1920 pixels in stage black, measured in
+ * tests/unit/plate-background.test.ts. Before this, `card-top` could only ever have an
+ * uploaded background, so every kit that shipped with one had bands of nothing.
+ */
+export function backgroundMedia(
+  kit: Kit,
+  picture?: string | null,
+): { url: string; kind: 'image' | 'video' } | null {
   const id = ((kit.frame ?? {}) as { background?: string }).background;
   if (!id) return null;
+  if (id === 'article') return picture ? { url: picture, kind: 'image' } : null;
   const row = mediaById(id);
   if (!row || !fs.existsSync(row.path)) return null;
   return {
@@ -323,4 +335,16 @@ export async function dvdPng(handle: string): Promise<string> {
   return cachedPng(`dvd-${hashOf(handle)}`, async () =>
     sharp(Buffer.from(dvdSvg(handle))).png().toBuffer(),
   );
+}
+
+/**
+ * The picture this run is using — what the owner picked on the Ảnh step, or the article's
+ * own first image. The same one the card draws, so the card and the space around it can
+ * never disagree about which photo this post is about.
+ */
+export function articlePicture(kit: Kit, item: { images?: string[] } | null | undefined): string | null {
+  const bgUrl = ((kit.card ?? {}) as { bgUrl?: string }).bgUrl;
+  if (bgUrl) return bgUrl;
+  const first = item?.images?.find((u) => /^https?:/.test(u));
+  return first ?? null;
 }

@@ -48,12 +48,35 @@ export async function cardPngFor(cardUrl: string): Promise<string> {
  * it over the background (or the neutral stage); for `multi`, the card itself, or the
  * background when there is no card. Returns a file path, or null when there is nothing.
  */
+/**
+ * A background is a local file for an upload and an https url for the article's own picture.
+ * The preview composes with sharp, which needs bytes on disk, so a remote one is cached once
+ * — otherwise `frame.background: 'article'` would render correctly in the video and show the
+ * stage colour in the preview beside it.
+ */
+async function localBackground(src: string | null): Promise<string | null> {
+  if (!src) return null;
+  if (!/^https?:/.test(src)) return fs.existsSync(src) ? src : null;
+  const file = path.join(CACHE, 'bg', `${hashOf(src)}.img`);
+  if (fs.existsSync(file)) return file;
+  try {
+    const res = await fetch(src, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) return null;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    return file;
+  } catch {
+    // A picture that will not download is a plate without one, never a failed render.
+    return null;
+  }
+}
+
 export async function scenePlate(opts: {
   card: string | null;
   background: string | null;
   layout: Layout;
 }): Promise<string | null> {
-  const bg = opts.background && fs.existsSync(opts.background) ? opts.background : null;
+  const bg = await localBackground(opts.background);
   if (opts.layout === 'multi') return opts.card ?? bg;
   if (!opts.card) return bg;
 

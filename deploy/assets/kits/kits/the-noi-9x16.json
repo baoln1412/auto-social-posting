@@ -18,7 +18,7 @@
     "engine": "studio",
     "theme": "toi",
     "ratio": "9:16",
-    "highlight": "after-colon",
+    "highlight": "ai",
     "background": "article",
     "font": "BeVietnamPro-Black",
     "radius": 0,
@@ -55,5 +55,5 @@
   "music": {
     "tier": "soft"
   },
-  "revision": 1
+  "revision": 2
 }
