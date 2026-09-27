@@ -49,35 +49,60 @@ run_cycle() {
     >> "$LOG" 2>&1
 }
 
-# `claude -p` exits 0 even when it never reached the API: the 18:00 run on 2026-09-25 died
-# three minutes in on "Can't reach the API server (ENOTFOUND)", launchd recorded a success,
-# and the only symptom was the owner noticing hours later that no posts had appeared. So
-# check the work, not the exit code. Step 1 of the skill writes an audit_runs row for every
-# market, so lastRunAt moving is proof a cycle actually happened.
-last_run() {
-  local id
-  id=$(curl -s -m 10 http://localhost:3000/api/pages 2>/dev/null |
-       python3 -c 'import sys,json; r=json.load(sys.stdin); r=r if isinstance(r,list) else r.get("pages",[]); print(r[0]["id"] if r else "")' 2>/dev/null)
-  [ -n "$id" ] || return 0
-  curl -s -m 10 "http://localhost:3000/api/audit?marketId=$id" 2>/dev/null |
-    python3 -c 'import sys,json; print(json.load(sys.stdin).get("lastRunAt") or "")' 2>/dev/null
+# `claude -p` exits 0 even when the cycle did nothing, so check the work rather than the
+# exit code. TWO failures taught this, and the first fix only caught one of them:
+#   2026-09-25 18:00 - died on "Can't reach the API server (ENOTFOUND)". Nothing ran.
+#   2026-09-26 06:00 - crawled, then backgrounded the crawl request and sat waiting for a
+#                      completion notification that a headless run never delivers. It wrote
+#                      one line and stopped, with ZERO posts generated.
+# The second slipped through a check that only asked "did a crawl get recorded", because the
+# crawl had in fact been recorded - it is step 1 of 5. So the test is posts, not crawls: a
+# healthy cycle generates dozens across the markets, and every real one on record has.
+# `postsSinceLastRun` counts gold written since this cycle's own crawl row, so summing it
+# across markets is exactly "what did this cycle produce".
+cycle_output() {   # echoes "<lastRunAt of first market> <total posts this cycle>"
+  curl -s -m 15 http://localhost:3000/api/pages 2>/dev/null |
+    python3 -c '
+import sys, json, urllib.request
+r = json.load(sys.stdin)
+r = r if isinstance(r, list) else r.get("pages", [])
+first, total = "", 0
+for i, m in enumerate(r):
+    try:
+        with urllib.request.urlopen(
+            "http://localhost:3000/api/audit?marketId=" + m["id"], timeout=15) as f:
+            d = json.load(f)
+    except Exception:
+        continue
+    if i == 0:
+        first = d.get("lastRunAt") or ""
+    total += d.get("postsSinceLastRun") or 0
+print(first, total)
+' 2>/dev/null
 }
 
-BEFORE=$(last_run)
+BEFORE=$(cycle_output | cut -d" " -f1)
 run_cycle
 
-# One retry, and only when the cycle recorded nothing. The failure this guards against is a
-# transient DNS blip - it had already cleared 50 minutes later - and one retry is the whole
-# difference between losing a cycle and not. A cycle that did real work is never repeated.
-if [ -n "$BEFORE" ] && [ "$(last_run)" = "$BEFORE" ]; then
-  echo "[run-pipeline] cycle recorded no crawl — retrying once in 60s" | tee -a "$LOG" >&2
+# A cycle counts as real only if its crawl landed AND it produced at least one post. An
+# genuinely empty news cycle would cost one wasted retry; that has never happened in the
+# log, while two dead cycles have.
+cycle_failed() {
+  local out after posts
+  out=$(cycle_output); after=${out%% *}; posts=${out##* }
+  [ -n "$BEFORE" ] || return 1               # can't tell - don't cry wolf
+  [ "$after" = "$BEFORE" ] || [ "$posts" = "0" ]
+}
+
+if cycle_failed; then
+  echo "[run-pipeline] cycle produced nothing — retrying once in 60s" | tee -a "$LOG" >&2
   sleep 60
   echo "\n===== run-pipeline RETRY $(date '+%Y-%m-%d %H:%M:%S %z') =====" >> "$LOG"
   run_cycle
 fi
 
-if [ -n "$BEFORE" ] && [ "$(last_run)" = "$BEFORE" ]; then
-  echo "[run-pipeline] FAILED — no crawl recorded after retry; see $LOG" | tee -a "$LOG" >&2
+if cycle_failed; then
+  echo "[run-pipeline] FAILED — no posts generated after retry; see $LOG" | tee -a "$LOG" >&2
   exit 1   # so `launchctl list` shows non-zero instead of a silent success
 fi
 

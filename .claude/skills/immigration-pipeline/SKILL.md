@@ -66,6 +66,13 @@ Run: `curl -s -X POST http://localhost:3000/api/pipeline/crawl`
 This pulls the last 24h from every market's feeds into bronze and deletes bronze >7d.
 (For a first run / backfill, you may use `?hours=168`.)
 
+**Run it in the FOREGROUND and wait.** It takes a few minutes, which makes backgrounding
+it tempting — but the scheduled cycle is a headless `claude -p` run, and a headless run has
+no later turn in which a background-completion notification can arrive. On 2026-09-26 the
+06:00 cycle backgrounded this request, wrote "I'll just wait for its completion
+notification", and ended there: crawl recorded, **zero posts generated**, exit code 0. Give
+it a generous timeout instead of a background job.
+
 ## Step 2 — List markets
 Run: `curl -s http://localhost:3000/api/pages`
 For each market note ALL of these config fields (they steer the pipeline and the
