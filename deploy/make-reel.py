@@ -46,6 +46,38 @@ INTRO = os.path.join(ROOT, "deploy", "assets", "intro.mp4")
 LANG = (os.environ.get("REEL_LANG") or "vi").lower()      # REEL_LANG=en for the English channel
 VOICES = {"vi": "vi-VN-HoaiMyNeural", "en": "en-US-AriaNeural"}
 VOICE = os.environ.get("REEL_VOICE") or VOICES.get(LANG, VOICES["vi"])
+
+# ---- the owner's own cloned voice -------------------------------------------------------------
+# BORROWED from the ai-learning-path checkout, not copied in. Over there the reference wav IS the
+# recipe, and a second copy drifts from the first silently - you find out by listening to a
+# finished render. Set REEL_OMNI_ROOT if that checkout ever moves.
+BAO = "bao"
+OMNI_ROOT = os.environ.get("REEL_OMNI_ROOT") or os.path.expanduser("~/ai-learning-path")
+OMNI_PY = os.path.join(OMNI_ROOT, ".venv-omni", "bin", "python")
+OMNI_SPEAK = os.path.join(OMNI_ROOT, "omni_speak.py")
+OMNI_REF = os.path.join(OMNI_ROOT, "assets", "voice", "bao-ref.wav")
+# Its OWN interpreter is not optional: OmniVoice pulls torch and transformers, and that resolution
+# uninstalls edge-tts and faster-whisper - the two things this renderer cannot do without. Hence a
+# subprocess into that venv, never an import.
+#
+# The reference's transcript. Passing it skips the model's own Whisper pass over the reference,
+# 4.3s of the ~5s a line otherwise costs. It describes that wav, so it is copied beside the path.
+OMNI_REF_TEXT = ("Và sự thật là gì? Bạn hoàn toàn không cần phải biết những điều đó. "
+                 "Trong 2 năm qua, tôi đã chứng kiến bức tranh công nghệ AI thay đổi chóng mặt.")
+# Empty = the model's own pace, measured 220.6 wpm over there, which already sits close to the
+# +25% this file asks edge-tts for. REEL_OMNI_SPEED=0.9 slows the PERFORMANCE (199.5 wpm) rather
+# than stretching a finished wav, which on a cloned voice is audible.
+OMNI_SPEED = os.environ.get("REEL_OMNI_SPEED", "")
+# THE RAW CLONE IS 14 dB UNDER BROADCAST - measured -27.8 LUFS - and beside edge-tts that reads as
+# a weak voice, not a quiet one. Same chain warroom.py masters with, because it was tuned on this
+# exact reference rather than on voices in general. asetrate 0.97 and atempo 1.0309 cancel, so the
+# duration this returns is still the duration the captions get timed against.
+OMNI_MASTER = ("asetrate=23280,aresample=24000,atempo=1.0309,highpass=f=65,"
+               "equalizer=f=105:t=q:w=0.8:g=4,equalizer=f=360:t=q:w=1.2:g=-3.5,"
+               "equalizer=f=1800:t=q:w=1.2:g=1.5,equalizer=f=3800:t=q:w=0.9:g=4.5,"
+               "acompressor=threshold=-24dB:ratio=4:attack=6:release=120:makeup=3,"
+               "volume=7dB,alimiter=limit=0.89")
+_SENT = re.compile(r"(?<=[.!?…])\s+")
 W, H = 1080, 1920
 PLATE_CACHE = os.path.join(ROOT, "data", "reels", "work", "plates")
 CAP_Y_DEFAULT = 780                   # kept for reference; real value comes from the style
@@ -76,6 +108,55 @@ def narration(post):
     lead = (post.get("facebookText", "") or "").split("🔹")[0]
     lead = clean(lead.split("\n\n")[0] if "\n\n" in lead else lead)
     return (title + ". " + lead).strip()[:600]
+
+def tts_omni(text, mp3):
+    """Speak in the owner's cloned voice, one sentence per sidecar call.
+
+    Per sentence is not a preference - OmniVoice takes a line at a time - but it also makes
+    hook_end exact. Only edge-tts emits SentenceBoundary, which is why CLAUDE.md warns that a
+    swapped engine has to recover hook_end from the whisper alignment. When sentence one is its
+    own file, its duration IS hook_end: measured, not inferred.
+
+    ponytail: one process per sentence, matching omni_speak.py's own note that model load (~2s)
+    dominates. If a long narration drags, the upgrade written down over there is one JSON job
+    file and a single model load. Not before.
+    """
+    missing = [p for p in (OMNI_PY, OMNI_SPEAK, OMNI_REF) if not os.path.exists(p)]
+    if missing:
+        raise RuntimeError("voice 'bao' needs the ai-learning-path checkout - missing: "
+                           + ", ".join(missing)
+                           + ". Point REEL_OMNI_ROOT at it, or pick another voice.")
+    sents = [x.strip() for x in _SENT.split(text) if x.strip()]
+    if not sents:
+        return 0.0, 0.0
+    work = os.path.join(os.path.dirname(mp3), f"omni-{os.getpid()}")
+    os.makedirs(work, exist_ok=True)
+    try:
+        wavs, durs = [], []
+        for i, line in enumerate(sents):
+            w = os.path.join(work, f"{i:03d}.wav")
+            subprocess.run([OMNI_PY, OMNI_SPEAK, line, LANG, OMNI_REF, w,
+                            OMNI_REF_TEXT, OMNI_SPEED],
+                           capture_output=True, text=True, timeout=300, check=True)
+            m = os.path.join(work, f"{i:03d}-m.wav")
+            subprocess.run(["ffmpeg", "-y", "-i", w, "-af", OMNI_MASTER,
+                            "-ar", "24000", "-ac", "1", m],
+                           capture_output=True, text=True, timeout=120, check=True)
+            os.replace(m, w)
+            wavs.append(w)
+            durs.append(video_duration(w))     # ffprobe reads audio the same way
+            print(f"  voice bao: {i + 1}/{len(sents)} ({durs[-1]:.1f}s)")
+        lst = os.path.join(work, "list.txt")
+        with open(lst, "w") as f:
+            for w in wavs:
+                f.write(f"file '{os.path.basename(w)}'\n")
+        subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "list.txt",
+                        "-c:a", "libmp3lame", "-q:a", "2", mp3],
+                       capture_output=True, text=True, timeout=300, check=True, cwd=work)
+        return sum(durs), durs[0]
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
 
 async def tts(text, mp3):
     import edge_tts
@@ -546,7 +627,8 @@ def prepare(post, work_dir):
     else:
         nar = narration(post)
     step("tts")
-    dur, hook_end = asyncio.run(tts(nar, mp3))
+    dur, hook_end = (tts_omni(nar, mp3) if VOICE == BAO
+                     else asyncio.run(tts(nar, mp3)))
     if dur <= 0:
         step("tts", "failed")
         return None
@@ -907,11 +989,43 @@ def demo():
     # emojiTitle+facebookText when the field is absent, so the key has to cover them.
     assert project_key({"emojiTitle": "A"}) != project_key({"emojiTitle": "B"})
 
+    # --- the owner's own voice -------------------------------------------------------------
+    # Sentence split: hook_end is the first sentence's duration, so a split that merges or drops
+    # sentence one silently moves where the intro is spliced.
+    assert [x.strip() for x in _SENT.split("Một. Hai! Ba? Bốn") if x.strip()] == \
+        ["Một.", "Hai!", "Ba?", "Bốn"]
+    assert [x.strip() for x in _SENT.split("") if x.strip()] == []
+    # A decimal must NOT split the line - "1.5 triệu" is one sentence, not two.
+    assert len([x for x in _SENT.split("Khoảng 1.5 triệu người đã nộp đơn.") if x.strip()]) == 1
+
+    # The missing-checkout guard, tested by making it REFUSE. Pointing at a path that is not
+    # there is the whole failure mode: this renderer borrows the voice from another repo, so the
+    # day that repo moves, the useful outcome is a sentence naming what is missing - not a
+    # traceback out of ffmpeg about a zero-byte wav.
+    _saved = (OMNI_PY, OMNI_SPEAK, OMNI_REF)
+    globals().update(OMNI_PY="/nope/python", OMNI_SPEAK="/nope/omni_speak.py", OMNI_REF="/nope/r.wav")
+    try:
+        tts_omni("Một câu.", "/tmp/unused.mp3")
+        raise AssertionError("tts_omni must refuse when the checkout is missing")
+    except RuntimeError as e:
+        assert "REEL_OMNI_ROOT" in str(e) and "/nope/python" in str(e), str(e)
+    finally:
+        globals().update(OMNI_PY=_saved[0], OMNI_SPEAK=_saved[1], OMNI_REF=_saved[2])
+
+    # --voice must come out of argv wherever it sits, like --style, or it reaches the positional
+    # args and the render writes its mp4 to a file called "bao".
+    assert take_opt(["x", "--voice", "bao", "m", "3"], "--voice") == (["x", "m", "3"], "bao")
+    assert take_opt(["x", "m", "3"], "--voice") == (["x", "m", "3"], None)
+
     print("make-reel.py self-check ok")
 
 
 def main():
+    global VOICE
     sys.argv[:], validate = take_flag(sys.argv, "--validate")
+    sys.argv[:], voice_arg = take_opt(sys.argv, "--voice")
+    if voice_arg:
+        VOICE = voice_arg
     sys.argv[:], no_intro = take_flag(sys.argv, "--no-intro")
     sys.argv[:], no_layout = take_flag(sys.argv, "--no-layout")
     sys.argv[:], only_prepare = take_flag(sys.argv, "--prepare")

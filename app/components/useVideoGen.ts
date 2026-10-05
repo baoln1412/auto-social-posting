@@ -34,6 +34,9 @@ export function useVideoGen(post: PostDraft, channelName?: string, drawerOpen = 
   const [media, setMedia] = useState<VgMedia[]>([]);
   const [includeIntro, setIncludeIntro] = useState(true);
   const [includeLayout, setIncludeLayout] = useState(true);
+  // 'edge' is the shipped Vietnamese voice; 'bao' is the owner's own, cloned, and
+  // borrowed from the ai-learning-path checkout at render time.
+  const [voice, setVoice] = useState<'edge' | 'bao'>('edge');
 
   const [style, setStyle] = useState<CaptionStyle>(() => {
     try { return post.captionStyle ? JSON.parse(post.captionStyle) : { preset: 'classic' }; }
@@ -176,7 +179,7 @@ export function useVideoGen(post: PostDraft, channelName?: string, drawerOpen = 
       const res = await fetch('/api/video/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emojiTitle: post.emojiTitle || post.article.title, narration: script, media: media_, includeIntro, includeLayout, style, postId: post.id }),
+        body: JSON.stringify({ emojiTitle: post.emojiTitle || post.article.title, narration: script, media: media_, includeIntro, includeLayout, style, voice, postId: post.id }),
       });
       const data = await res.json();
       if (!res.ok || !data.jobId) {
@@ -189,7 +192,7 @@ export function useVideoGen(post: PostDraft, channelName?: string, drawerOpen = 
       setJobStatus('error');
       setJobError(String(err));
     }
-  }, [media, post.id, post.article.imageUrl, post.article.imageUrls, post.emojiTitle, post.article.title, script, includeIntro, includeLayout, style]);
+  }, [media, post.id, post.article.imageUrl, post.article.imageUrls, post.emojiTitle, post.article.title, script, includeIntro, includeLayout, style, voice]);
 
   // Poll job status while running — independent of whether the drawer is open.
   useEffect(() => {
@@ -223,7 +226,7 @@ export function useVideoGen(post: PostDraft, channelName?: string, drawerOpen = 
   }, []);
 
   return {
-    script, setScript, loading, approved, setApproved, media,
+    script, setScript, loading, approved, setApproved, media, voice, setVoice,
     addFiles, removeMedia, moveMedia, generate, render, resetJob,
     jobStatus, jobFile, jobError, jobStep, jobPct, jobDone, includeIntro, setIncludeIntro, includeLayout, setIncludeLayout,
     style, setStyle, previewUrl, saveStyle,

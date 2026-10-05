@@ -433,6 +433,33 @@ export default function VideoGenModal({ open, onClose, post, vg, onShowChecklist
           )}
 
           <div className="space-y-3">
+            <div className="space-y-1.5">
+              <span className="text-sm font-semibold text-foreground">Giọng đọc</span>
+              <div className="flex gap-2">
+                {([['edge', 'HoaiMy', 'Giọng mặc định (edge-tts)'],
+                   ['bao', 'Bảo', 'Giọng của bạn, đã nhân bản']] as const).map(([v, name, hint]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => vg.setVoice(v)}
+                    title={hint}
+                    className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                      vg.voice === v
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-transparent text-foreground/80 border-border hover:bg-muted/40'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+              {vg.voice === 'bao' && (
+                <p className="text-[11px] text-muted-foreground">
+                  Giọng nhân bản đọc từng câu một nên render lâu hơn — khoảng 10 giây mỗi câu.
+                </p>
+              )}
+            </div>
+
             <label className="flex items-center gap-2 text-sm text-foreground/90 cursor-pointer w-fit">
               <input
                 type="checkbox"

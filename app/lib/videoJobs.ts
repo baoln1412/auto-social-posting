@@ -48,6 +48,7 @@ export function startRenderJob(payload: {
   includeIntro?: boolean;
   includeLayout?: boolean;
   style?: string;
+  voice?: string;
   postId?: string;
 }): string {
   mkdirSync(OUT_DIR, { recursive: true });
@@ -70,6 +71,10 @@ export function startRenderJob(payload: {
   if (payload.includeIntro === false) args.push('--no-intro');
   if (payload.includeLayout === false) args.push('--no-layout');
   if (payload.style) args.push('--style', payload.style);
+  // Only ever the owner's cloned voice or nothing: the renderer's default is edge-tts, and an
+  // arbitrary string here would reach make-reel.py as an edge-tts voice name, which fails deep
+  // inside the TTS step rather than here.
+  if (payload.voice === 'bao') args.push('--voice', 'bao');
   const child = spawn(PYTHON, args, { cwd: ROOT, env });
   let stderr = '';
   child.stderr.on('data', (d) => { stderr += d.toString(); });

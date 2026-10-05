@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { startRenderJob, getJob } from '../../../lib/videoJobs';
 
 export async function POST(req: NextRequest) {
-  const { emojiTitle, narration, media, includeIntro, includeLayout, style, postId } = await req.json();
+  const { emojiTitle, narration, media, includeIntro, includeLayout, style, voice, postId } = await req.json();
   if (!narration || !String(narration).trim()) {
     return NextResponse.json({ error: 'narration script is required' }, { status: 400 });
   }
@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
     includeIntro: includeIntro !== false,
     includeLayout: includeLayout !== false,
     style: typeof style === 'object' && style ? JSON.stringify(style) : undefined,
+    voice: voice === 'bao' ? 'bao' : undefined,
     postId: typeof postId === 'string' ? postId : undefined,
   });
   return NextResponse.json({ jobId });
