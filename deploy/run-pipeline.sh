@@ -81,6 +81,30 @@ print(first, total)
 ' 2>/dev/null
 }
 
+# WAIT FOR THE NETWORK BEFORE SPENDING A CYCLE. Both cycles lost this way died on
+# "Can't reach the API server (ENOTFOUND)" within seconds of the firing — 2026-09-25 18:00 and
+# 2026-10-06 06:00 — and in both cases the API was reachable again minutes later. DNS here resolves
+# through Tailscale (100.100.100.100), so when that is not up yet, nothing resolves. A curl that
+# returns ANY http code proves DNS, TCP and TLS all worked; 000 means it did not get that far.
+wait_for_api() {
+  local i code
+  for i in $(seq 1 20); do                     # 20 x 30s = up to 10 minutes
+    code=$(curl -s -o /dev/null -m 8 -w '%{http_code}' https://api.anthropic.com/v1/models 2>/dev/null)
+    # EMPTY counts as unreachable, not just "000". On a DNS failure curl writes NOTHING at all —
+    # measured — so a bare `!= "000"` is true for the one case this exists to catch, and the wait
+    # would wave every outage straight through. Any real code (401 unauthenticated, 200, 5xx)
+    # proves DNS, TCP and TLS all completed, which is all this needs to know.
+    case "$code" in
+      ""|000) ;;
+      *) [ "$i" -gt 1 ] && echo "[run-pipeline] network up after $((i * 30))s" >> "$LOG"; return 0 ;;
+    esac
+    sleep 30
+  done
+  echo "[run-pipeline] api unreachable after 10 min — running anyway" | tee -a "$LOG" >&2
+  return 1
+}
+
+wait_for_api
 BEFORE=$(cycle_output | cut -d" " -f1)
 run_cycle
 
@@ -95,8 +119,9 @@ cycle_failed() {
 }
 
 if cycle_failed; then
-  echo "[run-pipeline] cycle produced nothing — retrying once in 60s" | tee -a "$LOG" >&2
+  echo "[run-pipeline] cycle produced nothing — waiting for the network, then retrying" | tee -a "$LOG" >&2
   sleep 60
+  wait_for_api        # 60s was measured too short on 2026-10-06: the retry died the same way
   echo "\n===== run-pipeline RETRY $(date '+%Y-%m-%d %H:%M:%S %z') =====" >> "$LOG"
   run_cycle
 fi
