@@ -17,7 +17,7 @@ import { paletteFor } from '../card/theme';
 import { hashOf } from '../hash';
 import type { Draft } from '../gold';
 import { chooseHighlight, ruleHighlight } from '../highlight';
-import { isDemoChannel } from './registry';
+import { isDemoChannel } from './is-demo';
 import type { RunCtx, SourceItem, Step } from './types';
 
 const OUT_DIR = path.join(process.cwd(), 'public', 'studio-runs');
@@ -88,6 +88,26 @@ async function renderTo(file: string, draft: Draft & { highlight?: string | null
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const abs = path.join(OUT_DIR, file);
   fs.writeFileSync(abs, Buffer.from(await res.arrayBuffer()));
+  return abs;
+}
+
+/**
+ * The card the CURRENT controls would draw, as a file.
+ *
+ * Exported for the Video screen. The placement handles live there — it is the only screen
+ * showing the headline and the caption band together, which is where they collided — but
+ * they are card controls, so the scene has to show the card they describe rather than the
+ * one the Ảnh step happened to write. Named by a hash of its own parameters, so holding a
+ * handle costs one render per distinct position rather than one per pixel.
+ */
+export async function cardFor(draft: Draft, ctx: RunCtx): Promise<string> {
+  const withHl = { ...draft, highlight: await highlightFor(draft, ctx) };
+  const file = previewFile(withHl, ctx);
+  const abs = path.join(OUT_DIR, file);
+  if (!fs.existsSync(abs)) {
+    await renderTo(file, withHl, ctx);
+    sweepPreviews(ctx, file);
+  }
   return abs;
 }
 

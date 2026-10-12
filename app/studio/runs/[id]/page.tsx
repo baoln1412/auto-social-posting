@@ -4,6 +4,7 @@ import { declaresGate, getRun, isStale, previewStep } from '@/lib/studio/runs';
 import { can, tier } from '@/lib/studio/tier';
 import { sourceFor } from '@/lib/studio/steps/fetch';
 import { captionStyle, cardEngine, voiceId } from '@/lib/studio/kits/load';
+import { layoutOf } from '@/lib/studio/steps/overlay';
 import { listMedia } from '@/lib/studio/assets';
 import { ALL_STEPS, effectiveKit, RUN_STATUS_LABELS } from '@/lib/studio/steps/types';
 import type { SourceItem, StepName } from '@/lib/studio/steps/types';
@@ -72,6 +73,7 @@ export default async function RunPage({
       initialView={initialView}
       cardEngine={cardEngine(effectiveKit(rec.kit, rec.run.overrides))}
       cardRatio={String((effectiveKit(rec.kit, rec.run.overrides).card as { ratio?: string } | undefined)?.ratio ?? '4:5')}
+        cardLayout={layoutOf(effectiveKit(rec.kit, rec.run.overrides), rec.run.overrides)}
       sourceLabel={sourceFor(rec.channel.sources_json, rec.run.item_ref).def.label}
       status={rec.run.status}
       currentStep={rec.run.current_step}

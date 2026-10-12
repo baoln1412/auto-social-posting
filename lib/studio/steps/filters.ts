@@ -96,6 +96,101 @@ export function cardBox(layout: Layout, cw: number, ch: number): { x: number; y:
   };
 }
 
+/**
+ * The story frame: one photo, three treatments.
+ *
+ * Measured off ainius-2.mp4 (2026-10-12), which uses exactly ONE article image and never
+ * cuts to another — sharp behind the headline, then an inset card, then blurred and
+ * darkened into a bed the typography sits on. Its scene detector score is zero hard cuts in
+ * 31s: the background is continuous, and that is what stops a reel reading as a slideshow.
+ * Ours pinned a sharp card over a sharp photo for the whole reel, from the same one input.
+ *
+ * The windows do not overlap, so only one treatment is ever on screen.
+ */
+export const HERO_SEC = 3.5;
+export const INSET_SEC = 11;
+
+/** The inset keeps the card's own shape — a squashed card reads as a bug, not a choice. */
+export const INSET_WIDTH = 0.62;
+export const INSET_TOP = 0.055;
+/** One corner, two tenants: the source credit over the hero, the eyebrow after it. */
+export const SLOT = { left: 28, top: 28 };
+
+export function insetSize(cw: number, ch: number): { w: number; h: number } {
+  const w = Math.round(W * INSET_WIDTH);
+  return { w, h: Math.max(1, Math.round((ch / cw) * w)) };
+}
+
+/** The opening: the card as drawn, where the layout puts it, for the first seconds only. */
+export function heroAt(cw: number, ch: number): string {
+  const { x, y } = cardBox('card-top', cw, ch);
+  return `overlay=${x}:${y}:enable='lt(t,${HERO_SEC.toFixed(2)})'`;
+}
+
+/** Then the same card, smaller and nearer the top, until the type takes the screen. */
+export function insetAt(cw: number, ch: number): string {
+  const x = Math.round((W - cw) / 2);
+  const y = Math.round(H * INSET_TOP);
+  return `overlay=${x}:${y}:enable='between(t,${HERO_SEC.toFixed(2)},${INSET_SEC.toFixed(2)})'`;
+}
+
+/** Where the article came from, over the hero — the reference burns this in, we only ever
+ *  put it in a comment under the post, where a viewer never sees it. */
+export function creditAt(): string {
+  return `overlay=${SLOT.left}:${SLOT.top}:enable='lt(t,${HERO_SEC.toFixed(2)})'`;
+}
+
+/** What the story is, held for the rest of the reel once the hero has gone. */
+export function eyebrowAt(): string {
+  return `overlay=${SLOT.left}:${SLOT.top}:enable='gte(t,${HERO_SEC.toFixed(2)})'`;
+}
+
+/**
+ * Where the big number sits: left, above the middle, clear of the caption band.
+ *
+ * Left and not centred because it is an object on the page, not a title — the reference
+ * sets it as a block you read before the sentence catches up, and a centred figure reads
+ * as a score.
+ */
+export const NUMBER_LEFT = 56;
+export const NUMBER_TOP = 0.40;
+
+export function numberAt(from: number, until: number): string {
+  const y = Math.round(H * NUMBER_TOP);
+  return `overlay=${NUMBER_LEFT}:${y}:enable='between(t,${from.toFixed(2)},${until.toFixed(2)})'`;
+}
+
+/**
+ * The middle band: one object at a time, vertically centred on its own height.
+ *
+ * Centred rather than top-anchored because the two tenants that use it are different
+ * heights — a two-line quote and a three-box chain — and a shared top edge would leave one
+ * of them hanging. The band sits between the inset's bottom edge and the caption band's
+ * top, and nothing is ever scheduled here before INSET_SEC, so the inset's own window
+ * cannot collide with it.
+ */
+export const MIDDLE_LEFT = 56;
+export const MIDDLE_WIDTH = W - MIDDLE_LEFT * 2;
+export const MIDDLE_CENTER = 0.42;
+
+/** How long the card takes to settle, and how far it travels getting there. */
+export const MIDDLE_RISE = 0.35;
+export const MIDDLE_LIFT = 44;
+
+export function middleAt(h: number, from: number, until: number): string {
+  const y = Math.max(0, Math.round(H * MIDDLE_CENTER - h / 2));
+  // It rises into place rather than appearing. `alpha` cannot take an expression (see
+  // outroAt) but x and y can, which is the same door `stickerAt` already goes through —
+  // so the entrance is eased in position instead of faded in opacity.
+  //
+  // Eased and not linear because constant-speed motion is the tell that a frame was
+  // composited rather than animated, and decelerating into rest is what makes a card feel
+  // placed. Short, too: at 0.35s it has settled long before the line that says it ends.
+  const p = `min(max((t-${from.toFixed(2)})/${MIDDLE_RISE},0),1)`;
+  const ease = `(1-(1-${p})*(1-${p}))`;
+  return `overlay=${MIDDLE_LEFT}:'${y}+${MIDDLE_LIFT}*(1-${ease})':enable='between(t,${from.toFixed(2)},${until.toFixed(2)})'`;
+}
+
 /** Margins the drifting handle keeps: clear of the caption band at the bottom. */
 const DVD_PAD = { x: 60, top: 160, bottom: 320 };
 
@@ -249,14 +344,70 @@ export function sceneBoundaries(sceneChars: number[], durationSec: number): numb
   return out;
 }
 
+/** One transition sound per boundary, as legs waiting to be mixed. */
+export function sfxLegs(boundaries: number[], inputIndex: number): { legs: string; labels: string[] } | null {
+  if (boundaries.length === 0) return null;
+  return {
+    legs: boundaries
+      .map((t, i) => `[${inputIndex}:a]adelay=${Math.round(t * 1000)}|${Math.round(t * 1000)},volume=0.5[s${i}]`)
+      .join(';'),
+    labels: boundaries.map((_, i) => `[s${i}]`),
+  };
+}
+
 /** One transition sound per boundary, mixed under the narration without touching its level. */
 export function sfxMix(boundaries: number[], inputIndex: number): string | null {
-  if (boundaries.length === 0) return null;
-  const legs = boundaries
-    .map((t, i) => `[${inputIndex}:a]adelay=${Math.round(t * 1000)}|${Math.round(t * 1000)},volume=0.5[s${i}]`)
-    .join(';');
-  const names = boundaries.map((_, i) => `[s${i}]`).join('');
+  const p = sfxLegs(boundaries, inputIndex);
+  if (!p) return null;
   // `longest` and not `first`: a whoosh near the end must not be clipped, and the narration
   // is always the longest leg anyway.
-  return `${legs};[0:a]${names}amix=inputs=${boundaries.length + 1}:duration=longest:normalize=0[aout]`;
+  return `${p.legs};[0:a]${p.labels.join('')}amix=inputs=${boundaries.length + 1}:duration=longest:normalize=0[aout]`;
+}
+
+/**
+ * How loud the bed sits under the voice — the reference's Tắt / Nhỏ / Mặc định / To.
+ *
+ * Linear gain, not dB, because that is what ffmpeg's `volume` takes. Even the loud step is
+ * far below the narration: a bed that competes with the voice is the single most common way
+ * a reel becomes unwatchable, and the owner cannot hear it mixed while reading a transcript.
+ */
+export type MusicLevel = 'none' | 'soft' | 'default' | 'loud';
+export const MUSIC_GAIN: Record<MusicLevel, number> = {
+  none: 0,
+  soft: 0.05,
+  default: 0.12,
+  loud: 0.22,
+};
+export const MUSIC_LABELS: Record<MusicLevel, string> = {
+  none: 'Tắt',
+  soft: 'Nhỏ',
+  default: 'Mặc định',
+  loud: 'To',
+};
+
+/**
+ * The bed, looped to the reel's length and eased at both ends.
+ *
+ * Looped because a 40s track under a 90s reel is 50s of silence, and the library is sourced
+ * from CC0 beds that are rarely the length of a post. Faded because a bed that starts at
+ * full level on frame one reads as a mistake — and the fade shortens on a short reel rather
+ * than swallowing it whole.
+ */
+export function musicLeg(
+  inputIndex: number,
+  durationSec: number,
+  level: MusicLevel,
+): { leg: string; label: string } | null {
+  const gain = MUSIC_GAIN[level] ?? 0;
+  if (!gain) return null;
+  const d = Math.max(1, durationSec);
+  const fade = Math.min(2, d / 4);
+  return {
+    label: '[bed]',
+    leg:
+      `[${inputIndex}:a]aloop=loop=-1:size=2147483647,atrim=0:${d.toFixed(2)},asetpts=N/SR/TB,` +
+      `afade=t=in:st=0:d=${fade.toFixed(2)},` +
+      `afade=t=out:st=${(d - fade).toFixed(2)}:d=${fade.toFixed(2)},` +
+      `volume=${gain.toFixed(3)}[bed]`,
+  };
 }

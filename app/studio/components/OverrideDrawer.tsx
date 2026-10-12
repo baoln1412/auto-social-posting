@@ -101,9 +101,10 @@ export function OverrideDrawer({
             value={value.music ?? 'none'}
             onChange={(e) => set({ music: e.target.value as Overrides['music'] })}
           >
-            <option value="none">Không</option>
-            <option value="soft">Nhẹ</option>
-            <option value="groove">Sôi động</option>
+            <option value="none">Tắt</option>
+            <option value="soft">Nhỏ</option>
+            <option value="default">Mặc định</option>
+            <option value="loud">To</option>
           </select>
         </label>
 

@@ -55,8 +55,14 @@ describe('every control has a Vietnamese name', () => {
         for (const v of options ?? []) {
           // A value that is already a word a person would say needs no translation:
           // "4:5", "9:16". Everything else is an identifier.
-          if (/^[\d:.]+$/.test(v) || /^BeVietnamPro-/.test(v)) continue;
-          if (!VALUE_LABELS[v]) missing.push(`${tab}.${field} = ${v}`);
+          // Font names are brand names, not words to translate, and the face list is
+          // generated from what is actually on disk — pinning labels to it would mean
+          // editing this file every time a face is added.
+          if (/^[\d:.]+$/.test(v) || field === 'font') continue;
+          // Asked the way the UI asks: valueLabel() consults the per-field map first, so a
+          // volume can read "Tắt" where the shared table says "Không". Checking the shared
+          // table alone called a named value missing.
+          if (valueLabel(v, `${tab}.${field}`) === v) missing.push(`${tab}.${field} = ${v}`);
         }
       }
     }

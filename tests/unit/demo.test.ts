@@ -130,3 +130,50 @@ describe('shipped kit revisions', () => {
     expect(after.card.radius).toBe(7);
   });
 });
+
+describe('the demo reel preview', () => {
+  /**
+   * The demo channel is what a stranger judges Studio on, and it keeps drifting from the
+   * real step: first a fixture plate that ignored the kit's layout, then a preview that
+   * skipped the story frame entirely, so the moment chips had nothing to change. It now
+   * calls the same storyFrameUrl the real step does — both are local and free, so the
+   * tier still spends nothing.
+   */
+  it('takes the same story path as the real step, not a fixture', async () => {
+    const { DEMO_STEPS } = await import('@/lib/studio/demo/steps');
+    const sharp = (await import('sharp')).default;
+    const { renderFrame } = await import('@/lib/studio/frame');
+
+    const ctx: any = {
+      runId: 'r1',
+      channel: { id: 'demo' },
+      kit: { id: 'k', name: 'K', card: { ratio: '4:5' }, frame: { layout: 'card-top' }, captions: {} },
+      overrides: {},
+      selection: { commentIds: [], hideUnselected: false },
+      outputs: {},
+    };
+    const out: any = await DEMO_STEPS.reel!.preview!(
+      { title: 'T', text: 'Một câu.', hashtags: [], comments: [] } as any,
+      ctx,
+    );
+    const url = new URL(`http://x${out.data.firstFrameUrl}`);
+
+    // The three treatments never share the screen, so the still has to name its moment.
+    expect(out.data.at).toBe('hero');
+    expect(url.searchParams.get('at')).toBe('hero');
+    // And it must hand over something to make a bed from, or the type sits on flat colour.
+    expect(url.searchParams.get('background')).toBeTruthy();
+
+    // What it points at is a real 1080x1920 frame, not a 4:5 card.
+    const png = await renderFrame({
+      text: 'x',
+      style: {},
+      plate: url.searchParams.get('plate'),
+      background: url.searchParams.get('background'),
+      at: 'hero',
+      title: 'T',
+    });
+    const meta = await sharp(Buffer.from(png)).metadata();
+    expect([meta.width, meta.height]).toEqual([1080, 1920]);
+  }, 60000);
+});

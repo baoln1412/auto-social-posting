@@ -7,10 +7,11 @@
  * which is what makes the two agree — tests/unit/layer-render.test.ts measures that they do,
  * on a real MP4, to within two per cent.
  *
- * What the engine drew is NOT here. The card and the subtitle are burned in by
- * deploy/make-reel.py before this pass ever runs, so they are listed in the editor as locked
- * rows to explain the stack and every layer the owner adds is necessarily above them. A row
- * that pretended to be movable would be a control that cannot work.
+ * What the engine drew is NOT here, and it does not need to be. The card and the subtitle
+ * are burned in by deploy/make-reel.py before this pass ever runs, so every layer the owner
+ * adds is above them by construction — but the headline and the badge are card parameters
+ * and the band has a position, so PlacementHandles moves all three without this pass being
+ * involved at all. The editor lists them as their own rows for that reason.
  *
  * Pure and import-free: the editor is a client component.
  */
@@ -45,15 +46,6 @@ export interface Layer {
 
 /** The reference caps its list at twenty, and so does the editor's counter. */
 export const MAX_LAYERS = 20;
-
-/**
- * The rows the editor lists but cannot move: make-reel.py burns them in before the overlay
- * pass exists. Shown so the stack makes sense, never editable.
- */
-export const ENGINE_LAYERS: { id: string; label: string }[] = [
-  { id: 'card', label: 'Ảnh chụp bài viết' },
-  { id: 'subtitle', label: 'Subtitle' },
-];
 
 export const LAYER_LABELS: Record<LayerType, string> = {
   text: 'Chữ',

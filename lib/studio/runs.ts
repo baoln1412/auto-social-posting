@@ -177,6 +177,10 @@ export function getRun(id: string): RunRecord | null {
  * Build the ctx a step sees. `outputs` carries what earlier steps produced this run, and
  * `opts` is whatever the screen is holding unsaved — merged for this call only.
  */
+export function runCtx(rec: RunRecord, opts: StepOptions = {}): RunCtx {
+  return ctxFor(rec, opts);
+}
+
 function ctxFor(rec: RunRecord, opts: StepOptions = {}): RunCtx {
   const outputs: Partial<Record<StepName, unknown>> = {};
   for (const [name, s] of Object.entries(rec.steps)) {

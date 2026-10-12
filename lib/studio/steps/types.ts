@@ -78,7 +78,16 @@ export interface Overrides {
   reviewBeforeRender?: boolean;
   includeIntro?: boolean;
   includeLayout?: boolean;
-  music?: 'none' | 'soft' | 'groove';
+  /** Which treatment of the story frame the still preview is showing. */
+  at?: 'hero' | 'inset' | 'bed';
+  /**
+   * Which of the bed's middle objects the still is showing, counted round. The script
+   * decides how many there are, so the screen cycles rather than offering a list it would
+   * have to be told the length of.
+   */
+  mid?: number;
+  /** How loud the bed sits under the voice, for this run only. */
+  music?: 'none' | 'soft' | 'default' | 'loud';
   /** Read the post's title as the first line of narration. */
   readTitle?: boolean;
   /** A call-to-action end card, faded over the last seconds. Empty means none. */

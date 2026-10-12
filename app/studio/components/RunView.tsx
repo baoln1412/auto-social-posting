@@ -21,7 +21,10 @@ import type { PublishRow } from '@/lib/studio/publish/queue';
 import type { Where } from '@/lib/studio/steps/publish';
 import { PRESETS } from '@/app/lib/captionPresets';
 import { poolFor, scenesFor, type Scene } from '@/lib/studio/scenes';
+import { middleFills } from '@/lib/studio/steps/middle';
 import { useStepPreview, type LivePreview } from './useStepPreview';
+import { FramePlacer } from './FramePlacer';
+import type { Layout } from '@/lib/studio/steps/filters';
 import { estimateSeconds, mmss } from '@/lib/studio/estimate';
 import { STEP_LABELS as RENDER_LABELS, STEP_ORDER as RENDER_STEPS } from '@/app/lib/videoSteps';
 import {
@@ -70,6 +73,8 @@ export interface RunViewProps {
   cardEngine: 'classic' | 'studio';
   /** The kit's own card ratio, so an untouched control shows what is actually drawn. */
   cardRatio: string;
+  /** Where the card lands in the frame — what the placement surface draws its handles on. */
+  cardLayout: Layout;
   channelName: string;
   kitName: string;
   kitId: string;
@@ -389,6 +394,23 @@ export function RunView(p: RunViewProps) {
             <>
               {video ? (
                 <video data-testid="run-player" src={video} controls className="st-stage w-full" />
+              ) : live.preview?.kind === 'scenes' &&
+                (live.preview.data as { firstFrameUrl?: string })?.firstFrameUrl ? (
+                // The same composed frame the thumbnail showed, at a size you can actually
+                // grab: the caption band and the card's own headline are drawn by different
+                // renderers and were landing on each other.
+                <Veil stale={live.stale}>
+                  <FramePlacer
+                    src={(live.preview.data as { firstFrameUrl: string }).firstFrameUrl}
+                    engine={p.cardEngine}
+                    ratio={p.cardRatio}
+                    layout={p.cardLayout}
+                    captionDefaults={p.captionDefaults}
+                    titleLen={(p.item?.title ?? '').length}
+                    opts={opts}
+                    onChange={setOpts}
+                  />
+                </Veil>
               ) : (
                 live.preview?.kind === 'scenes' && <Preview preview={live.preview} stale={live.stale} />
               )}
@@ -422,6 +444,7 @@ export function RunView(p: RunViewProps) {
 
           {onCurrent && (
             <StepControls
+              runId={p.runId}
               step={view}
               opts={opts}
               scenes={scenes}
@@ -732,7 +755,71 @@ function toLocalInput(iso: string): string {
  * the preview's options, so the picture answers within a debounce — the whole point of the
  * step screens.
  */
+/**
+ * A motion draft on demand.
+ *
+ * The still answers "what does a frame look like"; it cannot answer "does the card arrive
+ * too early" or "does the quote still collide with the figure". Those cost a three-minute
+ * render to find out, which is why timing mistakes used to survive several of them.
+ *
+ * Its own button and not part of the live preview: the preview fires on every slider, and
+ * an ffmpeg pass per keystroke is a worse tool than no tool.
+ */
+function MotionDraft({ runId, opts }: { runId: string; opts: StepOptions }) {
+  const [state, setState] = useState<'idle' | 'busy'>('idle');
+  const [clip, setClip] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  // The clip is of the controls as they were when it was built; changing one makes it a
+  // picture of the past, and showing a stale clip is worse than showing none.
+  useEffect(() => {
+    setClip(null);
+  }, [opts]);
+
+  const build = async () => {
+    setState('busy');
+    setErr(null);
+    try {
+      const res = await fetch(`/api/studio/runs/${runId}/draft`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ opts }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !body.url) throw new Error(body.error ?? 'Không dựng được bản thử.');
+      setClip(body.url);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setState('idle');
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="ctl-motion-draft"
+        onClick={build}
+        disabled={state === 'busy'}
+        title="Dựng nhanh phần lớp phủ để xem nhịp — không có lời đọc, không có phụ đề"
+        className="st-chip"
+      >
+        {state === 'busy' ? 'Đang dựng…' : 'Thử chuyển động'}
+      </button>
+      {err && <span className="w-full text-xs text-[hsl(var(--destructive))]">{err}</span>}
+      {clip && (
+        <div className="w-full">
+          <video data-testid="motion-draft" src={clip} controls autoPlay loop muted className="h-72 rounded border-2 border-[var(--st-ink)]" />
+          <p className={CAPS}>bản thử: chỉ lớp phủ, chưa có lời đọc và phụ đề</p>
+        </div>
+      )}
+    </>
+  );
+}
+
 function StepControls({
+  runId,
   step,
   opts,
   scenes,
@@ -740,6 +827,7 @@ function StepControls({
   captionDefaults,
   onChange,
 }: {
+  runId: string;
   step: StepName;
   opts: StepOptions;
   scenes: Scene[];
@@ -751,6 +839,12 @@ function StepControls({
   // "dam" tells the owner the wrong thing, and picking the value it already claimed to have
   // then changes nothing at all.
   const caps = { ...captionDefaults, ...((opts.captions ?? {}) as Record<string, unknown>) };
+  // Counted here rather than fetched: middle.ts is pure, the same bargain scenesFor makes,
+  // so the browser can say how many objects the script put in the band without a round
+  // trip. Without the count the chip cycles invisibly on a script that supplied one, and a
+  // control that appears to do nothing is the bug this screen has already paid for twice.
+  const mids = middleFills(scenes.map((sc) => sc.text)).length;
+  const mid = mids ? (Math.max(0, Number(opts.mid) || 0)) % mids : 0;
   const set = (tab: 'captions', patch: Record<string, unknown>) =>
     onChange({ ...opts, [tab]: { ...((opts[tab] ?? {}) as object), ...patch } });
 
@@ -784,6 +878,38 @@ function StepControls({
             className={`${SEL} w-16`}
           />
         </label>
+        {/* Which of the three treatments the still shows. They never share the screen, so
+            a single picture has to say which moment of the reel it is. Nền chữ clicked
+            again steps through whatever the script put in the middle of that moment — a
+            figure, a quote, a chain — because only the server knows how many there are. */}
+        <div data-testid="ctl-moment" className="flex items-center gap-1">
+          <span className={CAPS}>khoảnh khắc</span>
+          {([['hero', 'Mở đầu'], ['inset', 'Thu nhỏ'], ['bed', 'Nền chữ']] as const).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              data-testid={`ctl-moment-${v}`}
+              aria-pressed={(opts.at ?? 'hero') === v}
+              title={v === 'bed' && mids > 1 ? 'Bấm lại để xem lớp giữa tiếp theo' : undefined}
+              onClick={() =>
+                onChange(
+                  v === 'bed' && opts.at === 'bed' && mids > 1
+                    ? { ...opts, at: v, mid: mid + 1 }
+                    : { ...opts, at: v },
+                )
+              }
+              className={`st-chip ${(opts.at ?? 'hero') === v ? 'st-on' : ''}`}
+            >
+              {label}
+              {v === 'bed' && mids > 1 && (
+                <span data-testid="ctl-moment-count" className="ml-1 opacity-60">
+                  {mid + 1}/{mids}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <MotionDraft runId={runId} opts={opts} />
         <label className={CTRL}>
           cảnh
           <select

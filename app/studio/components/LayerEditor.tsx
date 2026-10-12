@@ -13,9 +13,8 @@
  * construction. Drawing them as movable would be a control that cannot work.
  */
 import { useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Copy, Flag, Image as ImageIcon, Lock, Minus, Plus, Square, Type, Undo2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, Flag, Image as ImageIcon, Minus, Move, Plus, RotateCcw, Square, Type, Undo2, X } from 'lucide-react';
 import {
-  ENGINE_LAYERS,
   FRAME_LABELS,
   LAYER_LABELS,
   MAX_LAYERS,
@@ -30,12 +29,41 @@ import {
   type Layer,
   type LayerType,
 } from '@/lib/studio/layers';
+import {
+  HANDLE_LABELS,
+  PlacementHandles,
+  placementTouched,
+  type CardPlacement,
+  type Handle,
+  type PlacementPatch,
+} from './PlacementHandles';
+import type { Layout } from '@/lib/studio/steps/filters';
+
+/**
+ * What the engine draws and this screen can now move. It used to be two locked rows
+ * explaining that make-reel.py burns the card and the subtitle in before this pass runs —
+ * true, and beside the point: the headline and the badge are card parameters and the band
+ * has a position, so all three move without the overlay pass being involved at all.
+ */
+export interface PlacementProps {
+  engine: 'classic' | 'studio';
+  ratio: string;
+  layout: Layout;
+  /** The effective caption style; `pos` is read from it. */
+  caption: Record<string, unknown>;
+  card: CardPlacement;
+  titleLen: number;
+  onChange: (patch: PlacementPatch) => void;
+  onReset: () => void;
+}
 
 const CAPS = 'st-label text-muted-foreground';
 const BTN = 'st-btn st-sm';
 const TOOL_ICONS = { text: Type, image: ImageIcon, shape: Square, banner: Flag } as const;
 /** Canvas widths the zoom pills step through, in rem. */
 const ZOOMS = [12, 16, 20];
+/** Engine rows, in the order the renderers paint them. */
+const PLACED_ROWS: Handle[] = ['logo', 'title', 'caption'];
 
 export type LayerMap = Partial<Record<FrameKey, Layer[]>>;
 
@@ -44,15 +72,18 @@ export function LayerEditor({
   value,
   onChange,
   media,
+  placement,
 }: {
   /** The composed reel frame the layers sit on. */
   frameSrc: string;
   value: LayerMap;
   onChange: (next: LayerMap) => void;
   media: { id: string; name: string }[];
+  placement: PlacementProps;
 }) {
   const [frame, setFrame] = useState<FrameKey>('body');
   const [picked, setPicked] = useState<string | null>(null);
+  const [handle, setHandle] = useState<Handle | null>(null);
   const [history, setHistory] = useState<LayerMap[]>([]);
   const [zoom, setZoom] = useState(1);
   const canvas = useRef<HTMLDivElement>(null);
@@ -168,6 +199,20 @@ export function LayerEditor({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={frameSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          {/* Below the owner's layers on purpose: this screen is for arranging those, and a
+              full-width caption handle over them swallows the pointer before a layer sees it. */}
+          <PlacementHandles
+            canvas={canvas}
+            engine={placement.engine}
+            ratio={placement.ratio}
+            layout={placement.layout}
+            caption={placement.caption}
+            card={placement.card}
+            titleLen={placement.titleLen}
+            picked={handle}
+            onPick={setHandle}
+            onChange={placement.onChange}
+          />
           {inPaintOrder(layers).map((l) => (
             <div
               key={l.id}
@@ -278,19 +323,39 @@ export function LayerEditor({
             ))}
 
             {/* Listed so the stack makes sense; locked because the engine already drew them. */}
-            {ENGINE_LAYERS.map((e) => (
+            {PLACED_ROWS.filter((h) => h !== 'logo' || placement.engine === 'classic').map((h) => (
               <li
-                key={e.id}
-                data-testid={`layer-locked-${e.id}`}
-                className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground"
+                key={h}
+                data-testid={`layer-place-${h}`}
+                className={`flex items-center gap-1 rounded-md border-l-[3px] px-1.5 py-1 text-xs ${
+                  handle === h ? 'border-primary bg-sidebar-accent' : 'border-transparent hover:bg-muted'
+                }`}
               >
-                <span className="min-w-0 flex-1 truncate">{e.label}</span>
-                <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide">
-                  <Lock size={11} strokeWidth={2.5} /> cố định
+                <button type="button" onClick={() => setHandle(h)} className="min-w-0 flex-1 truncate text-left">
+                  {HANDLE_LABELS[h]}
+                </button>
+                <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Move size={11} strokeWidth={2.5} /> kéo trên khung
                 </span>
               </li>
             ))}
           </ol>
+
+          <div className="flex items-center justify-between gap-2 border-t-2 border-border pt-2">
+            <span className="text-[10px] leading-snug text-muted-foreground">
+              Phụ đề chỉ chạy dọc — dải chữ luôn rộng bằng khung hình.
+            </span>
+            <button
+              type="button"
+              data-testid="place-reset"
+              onClick={placement.onReset}
+              disabled={!placementTouched(placement.card, placement.caption.pos)}
+              className={`${BTN} shrink-0`}
+            >
+              <RotateCcw size={12} strokeWidth={2.5} />
+              Về mặc định
+            </button>
+          </div>
 
           {picked && layers.some((l) => l.id === picked) && (
             <LayerProps

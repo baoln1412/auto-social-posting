@@ -244,6 +244,18 @@
             "group"
           ],
           "description": "none: a headline card. group: the headline plus the chosen comments on one card."
+        },
+        "logoX": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Where the brand badge sits across the card, in percent. Classic engine only; unset leaves it on the art's own spot."
+        },
+        "logoY": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Where the brand badge sits down the card, in percent. Classic engine only; unset leaves it on the art's own spot."
         }
       },
       "description": "engine 'classic' = GET /api/image/card (brand overlay, og:image upgrade, focal crop; reads ratio/highlight/background only). engine 'studio' = GET /api/studio/card (theme/font/radius/titleSize/highlightColor/9:16). A field the chosen engine does not read is simply not sent."
@@ -303,11 +315,24 @@
         },
         "font": {
           "enum": [
+            "Anton-400",
+            "Baloo2-800",
+            "BarlowCondensed-900",
             "BeVietnamPro-Black",
             "BeVietnamPro-Bold",
             "BeVietnamPro-Medium",
-            "BeVietnamPro-Regular"
-          ]
+            "BeVietnamPro-Regular",
+            "BigShouldersDisplay-900",
+            "Lexend-800",
+            "Merriweather-900",
+            "Montserrat-900",
+            "Mulish-900",
+            "Oswald-700",
+            "PlayfairDisplay-900",
+            "RobotoCondensed-900",
+            "Rowdies-700"
+          ],
+          "description": "Caption face. Every one is verified to carry Vietnamese by deploy/fetch-fonts.py — a face without the diacritics does not error, it just drops them."
         },
         "color": {
           "type": "string",
@@ -375,6 +400,10 @@
         },
         "background": {
           "type": "string"
+        },
+        "story": {
+          "type": "boolean",
+          "description": "One photo, three treatments: sharp over the opening, an inset, then blurred as a bed for the type. Off pins the card for the whole reel."
         }
       }
     },
@@ -443,11 +472,14 @@
           "enum": [
             "none",
             "soft",
-            "groove"
-          ]
+            "default",
+            "loud"
+          ],
+          "description": "How loud the bed sits under the voice. Off, quiet, default, loud."
         },
         "track": {
-          "type": "string"
+          "type": "string",
+          "description": "Media id of the background music bed from Kho tai nguyen."
         }
       }
     },

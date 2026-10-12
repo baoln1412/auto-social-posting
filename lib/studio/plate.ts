@@ -109,3 +109,39 @@ export async function scenePlate(opts: {
   fs.writeFileSync(file, png);
   return file;
 }
+
+/**
+ * The bed: the article's own photo, blurred and darkened until type can sit on it.
+ *
+ * This is the whole background for the reel, start to end. Continuity is the point —
+ * ainius-2.mp4 scores zero hard cuts across 31s because the backdrop never changes, and
+ * that single fact is most of why it does not read as a slideshow. Ours played a sharp
+ * photo with a card pinned over it, which reads as one slide held for a minute.
+ *
+ * Cover-cropped to the frame so make-reel's own cover-scale is the identity, blurred enough
+ * that no detail competes with the words, and darkened enough that white type at full
+ * opacity stays legible over the brightest source photo — tests/unit/story.test.ts feeds it
+ * a near-white image and holds the result under a mean luma of 110.
+ */
+export async function bedFrom(src: string | null): Promise<string | null> {
+  if (!src) return null;
+  const local = await localBackground(src);
+  if (!local || !fs.existsSync(local)) return null;
+  const dir = path.join(CACHE, 'bed');
+  const file = path.join(dir, `${hashOf(local, 'v1')}.jpg`);
+  if (fs.existsSync(file)) return file;
+  try {
+    const png = await sharp(local)
+      .resize(W, H, { fit: 'cover', position: 'attention' })
+      .blur(28)
+      .modulate({ brightness: 0.42, saturation: 0.72 })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, png);
+    return file;
+  } catch {
+    // An unreadable photo is a reel without a bed, never a failed render.
+    return null;
+  }
+}

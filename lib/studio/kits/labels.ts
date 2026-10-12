@@ -51,6 +51,7 @@ export const TAB_LABELS: Record<string, Label> = {
 
 /** Keyed `<tab>.<field>`. `preset` is handled by the editor itself and never listed. */
 export const FIELD_LABELS: Record<string, Label> = {
+  'frame.story': { label: 'Kể bằng một ảnh', hint: 'Ảnh sắc nét lúc mở đầu, rồi thu nhỏ, rồi làm nền mờ cho chữ.' },
   'identity.channelName': { label: 'Tên kênh' },
   'identity.handle': { label: 'Handle', hint: 'Ví dụ @desoul.posting — hiện ở chữ ký.' },
   'identity.avatar': { label: 'Ảnh đại diện' },
@@ -84,8 +85,10 @@ export const FIELD_LABELS: Record<string, Label> = {
   'card.radius': { label: 'Bo góc thẻ (px)' },
   'card.titleSize': { label: 'Cỡ chữ trong thẻ (px)' },
   'card.highlightColor': { label: 'Màu chữ nhấn' },
-  'card.width': { label: 'Độ rộng khối chữ (%)' },
-  'card.y': { label: 'Vị trí dọc (%)', hint: '100 là sát đáy thẻ.' },
+  'card.width': { label: 'Độ rộng khối chữ (%)', hint: 'Kéo được trực tiếp ở bước Video.' },
+  'card.y': { label: 'Vị trí dọc của tiêu đề (%)', hint: 'Bỏ trống là bám đáy thẻ. Kéo được trực tiếp ở bước Video.' },
+  'card.logoX': { label: 'Logo — ngang (%)', hint: 'Chỉ bộ dựng ảnh gốc. Bỏ trống là giữ nguyên chỗ cũ.' },
+  'card.logoY': { label: 'Logo — dọc (%)', hint: 'Chỉ bộ dựng ảnh gốc. Bỏ trống là giữ nguyên chỗ cũ.' },
   'card.comments': {
     label: 'Cách hiện bình luận',
     hint: 'Chụp nhóm: tiêu đề và các bình luận đã chọn trên cùng một thẻ.',
@@ -197,6 +200,9 @@ export function labelFor(tab: string, field: string): Label {
  */
 const FIELD_VALUE_LABELS: Record<string, Record<string, string>> = {
   'card.highlight': { ai: 'AI chọn' },
+  // A volume, so the steps read as loudness rather than as genres. `none` and `soft` keep
+  // the shared labels; only the two new steps are named here.
+  'music.tier': { none: 'Tắt', soft: 'Nhỏ', default: 'Mặc định', loud: 'To' },
 };
 
 export function valueLabel(v: string, field?: string): string {

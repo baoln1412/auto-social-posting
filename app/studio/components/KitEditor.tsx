@@ -34,10 +34,11 @@ import {
   Tv,
   Zap,
 } from 'lucide-react';
-import { cardParams, cardPath, captionStyle } from '@/lib/studio/kits/load';
+import { cardEngine, cardParams, cardPath, captionStyle } from '@/lib/studio/kits/load';
 import { frameUrl } from '@/lib/studio/frame-url';
 import { TAB_LABELS, valueLabel } from '@/lib/studio/kits/labels';
 import { LayerEditor, type LayerMap } from './LayerEditor';
+import type { CardPlacement } from './PlacementHandles';
 import { PRESETS } from '@/app/lib/captionPresets';
 import { contrastRatio, paletteFor, type ThemeName } from '@/lib/studio/card/theme';
 import type { Kit } from '@/lib/studio/steps/types';
@@ -343,6 +344,32 @@ export function KitEditor({
             setSaved(false);
           }}
           media={tabs.flatMap((t) => t.media ?? []).map((m) => ({ id: m.id, name: m.name }))}
+          placement={{
+            engine: cardEngine(kit),
+            ratio: String(((kit.card ?? {}) as { ratio?: string }).ratio ?? '4:5'),
+            layout,
+            caption: captionStyle(kit),
+            card: (kit.card ?? {}) as CardPlacement,
+            titleLen: SAMPLE.title.length,
+            // Straight into the kit: this screen edits the kit, and the phone above redraws
+            // because cardUrl and the caption style are both built from it.
+            onChange: (patch) => {
+              setKit((k) => ({
+                ...k,
+                ...(patch.card ? { card: { ...((k.card ?? {}) as object), ...patch.card } } : {}),
+                ...(patch.caption ? { captions: { ...((k.captions ?? {}) as object), ...patch.caption } } : {}),
+              }));
+              setSaved(false);
+            },
+            onReset: () => {
+              setKit((k) => {
+                const { y, width, logoX, logoY, ...card } = (k.card ?? {}) as Record<string, unknown>;
+                const { pos, ...captions } = (k.captions ?? {}) as Record<string, unknown>;
+                return { ...k, card, captions };
+              });
+              setSaved(false);
+            },
+          }}
         />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[72px_minmax(0,1fr)_336px]" style={{ height: 'min(640px, calc(100vh - 15rem))', gridTemplateRows: 'minmax(0, 1fr)' }}>

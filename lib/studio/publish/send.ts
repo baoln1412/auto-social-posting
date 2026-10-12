@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import { sendVideo } from '../deliver';
 import { getRun } from '../runs';
-import { isDemoChannel } from '../steps/registry';
+import { isDemoChannel } from '../steps/is-demo';
 import type { Draft } from '../gold';
 import type { CardAsset } from '../steps/image';
 import type { ReelAsset } from '../steps/reel';

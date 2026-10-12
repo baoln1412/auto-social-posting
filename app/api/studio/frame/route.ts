@@ -41,6 +41,14 @@ export async function GET(req: NextRequest) {
       sticker: keep(q.get('sticker')),
       layout: (['card-top', 'continuous', 'multi'] as const).find((l) => l === q.get('layout')),
       background: keep(q.get('background')),
+      at: (['hero', 'inset', 'bed'] as const).find((a) => a === q.get('at')),
+      title: q.get('title') ?? undefined,
+      source: q.get('source'),
+      num: q.get('num'),
+      numUnit: q.get('numUnit'),
+    quote: q.get('quote'),
+    quoteWho: q.get('quoteWho'),
+    flow: q.get('flow')?.split('\n').filter(Boolean) ?? null,
     });
     return new NextResponse(new Uint8Array(png), {
       headers: {

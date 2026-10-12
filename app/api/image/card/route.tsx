@@ -27,6 +27,8 @@ import crypto from 'node:crypto';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+import { LOGO, logoAt, titleSide, titleTop } from '@/lib/studio/card/placement';
+
 const BLUE = '#1D51A4';
 const YELLOW = '#F8EF63';
 
@@ -34,15 +36,23 @@ const FONT_DIR = path.join(process.cwd(), 'public', 'fonts');
 const fontBold = fs.readFileSync(path.join(FONT_DIR, 'BeVietnamPro-Bold.ttf'));
 const fontBlack = fs.readFileSync(path.join(FONT_DIR, 'BeVietnamPro-Black.ttf'));
 
-// Brand overlay (logo + blue gradient) — one PNG per ratio, pre-cropped to
-// exact canvas size so it can be laid down with no scaling. 4:5 is the
-// source art (1080x1350). 1:1 is stitched from that same art: the logo
-// (top-right, rows 0-230) + the gradient (rows 500-1350) with the fully
-// transparent gap between them removed — a plain bottom-crop would have cut
-// the logo off entirely now that it sits at the top, not the bottom.
+// Brand overlay — one PNG per ratio, pre-cropped to exact canvas size so it
+// can be laid down with no scaling. 4:5 is the source art (1080x1350). 1:1 is
+// stitched from that same art: the logo (top-right, rows 0-230) + the gradient
+// (rows 500-1350) with the fully transparent gap between them removed — a plain
+// bottom-crop would have cut the logo off entirely now that it sits at the top,
+// not the bottom.
+//
+// The badge is no longer baked into that art: it is card-logo.png, laid down as
+// its own layer, so `lx`/`ly` can move it. The two were always disjoint — the
+// badge is rows 38-216 in both ratios, the gradient starts at row 720 (4:5) or
+// 450 (1:1) — so splitting them lost nothing, and
+// tests/unit/card-placement.test.ts recomposes the pair and compares bytes.
 const OVERLAY_DIR = path.join(process.cwd(), 'public', 'overlays');
-const overlay45 = `data:image/png;base64,${fs.readFileSync(path.join(OVERLAY_DIR, 'card-bg-4x5.png')).toString('base64')}`;
-const overlay11 = `data:image/png;base64,${fs.readFileSync(path.join(OVERLAY_DIR, 'card-bg-1x1.png')).toString('base64')}`;
+const dataUri = (f: string) => `data:image/png;base64,${fs.readFileSync(path.join(OVERLAY_DIR, f)).toString('base64')}`;
+const overlay45 = dataUri('card-grad-4x5.png');
+const overlay11 = dataUri('card-grad-1x1.png');
+const badgeArt = dataUri('card-logo.png');
 
 const UA = 'Mozilla/5.0 (compatible; CardBot/1.0)';
 
@@ -326,6 +336,17 @@ export async function GET(req: NextRequest) {
   const H = ratio === '1:1' ? 1080 : 1350;
   const overlay = ratio === '1:1' ? overlay11 : overlay45;
 
+  // Placement, all optional and all per cent of the canvas. Absent is the layout that
+  // shipped: production passes none of these, so nothing it renders moves.
+  const num = (k: string) => {
+    const raw = q.get(k);
+    const n = Number(raw);
+    return raw === null || raw.trim() === '' || !Number.isFinite(n) ? undefined : n;
+  };
+  const badge = logoAt(W, H, num('lx'), num('ly'));
+  const side = titleSide(W, num('tw'));
+  const top = titleTop(H, num('ty'));
+
   let bgUrl = q.get('bg');
   const insetUrl = q.get('inset');
   const articleUrl = q.get('article');
@@ -371,8 +392,12 @@ export async function GET(req: NextRequest) {
         {/* Layer 1 — background photo */}
         {bg && <img src={bg} width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, width: W, height: H, objectFit: 'cover' }} />}
 
-        {/* Layer 2 — brand overlay (logo + blue gradient, baked into the PNG) */}
+        {/* Layer 2 — blue gradient */}
         <img src={overlay} width={W} height={H} style={{ position: 'absolute', top: 0, left: 0, width: W, height: H, objectFit: 'cover' }} />
+
+        {/* Layer 2b — the brand badge, on the art's own spot unless lx/ly move it. Under the
+            headline on purpose: dragged on top of the words, the words stay readable. */}
+        <img src={badgeArt} width={LOGO.w} height={LOGO.h} style={{ position: 'absolute', left: badge.left, top: badge.top, width: LOGO.w, height: LOGO.h }} />
 
         {/* Layer 3 — circle inset with blue stroke (top-left) */}
         {inset && (
@@ -382,7 +407,19 @@ export async function GET(req: NextRequest) {
         {/* Layer 3 — headline (white + yellow highlight), centre-aligned.
             Satori ignores flex `gap`, so word/line spacing is set via per-span
             margins; symmetric horizontal margins keep each wrapped line centred. */}
-        <div style={{ position: 'absolute', left: 56, right: 56, bottom: 72 - lineGap, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-end' }}>
+        <div style={{
+          position: 'absolute',
+          left: side,
+          right: side,
+          // Bottom-anchored unless `ty` says otherwise, and those are two different layouts:
+          // anchored at the bottom a longer headline grows upward, which is exactly how it
+          // started colliding with the caption band.
+          ...(top === null ? { bottom: 72 - lineGap } : { top }),
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: top === null ? 'flex-end' : 'flex-start',
+        }}>
           {words.map((w, i) => (
             <span key={i} style={{ color: w.hl ? YELLOW : '#FFFFFF', fontSize, fontWeight: 900, lineHeight: 1, marginLeft: Math.round(wordGap / 2), marginRight: Math.round(wordGap / 2), marginBottom: lineGap, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
               {w.t}

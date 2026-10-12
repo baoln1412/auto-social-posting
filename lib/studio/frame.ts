@@ -17,7 +17,7 @@ import sharp from 'sharp';
 import { NextRequest } from 'next/server';
 import { POST as drawPreviewFrame } from '@/app/api/video/preview/route';
 import { STICKER_INSET } from './steps/overlay';
-import { cardPngFor, isCardUrl, scenePlate } from './plate';
+import { bedFrom, cardPngFor, isCardUrl, scenePlate } from './plate';
 import { hashOf } from './hash';
 import type { FrameSpec } from './frame-url';
 
@@ -64,7 +64,7 @@ async function stickerOn(base: Uint8Array, sticker: string): Promise<Uint8Array>
 
 /** The composed PNG, rendered once per distinct set of inputs and kept on disk. */
 export async function renderFrame(spec: FrameSpec): Promise<Uint8Array> {
-  const key = hashOf(spec.text, spec.style, spec.plate ?? null, spec.sticker ?? null, spec.layout ?? null, spec.background ?? null);
+  const key = hashOf(spec.text, spec.style, spec.plate ?? null, spec.sticker ?? null, spec.layout ?? null, spec.background ?? null, spec.at ?? null, spec.title ?? null, spec.source ?? null, spec.num ?? null, spec.numUnit ?? null, spec.quote ?? null, spec.quoteWho ?? null, (spec.flow ?? []).join('\n'));
   const file = path.join(CACHE_DIR, `${key}.png`);
   if (fs.existsSync(file)) return fs.readFileSync(file);
 
@@ -73,7 +73,16 @@ export async function renderFrame(spec: FrameSpec): Promise<Uint8Array> {
   // where the S12 pass puts it — so the engine's cover-scale of a 1080×1920 plate is identity.
   let plate: string | null = spec.plate ?? null;
   if (plate && isCardUrl(plate)) plate = await cardPngFor(plate);
-  if (spec.layout) plate = await scenePlate({ card: plate, background: spec.background ?? null, layout: spec.layout });
+  const card = plate;
+
+  // The story frame holds three treatments of one photo and never two at once, so the
+  // still has to pick a moment. The bed is the base for all three; what sits on it is the
+  // sharp card, the inset, or nothing at all.
+  if (spec.at) {
+    plate = (await bedFrom(spec.background ?? null)) ?? plate;
+  } else if (spec.layout) {
+    plate = await scenePlate({ card: plate, background: spec.background ?? null, layout: spec.layout });
+  }
 
   const res = await drawPreviewFrame(
     new NextRequest('http://127.0.0.1/api/video/preview', {
@@ -88,10 +97,80 @@ export async function renderFrame(spec: FrameSpec): Promise<Uint8Array> {
   }
 
   let png: Uint8Array = Buffer.from(await res.arrayBuffer());
+  // Above the caption band, which is where the overlay pass puts them in the real render.
+  if (spec.at) png = await storyOn(png, spec, card);
   if (spec.sticker) png = await stickerOn(png, spec.sticker);
 
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   sweep();
   fs.writeFileSync(file, png);
   return png;
+}
+
+/**
+ * The story frame's own layer, composed at the same numbers ffmpeg uses.
+ *
+ * filters.ts owns the geometry — cardBox for the hero, insetSize and INSET_TOP for the
+ * inset, SLOT for the corner — so the still and the MP4 cannot drift. That is the same
+ * bargain cardBox struck for the card, and the reason the placement handles line up.
+ */
+async function storyOn(base: Uint8Array, spec: FrameSpec, card: string | null): Promise<Uint8Array> {
+  const { cardBox, insetSize, INSET_TOP, SLOT } = await import('./steps/filters');
+  const { chipPng, insetPng } = await import('./steps/overlay');
+  const { eyebrowLines, creditLine } = await import('./steps/reel');
+
+  const layers: { input: string | Buffer; left: number; top: number }[] = [];
+
+  if (card && fs.existsSync(card) && spec.at !== 'bed') {
+    if (spec.at === 'hero') {
+      const m = await sharp(card).metadata();
+      const box = cardBox('card-top', m.width ?? W, m.height ?? H);
+      layers.push({ input: card, left: Math.max(0, box.x), top: Math.max(0, box.y) });
+    } else {
+      const inset = await insetPng(card);
+      if (inset) {
+        const m = await sharp(inset).metadata();
+        layers.push({
+          input: inset,
+          left: Math.round((W - (m.width ?? 0)) / 2),
+          top: Math.round(H * INSET_TOP),
+        });
+      }
+    }
+  }
+
+  // One corner, two tenants: the credit belongs to the hero, the eyebrow to everything after.
+  const chip =
+    spec.at === 'hero'
+      ? await chipPng('credit', creditLine(spec.source))
+      : await chipPng('eyebrow', eyebrowLines(spec.title ?? ''));
+  if (chip) layers.push({ input: chip, left: SLOT.left, top: SLOT.top });
+
+  // The middle band belongs to the bed — the only moment any of it is up in the reel. One
+  // tenant at a time here too, because that is what the reel does; `mid` chose which.
+  if (spec.at === 'bed') {
+    const { numberPng, quotePng, flowPng } = await import('./steps/overlay');
+    const { NUMBER_LEFT, NUMBER_TOP, MIDDLE_LEFT, MIDDLE_CENTER } = await import('./steps/filters');
+    if (spec.num) {
+      const card = await numberPng({ value: spec.num, unit: spec.numUnit ?? '' });
+      if (card) layers.push({ input: card, left: NUMBER_LEFT, top: Math.round(H * NUMBER_TOP) });
+    }
+    const band =
+      spec.quote && spec.quoteWho
+        ? await quotePng({ text: spec.quote, who: spec.quoteWho })
+        : spec.flow?.length
+          ? await flowPng(spec.flow)
+          : null;
+    if (band) {
+      const m = await sharp(band).metadata();
+      layers.push({
+        input: band,
+        left: MIDDLE_LEFT,
+        top: Math.max(0, Math.round(H * MIDDLE_CENTER - (m.height ?? 0) / 2)),
+      });
+    }
+  }
+
+  if (!layers.length) return base;
+  return sharp(base).composite(layers).png().toBuffer();
 }

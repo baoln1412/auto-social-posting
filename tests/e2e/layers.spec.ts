@@ -15,15 +15,19 @@ test('the canvas and the stack, as the reference draws them', async ({ page }) =
 
   await expect(page.getByTestId('layer-editor')).toBeVisible();
   await expect(page.getByTestId('layer-count')).toHaveText('0/20');
-  // The two rows the engine burned in are listed and locked, so the stack makes sense.
-  await expect(page.getByTestId('layer-locked-card')).toContainText('cố định');
-  await expect(page.getByTestId('layer-locked-subtitle')).toContainText('cố định');
+  // What the engine draws gets its own rows, and they are draggable on the frame rather
+  // than locked — the demo kit is the studio engine, whose card has no badge, so two.
+  await expect(page.getByTestId('layer-place-title')).toContainText('kéo trên khung');
+  await expect(page.getByTestId('layer-place-caption')).toContainText('kéo trên khung');
+  await expect(page.getByTestId('layer-place-logo')).toHaveCount(0);
+  await expect(page.getByTestId('place-title')).toBeVisible();
+  await expect(page.getByTestId('place-caption')).toBeVisible();
 
   for (const t of ['text', 'image', 'shape', 'banner']) {
     await page.getByTestId(`layer-add-${t}`).click();
   }
   await expect(page.getByTestId('layer-count')).toHaveText('4/20');
-  await expect(page.getByTestId('layer-list').locator('li')).toHaveCount(6); // 4 + 2 locked
+  await expect(page.getByTestId('layer-list').locator('li')).toHaveCount(6); // 4 + 2 engine rows
 
   await imagesLoaded(page, '[data-testid="layer-canvas"] img');
   await page.screenshot({ path: 'tests/shots/c0-layers.png', fullPage: true });
@@ -63,7 +67,7 @@ test('a layer can be dragged, and undo puts it back', async ({ page }) => {
   await expect(layer).toHaveAttribute('data-x', before!);
 });
 
-test('order, delete and the locked rows behave', async ({ page }) => {
+test('order, delete and the engine rows behave', async ({ page }) => {
   await page.goto('/studio/kits/demo');
   await dismissTour(page);
   await page.getByTestId('kit-mode-layers').click();
@@ -83,7 +87,7 @@ test('order, delete and the locked rows behave', async ({ page }) => {
   await page.getByTestId(`layer-del-${id}`).click();
   await expect(page.getByTestId('layer-count')).toHaveText('1/20');
   // Deleting the owner's layers never touches the engine's rows.
-  await expect(page.getByTestId('layer-locked-card')).toBeVisible();
+  await expect(page.getByTestId('layer-place-title')).toBeVisible();
 });
 
 test('what the editor stores is what the kit keeps', async ({ page, request }) => {

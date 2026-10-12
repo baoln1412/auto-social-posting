@@ -3,22 +3,15 @@
  * engines as each slice lands them.
  */
 import type { Channel, Step, StepName } from './types';
+import { isDemoChannel } from './is-demo';
+
+export { isDemoChannel };
 import { DEMO_STEPS } from '../demo/steps';
 import { fetchStep } from './fetch';
 import { draftStep } from './draft';
 import { imageStep } from './image';
 import { reelStep } from './reel';
 import { publishStep } from './publish';
-
-export function isDemoChannel(c: Channel): boolean {
-  try {
-    return (JSON.parse(c.sources_json || '[]') as { type?: string }[]).some(
-      (s) => s.type === 'demo',
-    );
-  } catch {
-    return false;
-  }
-}
 
 const REAL: Partial<Record<StepName, Step>> = {
   fetch: fetchStep,

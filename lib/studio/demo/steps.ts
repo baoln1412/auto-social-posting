@@ -10,6 +10,7 @@ import type { GateResult, RunCtx, SourceItem, Step, StepName } from '../steps/ty
 import { join } from 'node:path';
 import { scenesFor } from '../scenes';
 import { frameUrl } from '../frame-url';
+import { cardNow, momentOf, storyFrameUrl } from '../steps/reel';
 import { captionStyle } from '../kits/load';
 
 export const DEMO_CARD_URL = '/studio-demo/card.png';
@@ -123,11 +124,13 @@ const reelStep: Step<Draft, ReelAsset> = {
         // Composed, not a fixed picture: the demo tier is what a stranger judges Studio on,
         // and a still PNG where the real thing redraws would be showing them something else.
         // Drawing a frame is local and free, so the "spends nothing" promise is kept.
-        firstFrameUrl: frameUrl({
-          text: scenes[i]?.text ?? draft.title,
-          style: captionStyle(ctx.kit),
-          plate: DEMO_CARD_PATH,
-        }),
+        firstFrameUrl: await storyFrameUrl(
+          { comments: [], ...draft } as never,
+          ctx as never,
+          scenes[i]?.text ?? draft.title,
+          DEMO_CARD_PATH,
+        ),
+        at: momentOf(ctx as never),
       },
       cost: FREE,
     };

@@ -22,6 +22,25 @@ export interface FrameSpec {
   layout?: 'card-top' | 'continuous' | 'multi';
   /** Absolute path of the kit's background image, for the overlay layouts. */
   background?: string | null;
+  /**
+   * Which moment of the story frame to draw. The three treatments of the one photo never
+   * share the screen, so a still has to say which one it is showing — without this the
+   * Video screen drew a card that the finished reel only holds for three seconds.
+   */
+  at?: 'hero' | 'inset' | 'bed';
+  /** The headline the eyebrow is cut from, and the article url the credit names. */
+  title?: string;
+  source?: string | null;
+  /**
+   * Whichever object fills the middle band at the moment this still shows. A reel can hold
+   * a figure, an attributed quote and a causal chain at three different seconds; a still
+   * holds one, and the `mid` override is what cycles between them.
+   */
+  num?: string | null;
+  numUnit?: string | null;
+  quote?: string | null;
+  quoteWho?: string | null;
+  flow?: string[] | null;
 }
 
 /**
@@ -50,6 +69,15 @@ export function frameQuery(spec: FrameSpec): string {
   if (spec.sticker) q.set('sticker', spec.sticker);
   if (spec.layout) q.set('layout', spec.layout);
   if (spec.background) q.set('background', spec.background);
+  if (spec.at) q.set('at', spec.at);
+  if (spec.title) q.set('title', spec.title);
+  if (spec.source) q.set('source', spec.source);
+  if (spec.num) q.set('num', spec.num);
+  if (spec.numUnit) q.set('numUnit', spec.numUnit);
+  if (spec.quote) q.set('quote', spec.quote);
+  if (spec.quoteWho) q.set('quoteWho', spec.quoteWho);
+  // One per line: a box's own text may hold anything but a newline, which boxLabel rejects.
+  if (spec.flow?.length) q.set('flow', spec.flow.join('\n'));
   return q.toString();
 }
 

@@ -14,8 +14,14 @@ export interface CardTab {
   radius?: number;
   titleSize?: number;
   highlightColor?: string;
+  /** The headline block's width and top, both per cent of the card. Both engines read
+   *  them: the studio route as `width`/`y`, the classic route as `tw`/`ty`. */
   width?: number;
   y?: number;
+  /** The brand badge's place, per cent of the card. Classic engine only — the studio card
+   *  has no badge. Unset leaves it on the art's own spot. */
+  logoX?: number;
+  logoY?: number;
   comments?: 'none' | 'group';
   /** An explicit main picture, chosen on the Ảnh step. Beats the article's own. */
   bgUrl?: string;
@@ -96,14 +102,28 @@ export function cardParams(
     }
     if (card.bgUrl) q.set('bg', card.bgUrl);
     else if (pictureUrl && (card.background ?? 'none') === 'article') q.set('bg', pictureUrl);
-  } else if (card.bgUrl) {
-    // An explicit picture beats the article's own: the Ảnh step is where the owner says
-    // which of the article's images — or an upload — this post's card should show.
-    q.set('bg', card.bgUrl);
-    if (card.insetUrl) q.set('inset', card.insetUrl);
-  } else if (articleUrl && (card.background ?? 'article') === 'article') {
-    q.set('article', articleUrl);
-    if (card.insetUrl) q.set('inset', card.insetUrl);
+  } else {
+    // Placement. The same two kit fields the studio route reads as `width`/`y`, under the
+    // names the classic route reads — so one handle on the placement surface drives either
+    // engine — plus the badge, which only this engine has.
+    for (const [k, v] of [
+      ['ty', card.y],
+      ['tw', card.width],
+      ['lx', card.logoX],
+      ['ly', card.logoY],
+    ] as const) {
+      if (v !== undefined) q.set(k, String(v));
+    }
+
+    if (card.bgUrl) {
+      // An explicit picture beats the article's own: the Ảnh step is where the owner says
+      // which of the article's images — or an upload — this post's card should show.
+      q.set('bg', card.bgUrl);
+      if (card.insetUrl) q.set('inset', card.insetUrl);
+    } else if (articleUrl && (card.background ?? 'article') === 'article') {
+      q.set('article', articleUrl);
+      if (card.insetUrl) q.set('inset', card.insetUrl);
+    }
   }
   return q;
 }
@@ -165,6 +185,8 @@ export interface FrameTab {
   layout?: 'card-top' | 'continuous';
   intro?: boolean;
   durationBand?: 'short' | 'medium' | 'long';
+  /** One photo, three treatments. See HERO_SEC in steps/filters.ts. */
+  story?: boolean;
 }
 
 /**
@@ -180,6 +202,9 @@ export function effectiveFrame(kit: Kit, ov: Overrides) {
     // repo's actual content. At 25–75s, `medium` would have blocked ~95% of gold posts —
     // a default that fires on almost everything teaches the owner to click past the gate.
     durationBand: ov.durationBand ?? f.durationBand ?? 'long',
+    // On unless a kit says otherwise. A sharp card pinned over a sharp photo for a whole
+    // minute is the look this replaces, and defaulting to it would ship the work dark.
+    story: ((ov.frame as FrameTab | undefined)?.story ?? f.story) !== false,
   };
 }
 
